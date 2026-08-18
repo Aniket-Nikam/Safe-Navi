@@ -4,9 +4,8 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <fragment
-        android:id="@+id/map"
-        android:name="com.google.android.gms.maps.SupportMapFragment"
+    <org.maplibre.android.maps.MapView
+        android:id="@+id/mapView"
         android:layout_width="match_parent"
         android:layout_height="match_parent" />
 
@@ -14,61 +13,148 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:layout_margin="14dp"
-        app:cardBackgroundColor="#F9FCF9"
+        android:layout_margin="12dp"
+        app:cardBackgroundColor="#FAFFFC"
         app:cardCornerRadius="20dp"
-        app:cardElevation="7dp">
+        app:cardElevation="8dp">
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
+            android:orientation="vertical"
             android:padding="12dp">
-            <ImageButton
-                android:id="@+id/backButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="Back"
-                android:src="@drawable/ic_arrow_forward"
-                android:rotation="180"
-                app:tint="#15352C" />
+
             <LinearLayout
-                android:layout_width="0dp"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageButton
+                    android:id="@+id/backButton"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Back"
+                    android:rotation="180"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="#15352C" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Mumbai safety map"
-                    android:textColor="#10231D"
-                    android:textSize="17sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Synthetic demo · Tap a hazard for evidence"
-                    android:textColor="#718078"
-                    android:textSize="11sp" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Safe-Navi"
+                        android:textColor="#10231D"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="OpenStreetMap routes · Synthetic safety layer"
+                        android:textColor="#718078"
+                        android:textSize="10sp" />
+                </LinearLayout>
+
+                <ImageButton
+                    android:id="@+id/locationButton"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Use my location"
+                    android:src="@drawable/ic_location"
+                    app:tint="#08735C" />
             </LinearLayout>
-            <ImageButton
-                android:id="@+id/locationButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="Use my location"
-                android:src="@drawable/ic_location"
-                app:tint="#08735C" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:hint="Source"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:startIconDrawable="@drawable/ic_location">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/sourceInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionNext"
+                    android:inputType="textPostalAddress"
+                    android:singleLine="true"
+                    android:text="Vashi Railway Station, Navi Mumbai" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/destinationInputLayout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:hint="Destination"
+                app:boxBackgroundMode="outline"
+                app:boxCornerRadiusBottomEnd="12dp"
+                app:boxCornerRadiusBottomStart="12dp"
+                app:boxCornerRadiusTopEnd="12dp"
+                app:boxCornerRadiusTopStart="12dp"
+                app:endIconDrawable="@drawable/ic_more"
+                app:endIconMode="custom"
+                app:startIconDrawable="@drawable/ic_pin">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/destinationInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:imeOptions="actionDone"
+                    android:inputType="textPostalAddress"
+                    android:singleLine="true"
+                    android:text="CBD Belapur, Navi Mumbai" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <HorizontalScrollView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="7dp"
+                android:scrollbars="none">
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/travelModeGroup"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/modeDrive"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:checked="true"
+                        android:text="Drive" />
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/modeWalk"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Walk" />
+                    <com.google.android.material.chip.Chip
+                        android:id="@+id/modeCycle"
+                        style="@style/Widget.MaterialComponents.Chip.Choice"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Cycle" />
+                </com.google.android.material.chip.ChipGroup>
+            </HorizontalScrollView>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="96dp"
-        android:layout_marginEnd="14dp"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="12dp"
         app:cardBackgroundColor="#092F28"
         app:cardCornerRadius="18dp"
         app:cardElevation="5dp">
@@ -77,15 +163,17 @@
             android:layout_height="wrap_content"
             android:gravity="center"
             android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingVertical="12dp">
+            android:paddingStart="14dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="10dp">
             <TextView
                 android:id="@+id/mapSafetyScore"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="72"
                 android:textColor="#C8F06F"
-                android:textSize="25sp"
+                android:textSize="24sp"
                 android:textStyle="bold" />
             <TextView
                 android:id="@+id/mapSafetyLabel"
@@ -94,39 +182,132 @@
                 android:gravity="center"
                 android:text="Moderate risk"
                 android:textColor="#E7F0EC"
-                android:textSize="10sp" />
+                android:textSize="9sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <com.google.android.material.button.MaterialButton
-        android:id="@+id/routeProfilesButton"
-        android:layout_width="wrap_content"
-        android:layout_height="50dp"
-        android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="22dp"
-        android:text="Compare route profiles"
-        android:textAllCaps="false"
-        android:textColor="#FFFFFF"
-        app:backgroundTint="#08735C"
-        app:cornerRadius="16dp"
-        app:icon="@drawable/ic_explore"
-        app:iconTint="#FFFFFF" />
-
     <com.google.android.material.card.MaterialCardView
-        android:id="@+id/hazardDetailCard"
+        android:id="@+id/routeControlCard"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:layout_margin="14dp"
-        android:visibility="gone"
+        android:layout_margin="12dp"
         app:cardBackgroundColor="#FFFFFF"
-        app:cardCornerRadius="24dp"
+        app:cardCornerRadius="20dp"
         app:cardElevation="10dp">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="20dp">
+            android:padding="14dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Route priority"
+                android:textColor="#10231D"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/routeProfileGroup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:selectionRequired="true"
+                app:singleSelection="true">
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/profileFastest"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Fastest" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/profileBalanced"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:text="Balanced" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/profileSafest"
+                    style="@style/Widget.MaterialComponents.Chip.Choice"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Safest" />
+            </com.google.android.material.chip.ChipGroup>
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/findRouteButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:text="Find safety-aware routes"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                app:backgroundTint="#08735C"
+                app:cornerRadius="14dp"
+                app:icon="@drawable/ic_explore"
+                app:iconTint="#FFFFFF" />
+            <ProgressBar
+                android:id="@+id/routeProgress"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="center"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+            <LinearLayout
+                android:id="@+id/routeResultCard"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:background="#EEF8F3"
+                android:orientation="vertical"
+                android:padding="10dp"
+                android:visibility="gone">
+                <TextView
+                    android:id="@+id/routeResultTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="#0D4B3D"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/routeResultMeta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#506159"
+                    android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/routeResultRisk"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:textColor="#8B4A20"
+                    android:textSize="11sp" />
+            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="© OpenStreetMap contributors · MapLibre · OpenFreeMap"
+                android:textColor="#718078"
+                android:textSize="9sp" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/hazardDetailCard"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
+        android:layout_margin="14dp"
+        android:visibility="gone"
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="20dp"
+        app:cardElevation="10dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="18dp">
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -139,7 +320,7 @@
                     android:layout_weight="1"
                     android:text="Hazard"
                     android:textColor="#10231D"
-                    android:textSize="19sp"
+                    android:textSize="18sp"
                     android:textStyle="bold" />
                 <ImageButton
                     android:id="@+id/closeDetailButton"
@@ -154,8 +335,7 @@
                 android:id="@+id/hazardMeta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text="HIGH · ACTIVE · Government verified"
+                android:layout_marginTop="5dp"
                 android:textColor="#B5453B"
                 android:textSize="11sp"
                 android:textStyle="bold" />
@@ -163,11 +343,10 @@
                 android:id="@+id/hazardReason"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:text="Reason and location"
+                android:layout_marginTop="8dp"
+                android:lineSpacingExtra="3dp"
                 android:textColor="#506159"
-                android:textSize="14sp"
-                android:lineSpacingExtra="3dp" />
+                android:textSize="13sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 </FrameLayout>

@@ -2,7 +2,6 @@ package com.example.xavierproject;
 
 import android.os.Bundle;
 import android.content.Intent;
-import android.net.Uri;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -178,20 +177,10 @@ public class ComplaintDetailActivity extends AppCompatActivity {
 
     private void openLocationInMaps() {
         if (latitude != 0.0 && longitude != 0.0) {
-            // Create URI for Google Maps
-            Uri gmmIntentUri = Uri.parse("geo:" + latitude + "," + longitude + "?q=" + latitude + "," + longitude);
-            Intent mapIntent = new Intent(Intent.ACTION_VIEW, gmmIntentUri);
-            mapIntent.setPackage("com.google.android.apps.maps");
-
-            // Check if Google Maps is installed
-            if (mapIntent.resolveActivity(getPackageManager()) != null) {
-                startActivity(mapIntent);
-            } else {
-                // If Google Maps not installed, open in browser
-                Uri browserUri = Uri.parse("https://www.google.com/maps/search/?api=1&query=" + latitude + "," + longitude);
-                Intent browserIntent = new Intent(Intent.ACTION_VIEW, browserUri);
-                startActivity(browserIntent);
-            }
+            Intent mapIntent = new Intent(this, MapsActivity.class);
+            mapIntent.putExtra("destinationLatitude", latitude);
+            mapIntent.putExtra("destinationLongitude", longitude);
+            startActivity(mapIntent);
         } else {
             Toast.makeText(this, "Location coordinates not available", Toast.LENGTH_SHORT).show();
         }

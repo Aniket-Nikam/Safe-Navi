@@ -58,7 +58,7 @@ An authorized employee reviews a report and verifies, rejects, marks duplicate, 
 
 ## Map strategy
 
-Reuse the existing Google Maps SDK initially. UI consumes provider-neutral hazard geometry so MapLibre/OpenStreetMap can replace it later. Point hazards are first-class in the first UI; polylines and polygons are supported by the model. Candidate routes must come from a legitimate routing provider and are never fabricated locally. Keys stay in local.properties.
+Google Maps has been replaced by MapLibre Native and an OpenStreetMap-derived OpenFreeMap style. Point hazards render as severity-coloured markers plus translucent risk zones; polylines and polygons remain supported by the provider-neutral model. Explicit Nominatim lookup resolves source and destination while respecting its no-autocomplete and one-request-per-second public policy. Valhalla supplies real auto, pedestrian, and bicycle route alternatives. Public community services are for light demonstration only and must be replaced by hosted or self-hosted infrastructure before distribution.
 
 ## Deterministic risk engine
 
@@ -68,7 +68,7 @@ Future MLSafetyRiskEngine will implement the same interface. No fake ML model wi
 
 ## Safe routing
 
-RouteSafetyEvaluator accepts real candidate route geometry from a configured provider and calculates hazard exposure near segments. Fastest emphasizes travel cost, Balanced combines travel and safety, and Safest emphasizes exposure within detour limits.
+RouteSafetyEvaluator accepts real Valhalla candidate geometry and calculates hazard exposure along each route. Fastest ranks only travel time, Balanced combines travel and safety, and Safest gives hazard exposure greater weight. All alternatives remain real routes returned from the OpenStreetMap routing graph.
 
 ## Synthetic demo data
 
@@ -80,7 +80,7 @@ Verified hazards retain structured geometry, category, severity, status, timesta
 
 ## Required configuration
 
-The project reuses AndroidX, Material, Firebase, Google Maps/Location, OkHttp, Glide, CameraX, and Cloudinary integration. Local configuration requires MAPS_API_KEY, GEMINI_API_KEY, CLOUD_NAME, UPLOAD_PRESET, plus app/google-services.json for live Firebase features.
+The project uses AndroidX, Material, Firebase, MapLibre Native, OpenFreeMap, Nominatim, Valhalla, device location, OkHttp, Glide, CameraX, and Cloudinary integration. Map display and demo routing need no Google key. Optional live features require GEMINI_API_KEY, CLOUD_NAME, UPLOAD_PRESET, FIREBASE_DATABASE_URL, plus app/google-services.json. NOMINATIM_BASE_URL and VALHALLA_BASE_URL can point to hosted or self-hosted production services.
 
 ## Testing
 

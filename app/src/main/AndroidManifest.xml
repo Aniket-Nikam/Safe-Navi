@@ -102,12 +102,6 @@
             android:parentActivityName=".MainActivity"
             android:theme="@style/Theme.XavierProject" />
         <activity android:name=".ComplaintDetailActivity" />
-        <!-- Google Maps API Key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${mapsApiKey}" />
-
-
     </application>
 
 </manifest>

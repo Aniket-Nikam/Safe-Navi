@@ -31,20 +31,20 @@ import androidx.fragment.app.Fragment;
 import com.bumptech.glide.Glide;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.maps.CameraUpdateFactory;
-import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import org.maplibre.android.MapLibre;
+import org.maplibre.android.camera.CameraUpdateFactory;
+import org.maplibre.android.geometry.LatLng;
+import org.maplibre.android.maps.MapLibreMap;
+import org.maplibre.android.maps.MapView;
+import org.maplibre.android.maps.Style;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class ReportFragment extends Fragment implements OnMapReadyCallback {
+public class ReportFragment extends Fragment {
 
     private EditText editTextTitle, editTextDescription;
     private AutoCompleteTextView autoCompleteCategory;
@@ -56,7 +56,8 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
     private Uri selectedImageUri;
     private DatabaseReference databaseReference;
     private FirebaseAuth mAuth;
-    private GoogleMap googleMap;
+    private MapView reportMapView;
+    private MapLibreMap openMap;
     private FusedLocationProviderClient fusedLocationClient;
     private Location currentLocation;
 
@@ -76,6 +77,7 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        MapLibre.getInstance(requireContext());
 
         // Initialize Firebase
         mAuth = FirebaseAuth.getInstance();
@@ -141,7 +143,7 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
         initializeViews(view);
         setupCategoryDropdown();
         setupClickListeners();
-        setupMap();
+        setupMap(view);
 
         return view;
     }
@@ -186,25 +188,15 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
                 .commit();
     }
 
-    /**
-     * Setup Google Map
-     */
-    private void setupMap() {
-        SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager()
-                .findFragmentById(R.id.mapFragment);
-        if (mapFragment != null) {
-            mapFragment.getMapAsync(this);
-        }
-    }
-
-    @Override
-    public void onMapReady(@NonNull GoogleMap map) {
-        googleMap = map;
-        googleMap.getUiSettings().setZoomControlsEnabled(true);
-        googleMap.getUiSettings().setMyLocationButtonEnabled(true);
-
-        // Request location permission and get current location
-        checkLocationPermission();
+    private void setupMap(View root) {
+        reportMapView = root.findViewById(R.id.mapFragment);
+        reportMapView.onCreate(null);
+        reportMapView.getMapAsync(map -> {
+            openMap = map;
+            openMap.setStyle(new Style.Builder().fromUri(
+                    "https://tiles.openfreemap.org/styles/liberty"));
+            checkLocationPermission();
+        });
     }
 
     /**
@@ -235,10 +227,6 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
             return;
         }
 
-        if (googleMap != null) {
-            googleMap.setMyLocationEnabled(true);
-        }
-
         fusedLocationClient.getLastLocation()
                 .addOnSuccessListener(location -> {
                     if (location != null) {
@@ -265,13 +253,8 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
 
         LatLng latLng = new LatLng(location.getLatitude(), location.getLongitude());
 
-        // Update map
-        if (googleMap != null) {
-            googleMap.clear();
-            googleMap.addMarker(new MarkerOptions()
-                    .position(latLng)
-                    .title("Current Location"));
-            googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
+        if (openMap != null) {
+            openMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, DEFAULT_ZOOM));
         }
 
         // Update location text
@@ -582,7 +565,14 @@ public class ReportFragment extends Fragment implements OnMapReadyCallback {
 
     @Override
     public void onDestroyView() {
+        if (reportMapView != null) reportMapView.onDestroy();
         super.onDestroyView();
         selectedImageUri = null;
     }
+
+    @Override public void onStart() { super.onStart(); if (reportMapView != null) reportMapView.onStart(); }
+    @Override public void onResume() { super.onResume(); if (reportMapView != null) reportMapView.onResume(); }
+    @Override public void onPause() { if (reportMapView != null) reportMapView.onPause(); super.onPause(); }
+    @Override public void onStop() { if (reportMapView != null) reportMapView.onStop(); super.onStop(); }
+    @Override public void onLowMemory() { super.onLowMemory(); if (reportMapView != null) reportMapView.onLowMemory(); }
 }

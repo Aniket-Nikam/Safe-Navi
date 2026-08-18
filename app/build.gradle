@@ -28,15 +28,14 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Inject keys into BuildConfig
-        buildConfigField "String", "MAPS_API_KEY", "\"${localProperties.getProperty('MAPS_API_KEY', '')}\""
         buildConfigField "String", "CLOUD_NAME", "\"${localProperties.getProperty('CLOUD_NAME', '')}\""
         buildConfigField "String", "UPLOAD_PRESET", "\"${localProperties.getProperty('UPLOAD_PRESET', '')}\""
         buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('GEMINI_API_KEY', '')}\""
         buildConfigField "String", "FIREBASE_DATABASE_URL", "\"${localProperties.getProperty('FIREBASE_DATABASE_URL', '')}\""
+        buildConfigField "String", "NOMINATIM_BASE_URL", "\"${localProperties.getProperty('NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org')}\""
+        buildConfigField "String", "VALHALLA_BASE_URL", "\"${localProperties.getProperty('VALHALLA_BASE_URL', 'https://valhalla1.openstreetmap.de')}\""
         buildConfigField "boolean", "HAS_FIREBASE_CONFIG", file('google-services.json').exists().toString()
         
-        // Inject maps key into manifest directly via manifestPlaceholders
-        manifestPlaceholders = [mapsApiKey: localProperties.getProperty('MAPS_API_KEY', '')]
     }
 
     buildTypes {
@@ -90,8 +89,8 @@ dependencies {
     // Google Sign-In
     implementation 'com.google.android.gms:play-services-auth:20.7.0'
 
-    // Google Maps & Location
-    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    // OpenStreetMap rendering through MapLibre.
+    implementation 'org.maplibre.gl:android-sdk:13.4.1'
     implementation 'com.google.android.gms:play-services-location:21.1.0'
 
     // CameraX (STABLE)

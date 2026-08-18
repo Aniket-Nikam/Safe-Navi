@@ -1,7 +1,8 @@
 # Copy this file to local.properties and keep real keys local.
 sdk.dir=C\:\\Users\\YOUR_NAME\\AppData\\Local\\Android\\Sdk
-MAPS_API_KEY=
 GEMINI_API_KEY=
 CLOUD_NAME=
 UPLOAD_PRESET=
 FIREBASE_DATABASE_URL=https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app
+NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org
+VALHALLA_BASE_URL=https://valhalla1.openstreetmap.de

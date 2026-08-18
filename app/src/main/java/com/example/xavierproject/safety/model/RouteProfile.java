@@ -1,7 +1,7 @@
 package com.example.xavierproject.safety.model;
 
 public enum RouteProfile {
-    FASTEST(0.20), BALANCED(1.00), SAFEST(2.25);
+    FASTEST(0.0), BALANCED(0.35), SAFEST(1.0);
 
     private final double safetyWeight;
 

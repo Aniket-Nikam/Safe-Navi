@@ -7,12 +7,13 @@ The repository runs immediately in **synthetic demo mode** without Firebase cred
 ## What works
 
 - Citizen and government demo entry points with no sign-up
-- Google map with severity-coloured verified hazard markers
+- MapLibre/OpenStreetMap map with severity-coloured verified hazard markers and translucent risk zones
 - Tap-anywhere local safety score, confidence, and human-readable reasons
 - Citizen report submission into a shared in-memory demo repository
 - Government review: verify/publish, downgrade to monitoring, resolve, plus domain support for reject/duplicate and immutable audit history
 - Deterministic risk engine using severity, verification, distance bands, age, status, recurrence, and confirmations
-- Fastest, balanced, and safest route evaluation domain logic (route drawing waits for a legitimate routing provider)
+- Address/coordinate source and destination entry, plus driving, walking, and cycling routes
+- Real OpenStreetMap/Valhalla route alternatives ranked as fastest, balanced, or safest
 - Migrated Firebase authentication, complaint, community, comment, profile, image-upload, and Gemini assistant screens for configured builds
 
 ## Quick start
@@ -38,14 +39,15 @@ The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 Create `local.properties` from the example and add only the keys you need. Place the matching Firebase Android configuration at `app/google-services.json`. That file and `local.properties` are ignored by Git.
 
 ```properties
-MAPS_API_KEY=your_restricted_android_maps_key
 GEMINI_API_KEY=your_development_key
 CLOUD_NAME=your_cloudinary_cloud
 UPLOAD_PRESET=your_unsigned_upload_preset
 FIREBASE_DATABASE_URL=https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app
+NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org
+VALHALLA_BASE_URL=https://valhalla1.openstreetmap.de
 ```
 
-Restrict the Maps key by Android package and signing certificate. A mobile client cannot truly protect a Gemini secret; production should proxy Gemini and Cloudinary signing through a server. Deploy `firebase/database.rules.json` only after configuring server-issued Firebase custom claims (`citizen`, `government`, or `admin`) and validating the rules in the Firebase Emulator Suite.
+No Google Maps key is required. A mobile client cannot truly protect a Gemini secret; production should proxy Gemini and Cloudinary signing through a server. Deploy `firebase/database.rules.json` only after configuring server-issued Firebase custom claims (`citizen`, `government`, or `admin`) and validating the rules in the Firebase Emulator Suite.
 
 ## Architecture
 
@@ -67,12 +69,14 @@ Each eligible hazard contribution is bounded and derived from configured severit
 
 This is an explainable rules engine, **not trained ML**. An ML model should only replace it after labelled, legally obtained and fairness-reviewed data exists; keep the same interface and compare both approaches offline first.
 
-## Route boundary
+## Open map and route services
 
-The project contains route-profile and route-safety evaluation logic, but it does not fabricate road geometry. For real fastest/balanced/safest navigation, connect a licensed routing source such as Google Routes API, Mapbox Directions, GraphHopper, or an OpenStreetMap-based OSRM/Valhalla service. Request alternatives, sample hazards along each polyline, evaluate them locally, and display provider attribution and uncertainty.
+MapLibre renders OpenStreetMap-derived vector tiles using the OpenFreeMap Liberty style. Explicit address submissions use Nominatim; there is no type-ahead autocomplete, requests are rate-limited to at most one per second, and an identifying User-Agent is sent. Valhalla returns genuine `auto`, `pedestrian`, and `bicycle` routes and alternatives. Safe-Navi decodes their polylines, measures verified-hazard exposure along each candidate, then ranks them using the selected profile. The app never invents road geometry.
+
+The bundled endpoints are community demo services suitable only for light testing. Before distribution, obtain a hosted provider or self-host tiles, Nominatim, and Valhalla; update the three URLs in local configuration and follow provider quotas, privacy terms, and attribution requirements.
 
 ## Tests and limitations
 
-Local JUnit tests cover score behaviour, confidence, role enforcement, verification/audit lifecycle, rejection history, and duplicate matching. The synthetic repository resets with the app process. Live hazard persistence, push notifications, media moderation, backend-enforced custom claims, production routing, offline maps, accessibility audit, and instrumentation/Espresso coverage remain production-phase work.
+Local JUnit tests cover score behaviour, confidence, role enforcement, verification/audit lifecycle, rejection history, duplicate matching, route ranking, Nominatim parsing, Valhalla parsing, and polyline decoding. The synthetic repository resets with the app process. Live hazard persistence, push notifications, media moderation, backend-enforced custom claims, production-grade map service hosting, offline maps, accessibility audit, and instrumentation/Espresso coverage remain production-phase work.
 
 Never use this prototype as an emergency service or as a guarantee that a place or route is safe.
