@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F7F5"
+    android:fillViewport="true">
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="REPORT A DANGER" android:textColor="#B83A32" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.1" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="7dp" android:text="Help your community notice what changed." android:textColor="#10231D" android:textSize="26sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Synthetic demo submissions require government verification before they affect safety scores." android:textColor="#68776F" android:textSize="13sp" />
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:hint="Report title">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/demoReportTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Road heavily flooded after rainfall" />
+        </com.google.android.material.textfield.TextInputLayout>
+        <Spinner android:id="@+id/demoReportCategory" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="14dp" android:entries="@array/safety_hazard_categories" android:background="@drawable/bg_input" android:paddingHorizontal="14dp" />
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:hint="What happened?">
+            <com.google.android.material.textfield.TextInputEditText android:id="@+id/demoReportDescription" android:layout_width="match_parent" android:layout_height="110dp" android:gravity="top" android:inputType="textMultiLine" android:paddingTop="14dp" android:text="Heavy waterlogging is blocking one side of the road." />
+        </com.google.android.material.textfield.TextInputLayout>
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" app:cardBackgroundColor="#E7F2ED" app:cardCornerRadius="14dp" app:cardElevation="0dp">
+            <TextView android:id="@+id/demoReportLocation" android:layout_width="match_parent" android:layout_height="wrap_content" android:drawableStart="@drawable/ic_location" android:drawablePadding="10dp" android:padding="16dp" android:text="Sion Circle service road" android:textColor="#174A3D" android:textSize="14sp" />
+        </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.button.MaterialButton android:id="@+id/submitDemoReportButton" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="20dp" android:text="Submit for government review" android:textAllCaps="false" android:textStyle="bold" app:backgroundTint="#B83A32" app:cornerRadius="14dp" />
+    </LinearLayout>
+</ScrollView>

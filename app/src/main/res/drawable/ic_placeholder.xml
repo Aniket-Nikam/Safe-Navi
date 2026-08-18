@@ -1,0 +1,43 @@
+<!-- File: res/drawable/ic_placeholder.xml -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Background rectangle -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M0,0h200v200h-200z"/>
+
+    <!-- Mountain/Landscape shape -->
+    <path
+        android:fillColor="#BDBDBD"
+        android:pathData="M0,120 L40,80 L80,100 L120,60 L160,90 L200,70 L200,200 L0,200 Z"/>
+
+    <!-- Sun/Moon circle -->
+    <path
+        android:fillColor="#9E9E9E"
+        android:pathData="M150,50 m-20,0 a20,20 0,1,1 40,0 a20,20 0,1,1 -40,0"/>
+
+    <!-- Image icon in center -->
+    <path
+        android:fillColor="#757575"
+        android:pathData="M70,70 h60 v60 h-60 z"/>
+
+    <!-- Photo frame detail -->
+    <path
+        android:fillColor="#E0E0E0"
+        android:pathData="M75,75 h50 v50 h-50 z"/>
+
+    <!-- Mountain in photo -->
+    <path
+        android:fillColor="#9E9E9E"
+        android:pathData="M75,110 L90,90 L105,105 L120,85 L125,95 L125,125 L75,125 Z"/>
+
+    <!-- Sun in photo -->
+    <path
+        android:fillColor="#757575"
+        android:pathData="M110,90 m-8,0 a8,8 0,1,1 16,0 a8,8 0,1,1 -16,0"/>
+
+</vector>

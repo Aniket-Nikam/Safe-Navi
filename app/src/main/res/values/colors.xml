@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#6366F1</color>
+    <color name="primary_dark">#4F46E5</color>
+    <color name="primary_light">#A5B4FC</color>
+
+    <!-- Accent Colors -->
+    <color name="accent">#EC4899</color>
+    <color name="accent_light">#F9A8D4</color>
+
+    <!-- Background Colors - Light Mode -->
+    <color name="background">#F8FAFC</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="input_background">#F1F5F9</color>
+
+    <!-- Text Colors - Light Mode -->
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#64748B</color>
+    <color name="text_hint">#94A3B8</color>
+    <color name="button_default">#757575</color>
+    <!-- Other Colors -->
+    <color name="divider">#E2E8F0</color>
+    <color name="error">#EF4444</color>
+    <color name="success">#10B981</color>
+    <color name="warning">#F59E0B</color>
+    <color name="warning_background">#FEF3C7</color>
+    <color name="category_general">#E0E0E0</color>
+    <color name="category_question">#2196F3</color>
+    <color name="category_discussion">#9C27B0</color>
+    <color name="category_announcement">#F44336</color>
+    <color name="category_help">#FF9800</color>
+    <color name="chip_background">#E0E0E0</color>
+
+    <!-- Component Colors -->
+    <color name="switch_track">#CBD5E1</color>
+
+    <!-- System Colors -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+
+    <!-- Status Colors -->
+    <color name="status_pending">#FF9800</color>
+    <color name="status_in_progress">#2196F3</color>
+    <color name="status_resolved">#4CAF50</color>
+</resources>

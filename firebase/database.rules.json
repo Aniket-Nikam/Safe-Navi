@@ -1,0 +1,52 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid || auth.token.role === 'government' || auth.token.role === 'admin'",
+        ".write": "$uid === auth.uid || auth.token.role === 'admin'",
+        "role": { ".write": "auth.token.role === 'admin'" }
+      }
+    },
+    "citizenReports": {
+      ".indexOn": ["status", "categoryKey", "createdAt"],
+      "$reportId": {
+        ".read": "auth != null",
+        ".create": "auth != null && newData.child('citizenId').val() === auth.uid && newData.child('status').val() === 'REPORTED' && newData.child('governmentVerified').val() !== true",
+        ".update": "auth.token.role === 'government' || auth.token.role === 'admin'",
+        ".delete": "auth.token.role === 'admin'"
+      }
+    },
+    "hazards": {
+      ".read": "auth != null",
+      ".indexOn": ["status", "severity", "updatedAt"],
+      "$hazardId": {
+        ".write": "auth.token.role === 'government' || auth.token.role === 'admin'",
+        ".validate": "newData.hasChildren(['categoryKey','location','severity','status','governmentVerified','reason','updatedAt']) && newData.child('governmentVerified').val() === true"
+      }
+    },
+    "hazardHistory": {
+      ".read": "auth != null",
+      "$historyId": {
+        ".create": "auth.token.role === 'government' || auth.token.role === 'admin'",
+        ".update": false,
+        ".delete": false
+      }
+    },
+    "posts": {
+      ".read": "auth != null",
+      "$postId": {
+        ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || auth.token.role === 'admin')"
+      }
+    },
+    "comments": {
+      ".read": "auth != null",
+      "$postId": {
+        "$commentId": {
+          ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || auth.token.role === 'admin')"
+        }
+      }
+    }
+  }
+}

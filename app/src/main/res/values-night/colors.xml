@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Primary Colors -->
+    <color name="primary">#818CF8</color>
+    <color name="primary_dark">#6366F1</color>
+    <color name="primary_light">#4F46E5</color>
+
+    <!-- Accent Colors -->
+    <color name="accent">#F472B6</color>
+    <color name="accent_light">#DB2777</color>
+
+    <!-- Background Colors - Dark Mode -->
+    <color name="background">#0F172A</color>
+    <color name="surface">#1E293B</color>
+    <color name="input_background">#334155</color>
+
+    <!-- Text Colors - Dark Mode -->
+    <color name="text_primary">#F8FAFC</color>
+    <color name="text_secondary">#94A3B8</color>
+    <color name="text_hint">#64748B</color>
+    <color name="button_default">#94A3B8</color>
+    
+    <!-- Other Colors -->
+    <color name="divider">#334155</color>
+    <color name="error">#F87171</color>
+    <color name="success">#34D399</color>
+    <color name="warning">#FBBF24</color>
+    <color name="warning_background">#78350F</color>
+    
+    <color name="category_general">#334155</color>
+    <color name="category_question">#3B82F6</color>
+    <color name="category_discussion">#8B5CF6</color>
+    <color name="category_announcement">#EF4444</color>
+    <color name="category_help">#F59E0B</color>
+    <color name="chip_background">#334155</color>
+
+    <!-- Component Colors -->
+    <color name="switch_track">#475569</color>
+</resources>
