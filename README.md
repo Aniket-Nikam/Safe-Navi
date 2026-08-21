@@ -1,82 +1,136 @@
 # Safe-Navi
 
-Safe-Navi is a native Android proof of concept for community safety, verified civic hazards, explainable local risk, and safer navigation decisions. It is migrated from XavierProject and intentionally preserves the working Java/XML/Firebase foundation while separating citizen reports from government-published hazards.
+Safe-Navi is a runnable 30% college-project milestone that combines real OpenStreetMap routing with a privacy-safe Mumbai–Navi Mumbai synthetic road-safety dataset. It supports citizen reporting, government verification, explainable point risk, and Fastest/Balanced/Safest route comparison.
 
-The repository runs immediately in **synthetic demo mode** without Firebase credentials. All bundled locations and events are fictional demonstrations around Mumbai and Navi Mumbai; the app does not claim live coverage or real-world safety guarantees.
+The Android namespace and application ID are `com.safenavi.app`. The repository contains no previous project-name namespace or branding.
 
-## What works
+## What is genuinely integrated
 
-- Citizen and government demo entry points with no sign-up
-- MapLibre/OpenStreetMap map with severity-coloured verified hazard markers and translucent risk zones
-- Tap-anywhere local safety score, confidence, and human-readable reasons
-- Citizen report submission into a shared in-memory demo repository
-- Government review: verify/publish, downgrade to monitoring, resolve, plus domain support for reject/duplicate and immutable audit history
-- Deterministic risk engine using severity, verification, distance bands, age, status, recurrence, and confirmations
-- Address/coordinate source and destination entry, plus driving, walking, and cycling routes
-- Real OpenStreetMap/Valhalla route alternatives ranked as fastest, balanced, or safest
-- Migrated Firebase authentication, complaint, community, comment, profile, image-upload, and Gemini assistant screens for configured builds
+- MapLibre renders OpenStreetMap-derived OpenFreeMap tiles.
+- Nominatim resolves explicitly submitted source and destination names.
+- Valhalla returns genuine driving, walking and cycling road routes.
+- FastAPI queries an included SQLite spatial runtime derived from the completed synthetic dataset.
+- Point scores and route exposure use the dataset's ten factors for the current time period.
+- The map visibly reports `Dataset API`, time period, coverage percentage and leading factors.
+- If the local API is stopped, the Android app clearly labels and uses a controlled offline-hazard fallback.
+- Citizen reports and government-verified hazards remain separate domain concepts.
+- Thirteen Android JVM tests and three backend tests cover the current milestone.
 
-## Quick start
+## Dataset boundary
 
-1. Install Android Studio with Android SDK 34. Java 17 or Android Studio's bundled Java 21 is supported.
-2. Clone this repository and open its root folder in Android Studio.
-3. Copy `local.properties.example` to `local.properties` and correct `sdk.dir`.
-4. Leave service keys blank for the credential-free demo, then run the `app` configuration on an Android 7.0+ emulator/device.
-5. Choose **Citizen demo** to explore/report, or **Government demo** to review and publish the pending synthetic report.
+The original analytics dataset contains 452,466 physical OSM road segments and 1,809,864 segment-time rows across morning peak, midday, evening peak and night. Its ten factors are traffic congestion, crime risk, lighting quality, population density, road condition, pedestrian activity, emergency access, flood risk, isolation and public-transport access.
 
-Command-line verification on Windows:
+The full 158 MB `road_segments.parquet` remains the street-level training and future PostGIS source. It is not copied into Git because it exceeds normal GitHub file limits. The repository includes:
+
+- `backend/data/source/area_cells.csv.gz` — the complete 1 km area/time aggregation from that dataset;
+- `backend/data/source/manifest.json` — provenance and complete road-level statistics;
+- `backend/data/safe_navi_runtime.sqlite` — 6,508 indexed area/time rows used by the app today;
+- `backend/scripts/build_runtime_db.py` — a standard-library reproducible database builder.
+
+This is defensible for the 30% milestone: the application uses the completed dataset at city-wide area-cell resolution, while street-segment PostGIS lookup and ML remain explicitly scheduled work.
+
+All safety factors and targets are synthetic. They are not observed crime, lighting, population, traffic or safety measurements and cannot describe the actual safety of any neighbourhood.
+
+## Quick start on Windows
+
+### 1. Start the dataset API
 
 ```powershell
+cd backend
+py -3.11 -m venv venv
+.\venv\Scripts\python.exe -m pip install -r requirements.txt
+.\venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
+
+Verify `http://127.0.0.1:8000/health` or open the interactive API at `http://127.0.0.1:8000/docs`.
+
+### 2. Run Android
+
+1. Install Android Studio, Android SDK 34 and an Android 7.0+ emulator.
+2. Open the repository root in Android Studio.
+3. Copy `local.properties.example` to `local.properties` and correct `sdk.dir` if Android Studio does not create it.
+4. Start an emulator. The default `RISK_API_BASE_URL=http://10.0.2.2:8000` reaches the host computer from the Android emulator.
+5. Run the `app` configuration.
+6. Choose **Enter citizen demo**, open **Map**, and use Vashi Railway Station → CBD Belapur.
+
+For a physical phone, replace `10.0.2.2` in `local.properties` with the computer's LAN IP, keep both devices on the same network, and allow port 8000 through the local firewall.
+
+### One-command helper
+
+From the repository root:
+
+```powershell
+.\run_demo.ps1
+```
+
+It validates the database, creates/updates the backend environment, starts FastAPI, builds the APK, and installs/launches it when an Android device or emulator is connected.
+
+## Verification
+
+```powershell
+cd backend
+.\venv\Scripts\python.exe -m pytest -q
+
+cd ..
 $env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat assembleDebug
+.\gradlew.bat testDebugUnitTest lintDebug assembleDebug
 ```
 
 The APK is generated at `app/build/outputs/apk/debug/app-debug.apk`.
 
-## Optional live services
+## Runtime architecture
 
-Create `local.properties` from the example and add only the keys you need. Place the matching Firebase Android configuration at `app/google-services.json`. That file and `local.properties` are ignored by Git.
-
-```properties
-GEMINI_API_KEY=your_development_key
-CLOUD_NAME=your_cloudinary_cloud
-UPLOAD_PRESET=your_unsigned_upload_preset
-FIREBASE_DATABASE_URL=https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app
-NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org
-VALHALLA_BASE_URL=https://valhalla1.openstreetmap.de
+```text
+OSM/Geofabrik snapshot
+        │
+        ├── road_segments.parquet (street-level analytics / future ML + PostGIS)
+        │
+        └── area_cells.csv.gz
+                 │ reproducible builder
+                 ▼
+         SQLite + RTree index
+                 │
+              FastAPI
+                 │ point/route risk JSON
+                 ▼
+Android app ── Nominatim + Valhalla + MapLibre
 ```
 
-No Google Maps key is required. A mobile client cannot truly protect a Gemini secret; production should proxy Gemini and Cloudinary signing through a server. Deploy `firebase/database.rules.json` only after configuring server-issued Firebase custom claims (`citizen`, `government`, or `admin`) and validating the rules in the Firebase Emulator Suite.
+SQLite provides a small, shareable runtime for the college demonstration. `backend/sql/postgresql_postgis_schema.sql` documents the production migration path for exact road-segment spatial intersections.
 
-## Architecture
+## Route ranking
 
-- `app/src/main/java/com/example/xavierproject/safety/model` — hazard, report, audit, score, and route types
-- `.../safety/risk` — transparent deterministic risk calculation
-- `.../safety/service` — role authorization, government lifecycle, duplicate detection, route evaluation
-- `.../safety/data` — repository boundary and demo implementation
-- `.../safety/demo` — clearly labelled synthetic fixtures and shared demo session
-- `docs/IMPLEMENTATION_PLAN.md` — source audit, product decisions, data design, delivery sequence, and production boundary
-- `firebase/database.rules.json` — deny-by-default authorization template
+FastAPI samples each real candidate route, looks up matching dataset cells, averages synthetic risk and factors, and calculates:
 
-The legacy Java namespace remains `com.example.xavierproject` to avoid a risky package migration during the product refactor. The application name and product experience are Safe-Navi.
+- Fastest: `travel_minutes`
+- Balanced: `travel_minutes + 0.35 × risk_exposure`
+- Safest: `travel_minutes + 1.00 × risk_exposure`
 
-## Risk semantics
+The response includes coverage ratio and the leading route factors. Missing API connectivity never masquerades as live dataset scoring; the UI says `offline fallback`.
 
-`risk = 100 × (1 - product(1 - contribution / 100))`
+## Optional configuration
 
-Each eligible hazard contribution is bounded and derived from configured severity, verified/unverified weighting, distance band, time decay, lifecycle status, recurrence, and report confirmations. The visible safety score is `100 - risk`. Confidence is shown separately and rises with corroborated government-verified evidence. A lack of records returns low confidence rather than pretending the area is proven safe.
+```properties
+RISK_API_BASE_URL=http://10.0.2.2:8000
+NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org
+VALHALLA_BASE_URL=https://valhalla1.openstreetmap.de
+GEMINI_API_KEY=
+CLOUD_NAME=
+UPLOAD_PRESET=
+FIREBASE_DATABASE_URL=
+```
 
-This is an explainable rules engine, **not trained ML**. An ML model should only replace it after labelled, legally obtained and fairness-reviewed data exists; keep the same interface and compare both approaches offline first.
+No Google Maps key is required. Firebase, Cloudinary and Gemini are optional integrations and are not required for the dataset-backed safety demo.
 
-## Open map and route services
+## GitHub
 
-MapLibre renders OpenStreetMap-derived vector tiles using the OpenFreeMap Liberty style. Explicit address submissions use Nominatim; there is no type-ahead autocomplete, requests are rate-limited to at most one per second, and an identifying User-Agent is sent. Valhalla returns genuine `auto`, `pedestrian`, and `bicycle` routes and alternatives. Safe-Navi decodes their polylines, measures verified-hazard exposure along each candidate, then ranks them using the selected profile. The app never invents road geometry.
+The repository is GitHub-ready and excludes local secrets, virtual environments, build folders and the oversized Parquet file. See `docs/GITHUB_SETUP.md` for exact commands. To distribute the full Parquet dataset, use a GitHub Release asset, Git LFS, institutional storage or the documented generator rather than committing it to normal Git history.
 
-The bundled endpoints are community demo services suitable only for light testing. Before distribution, obtain a hosted provider or self-host tiles, Nominatim, and Valhalla; update the three URLs in local configuration and follow provider quotas, privacy terms, and attribution requirements.
+## Limitations
 
-## Tests and limitations
-
-Local JUnit tests cover score behaviour, confidence, role enforcement, verification/audit lifecycle, rejection history, duplicate matching, route ranking, Nominatim parsing, Valhalla parsing, and polyline decoding. The synthetic repository resets with the app process. Live hazard persistence, push notifications, media moderation, backend-enforced custom claims, production-grade map service hosting, offline maps, accessibility audit, and instrumentation/Espresso coverage remain production-phase work.
-
-Never use this prototype as an emergency service or as a guarantee that a place or route is safe.
+- Synthetic factors only; no real-world predictive accuracy claim.
+- Runtime SQLite uses 1 km aggregated cells, not exact street-segment intersection.
+- Public OpenFreeMap, Nominatim and Valhalla services are for light demonstration use.
+- Production government authorization still requires server-issued roles and deployed security rules.
+- No trained ML model is claimed in this milestone.
+- Safe-Navi is not an emergency service and never guarantees that a route or place is safe.

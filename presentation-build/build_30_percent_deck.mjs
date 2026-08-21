@@ -89,7 +89,7 @@ function addCover(p) {
   note(s, [
     "Open by stating that Safe-Navi adds an explainable safety objective to conventional navigation.",
     "Clarify that this is the first 30% of the complete research and product roadmap: it is runnable, but uses synthetic safety data and is not a safety guarantee.",
-  ], ["Project repository README.md, commit 6f76f79"]);
+  ], ["Project repository README.md"]);
 }
 
 function addProblem(p) {
@@ -112,11 +112,11 @@ function addThirty(p) {
   shape(s, "roundRect", 430, 390, 778, 162, C.mint, C.border, "rounded-xl");
   textBox(s, "Quality checks passed", 456, 416, 320, 34, { size: 25, bold: true, color: C.green });
   textBox(s, "No null factors • valid geometries • spatial ML split • balanced labels", 456, 466, 700, 58, { size: 19, color: C.ink });
-  textBox(s, "Current app: controlled synthetic scenarios  •  Next integration: serve Parquet-derived road risk through a backend/API", 72, 605, 1136, 52, { size: 18, bold: true, color: C.muted });
+  textBox(s, "Integrated now: 2.2 MB SQLite/RTree runtime  •  6,508 area/time rows  •  FastAPI  •  Android dataset scoring", 72, 605, 1136, 52, { size: 18, bold: true, color: C.muted });
   note(s, [
     "Do not measure progress only by the number of screens. The complete denominator includes data governance, secure backend, ML validation, operations, production hosting, and cross-platform delivery.",
     "The separate Mumbai–Navi Mumbai dataset is complete: 452,466 physical road segments become 1,809,864 rows across four time periods, with exactly ten synthetic factors.",
-    "Be precise: the Android app currently uses controlled synthetic scenarios. The full Parquet table is prepared for training and backend integration; it is not embedded in the APK.",
+    "The Android app now queries a compact SQLite/RTree runtime containing all 6,508 one-kilometre area/time aggregates through FastAPI. The full Parquet remains the street-level training and future PostGIS source.",
   ], ["Dataset manifest.json", "Dataset QUALITY_REPORT.json", "Project repository docs/30_PERCENT_PROGRESS_REPORT.md"]);
 }
 
@@ -128,7 +128,7 @@ function addCurrentDemo(p) {
   note(s, [
     "Walk through the citizen and government sides as one connected lifecycle.",
     "Emphasize that routing uses genuine road geometry returned by Valhalla. Synthetic data applies only to hazard labels in this milestone.",
-    "The running mobile demo does not query the 158 MB Parquet file directly. It uses a small controlled scenario set while the full dataset remains the analytics/training source for the next backend integration.",
+    "The mobile app does not scan the 158 MB Parquet file directly. It queries the complete dataset-derived area-cell runtime and clearly displays Dataset API, time period, coverage and leading factors.",
   ], ["Project repository README.md", "https://github.com/valhalla/valhalla/blob/master/README.md"]);
 }
 
@@ -139,8 +139,8 @@ function addStack(p) {
     ["MapLibre + OpenStreetMap", "Provider-neutral interactive mapping without a Google Maps key"],
     ["Nominatim", "Resolve explicitly submitted place names to coordinates"],
     ["Valhalla", "Real driving, walking, and cycling routes plus alternatives"],
-    ["Firebase foundation", "Rapid auth/persistence path; secure roles remain future work"],
-    ["JUnit + deterministic engine", "Repeatable tests and explanations before any ML claim"],
+    ["FastAPI + SQLite/RTree", "Shareable dataset service with indexed point and route queries"],
+    ["JUnit + Pytest", "Repeatable Android and backend verification before any ML claim"],
   ];
   rows.forEach((r, i) => {
     const y = 183 + i * 75;
@@ -162,11 +162,11 @@ function addStack(p) {
 function addRisk(p) {
   const s = p.slides.add(); header(s, "05 • Core method", "Explainable risk before machine learning", 6);
   const xs = [72, 356, 640, 924];
-  const titles = ["Structured hazard", "Bounded contribution", "Route exposure", "Profile ranking"];
+  const titles = ["10-factor data", "SQLite lookup", "Route exposure", "Profile ranking"];
   const bodies = [
-    "10 factors\nincluding severity, status, age, distance and confidence",
-    "Weights + distance/time decay\n\nNo single record can grow without limit",
-    "Measure candidate geometry near active hazards",
+    "Traffic, crime, lighting, density, roads, activity, access, flood and isolation",
+    "RTree finds the current 1 km cell and time period",
+    "Sample real candidate geometry and average dataset risk",
     "Fastest = time\nBalanced = both\nSafest = exposure priority",
   ];
   xs.forEach((x, i) => {
@@ -174,18 +174,18 @@ function addRisk(p) {
     if (i < 3) textBox(s, "→", x + 244, 335, 36, 45, { size: 35, bold: true, color: C.teal, align: "center" });
   });
   shape(s, "roundRect", 170, 552, 940, 64, C.navy, "none", "rounded-lg");
-  textBox(s, "risk = 100 × (1 − ∏(1 − contribution / 100))    •    safety = 100 − risk", 195, 569, 890, 30, { size: 21, bold: true, color: C.white, align: "center" });
+  textBox(s, "Dataset risk API drives routing  •  Explainable hazard engine remains the labelled offline fallback", 195, 569, 890, 30, { size: 20, bold: true, color: C.white, align: "center" });
   note(s, [
     "State clearly: this milestone does not contain a trained ML model. The rule engine is a transparent baseline because the project does not yet have a lawful, labelled, real-world training set.",
-    "Risk and confidence are separate. Few records may produce low measured risk but must also produce low confidence, avoiding a claim that missing data equals safety.",
-  ], ["Project repository README.md", "Project repository app/src/main/java/com/example/xavierproject/safety/risk"]);
+    "The API returns route coverage and leading factor values. If it is unavailable, the UI explicitly says offline fallback rather than pretending dataset scoring occurred.",
+  ], ["Project repository README.md", "Project repository app/src/main/java/com/safenavi/app/safety/risk"]);
 }
 
 function addEvidence(p) {
   const s = p.slides.add(); header(s, "06 • Verification evidence", "Built, tested, and repeatable", 7);
   const stats = [
-    ["11", "JVM tests passing", C.teal],
-    ["3", "travel modes", C.navy],
+    ["13", "Android JVM tests", C.teal],
+    ["3", "backend API tests", C.navy],
     ["3", "route preferences", "#9A6500"],
   ];
   stats.forEach((st, i) => {
@@ -196,7 +196,7 @@ function addEvidence(p) {
   });
   panel(s, 72, 444, 1136, 156, "Build gates passed", "Android lint ✓     Unit tests ✓     Debug APK assembly ✓     Route/geocoder parsers ✓     Role and lifecycle rules ✓", C.white, C.green);
   note(s, [
-    "The eleven tests cover risk behaviour, confidence, authorization, verification and resolution history, duplicates, route ranking, geocoding parsing, routing parsing, and encoded-polylines.",
+    "Thirteen Android tests cover risk, confidence, authorization, lifecycle, duplicates, map parsing and dataset-response parsing. Three backend tests verify health, metadata, point risk and profile scoring.",
     "Android lint, unit-test, and debug APK assembly tasks pass. Device UI automation remains future work.",
   ], ["Project repository app/src/test", "Local verified build output app/build/outputs/apk/debug/app-debug.apk"]);
 }
@@ -204,8 +204,8 @@ function addEvidence(p) {
 function addRoadmap(p) {
   const s = p.slides.add(); header(s, "07 • Delivery roadmap", "From prototype to validated system", 8);
   const stages = [
-    ["NOW • 30%", "Feasibility", "Android demo\nOSM routing\nExplainable baseline", C.teal],
-    ["NEXT • 55%", "Integration", "Secure roles\nDataset risk API\nModeration + tests", C.navy],
+    ["NOW • 30%", "Integrated MVP", "Android demo\nOSM routing\nSQLite + FastAPI", C.teal],
+    ["NEXT • 55%", "Street precision", "PostGIS segments\nSecure roles\nPersistence + tests", C.navy],
     ["THEN • 80%", "Validation", "ML baselines\nBias + calibration\nHosted map stack", "#9A6500"],
     ["FINAL • 100%", "Productization", "Flutter Android/iOS\nAdmin + privacy\nPilot + monitoring", C.red],
   ];
@@ -226,7 +226,7 @@ function addRoadmap(p) {
 
 function addLimits(p) {
   const s = p.slides.add(); header(s, "08 • Academic honesty", "What we are not claiming", 9);
-  panel(s, 72, 190, 536, 390, "Current limitations", "• Safety labels are synthetic\n\n• No trained ML model yet\n\n• Demo persistence resets\n\n• Public services are for light testing\n\n• Device UI automation is incomplete", C.redPale, C.red);
+  panel(s, 72, 190, 536, 390, "Current limitations", "• Safety labels are synthetic\n\n• No trained ML model yet\n\n• Citizen report persistence resets\n\n• Runtime risk uses 1 km cells\n\n• Public services are for light testing", C.redPale, C.red);
   panel(s, 672, 190, 536, 390, "Responsible boundaries", "• No claim about real neighbourhood safety\n\n• No private victim/offender data\n\n• Missing data ≠ proven safety\n\n• Not an emergency service\n\n• Never guarantees a route is safe", C.mint, C.green);
   textBox(s, "The prototype demonstrates feasibility—not real-world predictive accuracy.", 72, 615, 1136, 38, { size: 24, bold: true, color: C.navy, align: "center" });
   note(s, [
@@ -266,7 +266,7 @@ function addClose(p) {
   textBox(s, "Real road routing + verified-hazard lifecycle + explainable safety objective", 92, 252, 980, 80, { size: 29, color: C.mint });
   shape(s, "roundRect", 92, 382, 1096, 134, C.white, "none", "rounded-xl");
   textBox(s, "Next review target", 120, 406, 280, 32, { size: 22, bold: true, color: C.teal });
-  textBox(s, "Secure persistence  •  dataset-backed route scoring  •  baseline ML evaluation protocol", 120, 454, 1020, 36, { size: 21, bold: true, color: C.navy });
+  textBox(s, "Exact PostGIS road scoring  •  secure persistence  •  baseline ML evaluation protocol", 120, 454, 1020, 36, { size: 21, bold: true, color: C.navy });
   textBox(s, "Questions & feedback", 92, 604, 1096, 38, { size: 25, bold: true, color: C.white, align: "center" });
   note(s, [
     "Close by asking for feedback on three items: whether the ten factors are academically defensible, how the synthetic-data generator should be validated, and what evaluation metrics the department expects for the later ML comparison.",

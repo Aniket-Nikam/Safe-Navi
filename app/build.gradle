@@ -15,11 +15,11 @@ if (localPropertiesFile.exists()) {
 }
 
 android {
-    namespace 'com.example.xavierproject'
+    namespace 'com.safenavi.app'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.example.xavierproject"
+        applicationId "com.safenavi.app"
         minSdk 24
         targetSdk 34
         versionCode 1
@@ -34,6 +34,7 @@ android {
         buildConfigField "String", "FIREBASE_DATABASE_URL", "\"${localProperties.getProperty('FIREBASE_DATABASE_URL', '')}\""
         buildConfigField "String", "NOMINATIM_BASE_URL", "\"${localProperties.getProperty('NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org')}\""
         buildConfigField "String", "VALHALLA_BASE_URL", "\"${localProperties.getProperty('VALHALLA_BASE_URL', 'https://valhalla1.openstreetmap.de')}\""
+        buildConfigField "String", "RISK_API_BASE_URL", "\"${localProperties.getProperty('RISK_API_BASE_URL', 'http://10.0.2.2:8000')}\""
         buildConfigField "boolean", "HAS_FIREBASE_CONFIG", file('google-services.json').exists().toString()
         
     }

@@ -9,6 +9,13 @@ deliverables/*.ndjson
 deliverables/dataset-demo-pack/
 deliverables/*Dataset-Demo-Pack.zip
 deliverables/*Preview.png
+deliverables/*Dataset-Map.png
+deliverables/*Dataset-Route.png
+backend/venv/
+backend/.venv/
+backend/.pytest_cache/
+backend/**/__pycache__/
+*.pyc
 .gradle
 /local.properties
 /.idea/caches

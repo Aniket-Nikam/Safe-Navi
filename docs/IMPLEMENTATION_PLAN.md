@@ -2,7 +2,7 @@
 
 ## Source assessment
 
-XavierProject is a Java/XML Android application with Firebase Authentication and Realtime Database, Google Maps/Location, Cloudinary image upload, Gemini over OkHttp, and RecyclerView-based community features.
+SafeNavi is a Java/XML Android application with Firebase Authentication and Realtime Database, Google Maps/Location, Cloudinary image upload, Gemini over OkHttp, and RecyclerView-based community features.
 
 ### Working components to reuse
 
@@ -26,9 +26,9 @@ XavierProject is a Java/XML Android application with Firebase Authentication and
 - No centralized risk engine, duplicate detector, confidence model, or route safety evaluator exists.
 - Several live features require external Firebase, Maps, Gemini, and Cloudinary configuration.
 
-## Migration
+## Completed migration
 
-The empty Safe-Navi repository will receive a preserved copy of XavierProject. The Java namespace initially remains com.example.xavierproject to avoid a risky blind package migration. User-facing identity, labels, theme, docs, and assistant behavior become Safe-Navi. Working features remain intact while new business rules move into model, data, risk, auth, and service packages.
+The Android namespace and application ID are now `com.safenavi.app`. User-facing identity, labels, theme and documentation use Safe-Navi consistently, and the previous package/branding is absent from the repository. Existing screens remain intact while the new business rules live in model, data, risk and service packages.
 
 ## Target architecture
 
@@ -92,7 +92,7 @@ The project uses AndroidX, Material, Firebase, MapLibre Native, OpenFreeMap, Nom
 
 ## Implementation sequence
 
-1. Copy XavierProject into Safe-Navi without touching XavierProject history.
+1. Copy SafeNavi into Safe-Navi without touching SafeNavi history.
 2. Rebrand the product.
 3. Add models, repositories, risk engine, workflow, authorization, duplicate detection, and synthetic data.
 4. Establish citizen Home, Map, Report, Community, and Profile navigation.

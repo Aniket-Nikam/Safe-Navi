@@ -61,7 +61,7 @@ Safe-Navi therefore combines three ideas:
 - A 2 km spatial-block `train`/`validation`/`test` split is supplied to reduce geographic leakage.
 - Automated QA passed: no null or out-of-range factors, no duplicate segment-period keys, valid road geometries, positive lengths, all four periods per segment, and balanced risk labels.
 - The complete analytics table is stored separately as `road_segments.parquet` (approximately 158 MB), with CSV, GeoPackage, sample, manifest, quality report, data dictionary, and reproducible generator files.
-- This full table is not embedded inside the Android APK. The current mobile demo uses controlled synthetic hazard scenarios; backend/API integration of the Parquet-derived road risk is the next phase.
+- The full table is not embedded inside the Android APK. The app now calls FastAPI, which queries a 2.2 MB SQLite/RTree runtime containing all 6,508 one-kilometre area/time aggregates derived from the dataset. Exact street-segment PostGIS lookup remains the next resolution upgrade.
 
 ## 4. Technology used and why
 
@@ -123,7 +123,7 @@ The denominator is the complete proposed system, not merely an Android screen. T
 | Open map and multimodal routing | Working prototype |
 | Explainable risk and report lifecycle | Working with synthetic data |
 | Persistent secure backend | Partial foundation only |
-| City-scale synthetic/public feature pipeline | Dataset and QA completed; runtime API integration pending |
+| City-scale synthetic/public feature pipeline | Dataset, SQLite runtime and FastAPI/Android integration completed at 1 km resolution |
 | Trained and evaluated ML model | Not started; deliberately not faked |
 | Moderation, alerts, offline use, accessibility | Future work |
 | Flutter Android/iOS application | Future phase after validation |
@@ -135,7 +135,7 @@ The denominator is the complete proposed system, not merely an Android screen. T
 
 - Persist reports, hazards, history, and saved routes.
 - Enforce roles using Firebase custom claims/security rules or a FastAPI backend.
-- Integrate Parquet-derived road risk through a FastAPI/PostGIS or compact spatial service rather than embedding the full table in the APK.
+- Upgrade the working FastAPI/SQLite area-cell service to exact road-segment intersection using PostgreSQL/PostGIS and the full Parquet source.
 - Preserve and publish the existing manifest, data dictionary, generator, OSM attribution, and quality checks.
 - Add report evidence, moderation, notification, and map-filter workflows.
 - Add Android instrumentation tests and conduct a usability study.
@@ -167,4 +167,4 @@ The denominator is the complete proposed system, not merely an Android screen. T
 
 ## 10. Tomorrow's presentation outcome
 
-The milestone should be evaluated on whether it proves the idea is technically buildable. The work now includes both a quality-checked city-scale synthetic road dataset and a runnable Android feasibility prototype. The live application obtains real road routes, attaches controlled explainable synthetic hazard risk, recommends alternatives under three route preferences, and connects citizen reporting with government verification. The next academic decision is how to serve the road-segment dataset to runtime routing and compare deterministic and ML methods without presenting synthetic estimates as real public-safety facts.
+The milestone should be evaluated on whether it proves the idea is technically buildable. The work now includes a quality-checked city-scale synthetic road dataset, an indexed SQLite runtime, a FastAPI risk service, and a runnable Android prototype. The live application obtains real road routes, queries dataset-derived point and route risk for the current time period, reports spatial coverage and leading factors, recommends alternatives under three route preferences, and connects citizen reporting with government verification. The next academic decision is how to upgrade from 1 km aggregates to exact PostGIS road segments and compare deterministic and ML methods without presenting synthetic estimates as real public-safety facts.

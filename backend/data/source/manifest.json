@@ -1,0 +1,124 @@
+{
+  "dataset_name": "Safe Navi Mumbai\u2013Navi Mumbai Synthetic Road Safety Dataset",
+  "version": "1.0.1",
+  "generated_at_utc": "2026-08-09T07:05:53.428492+00:00",
+  "random_seed": 24031996,
+  "factor_count": 10,
+  "osm_attribution": "\u00a9 OpenStreetMap contributors",
+  "osm_license": "ODbL 1.0",
+  "osm_extract_provider": "Geofabrik GmbH",
+  "osm_extract_file": "western-zone-latest.osm.pbf",
+  "osm_extract_url": "https://download.geofabrik.de/asia/india/western-zone-latest.osm.pbf",
+  "coverage_definition": "Mumbai OSM district relations 7964376/7964375 plus documented Navi Mumbai corridor envelope",
+  "road_eligibility": "All OSM highway ways except dedicated non-road paths, inactive/proposed ways, platforms, cycleways and steps",
+  "time_periods": {
+    "morning_peak": {
+      "traffic": 1.2,
+      "crime": 0.88,
+      "light": 0.92,
+      "pedestrian": 1.12
+    },
+    "midday": {
+      "traffic": 0.88,
+      "crime": 0.78,
+      "light": 1.12,
+      "pedestrian": 1.0
+    },
+    "evening_peak": {
+      "traffic": 1.28,
+      "crime": 1.06,
+      "light": 0.82,
+      "pedestrian": 1.18
+    },
+    "night": {
+      "traffic": 0.55,
+      "crime": 1.3,
+      "light": 0.62,
+      "pedestrian": 0.42
+    }
+  },
+  "all_factor_values_and_targets_synthetic": true,
+  "statistics": {
+    "physical_road_segments": 452466,
+    "road_time_rows": 1809864,
+    "area_cells": 1627,
+    "area_time_rows": 6508,
+    "named_road_share": 0.1971,
+    "jurisdiction_physical_segments": {
+      "Mumbai": 263055,
+      "Navi Mumbai": 189411
+    },
+    "road_class_counts": {
+      "residential": 233845,
+      "service": 92201,
+      "tertiary": 39205,
+      "track": 23391,
+      "secondary": 19686,
+      "primary": 13314,
+      "living_street": 7911,
+      "unclassified": 7443,
+      "trunk": 6481,
+      "motorway": 2129,
+      "motorway_link": 1926,
+      "trunk_link": 1805,
+      "primary_link": 1286,
+      "secondary_link": 967,
+      "tertiary_link": 832,
+      "stop": 26,
+      "services": 14,
+      "busway": 4
+    },
+    "risk_label_counts": {
+      "moderate": 453238,
+      "low": 452516,
+      "high": 452183,
+      "very_high": 451927
+    },
+    "ml_split_counts": {
+      "train": 1185896,
+      "test": 336932,
+      "validation": 287036
+    },
+    "unique_osm_way_ids": 79320,
+    "unique_street_names": 3869,
+    "unique_area_labels": 719,
+    "total_physical_road_length_km": 12124.31
+  },
+  "quality_checks": {
+    "status": "passed",
+    "factor_count": 10,
+    "factor_columns": [
+      "traffic_congestion_index",
+      "crime_risk_index",
+      "lighting_quality_index",
+      "population_density_index",
+      "road_condition_index",
+      "pedestrian_activity_index",
+      "emergency_access_index",
+      "flood_risk_index",
+      "isolation_index",
+      "public_transport_access_index"
+    ],
+    "null_factor_values": 0,
+    "out_of_range_factor_values": 0,
+    "periods": [
+      "morning_peak",
+      "midday",
+      "evening_peak",
+      "night"
+    ],
+    "risk_classes_quartile_balanced": true,
+    "duplicate_segment_time_keys": 0,
+    "invalid_road_geometries": 0,
+    "nonpositive_segment_lengths": 0,
+    "all_periods_per_segment": true,
+    "spatial_split_consistent_per_segment": true
+  },
+  "risk_label_method": "Global quartiles of synthetic_safety_risk_score",
+  "risk_label_thresholds": {
+    "low_max": 43.02,
+    "moderate_max": 46.9,
+    "high_max": 50.61,
+    "very_high_max": 100.0
+  }
+}

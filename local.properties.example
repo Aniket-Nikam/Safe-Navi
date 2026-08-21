@@ -6,3 +6,4 @@ UPLOAD_PRESET=
 FIREBASE_DATABASE_URL=https://YOUR_PROJECT-default-rtdb.asia-southeast1.firebasedatabase.app
 NOMINATIM_BASE_URL=https://nominatim.openstreetmap.org
 VALHALLA_BASE_URL=https://valhalla1.openstreetmap.de
+RISK_API_BASE_URL=http://10.0.2.2:8000

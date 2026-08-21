@@ -5,9 +5,9 @@
 The strongest presentation is a two-part demonstration:
 
 1. **Data milestone:** prove that the city-scale synthetic dataset exists, is documented, and passes QA.
-2. **Application milestone:** prove that the mobile workflow and OpenStreetMap routing work, while stating that full Parquet-to-app integration is the next phase.
+2. **Application milestone:** prove that the mobile workflow uses a FastAPI/SQLite runtime derived from the full dataset alongside OpenStreetMap routing.
 
-Do not claim that the Android route shown today is already reading all 1.8 million Parquet rows.
+Do not claim that Android scans all 1.8 million Parquet rows directly. State that it queries all 6,508 area/time aggregates through the included SQLite/RTree and FastAPI runtime.
 
 ## Before presenting
 
@@ -113,7 +113,7 @@ Point out:
 
 Say:
 
-“The road route is real OpenStreetMap geometry. The safety exposure shown in this mobile milestone comes from controlled synthetic hazard scenarios. The full road-segment Parquet dataset will be served through a backend in the next integration phase.”
+“The road route is real OpenStreetMap geometry. FastAPI samples it against the dataset-derived SQLite runtime for the current time period. The screen proves this by showing Dataset API, coverage percentage and leading factors. The next phase upgrades the current 1 km aggregation to exact PostGIS road-segment intersections.”
 
 ### Citizen-to-government workflow
 
@@ -129,13 +129,13 @@ Explain that citizen reports and verified hazards are separate so an unverified 
 
 Say:
 
-“The complete Parquet file is approximately 158 MB and contains 1.8 million rows. It is designed for analytics, model training, and indexed spatial lookup. Shipping and scanning it directly inside every phone would increase the APK size and produce inefficient queries. The planned architecture stores it behind FastAPI with PostgreSQL/PostGIS, or produces compact indexed regional extracts. The phone sends route geometry and time period; the service returns the relevant segment risks and explanation.”
+“The complete Parquet file is approximately 158 MB and contains 1.8 million rows. It is designed for analytics, model training, and future exact PostGIS lookup. Shipping and scanning it directly inside every phone would be inefficient. Our working architecture derives a 2.2 MB SQLite/RTree database containing all 1 km area/time aggregates and serves it through FastAPI. The phone sends route geometry and time period; the service returns exposure, coverage and factor explanations.”
 
 ## Part 5 — Future work (1 minute)
 
 Present the next sequence:
 
-1. load Parquet/GeoPackage data into PostgreSQL/PostGIS;
+1. load full Parquet road segments into PostgreSQL/PostGIS to upgrade the current working area-cell API;
 2. expose nearby-segment and route-risk endpoints through FastAPI;
 3. connect the Android route evaluator to those endpoints;
 4. persist reports and enforce government roles server-side;

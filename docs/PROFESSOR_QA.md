@@ -10,11 +10,11 @@ It proves software and workflow feasibility: real road routes can be obtained, h
 
 ## Are you claiming to cover every street of Mumbai?
 
-The dataset covers every eligible road-like OpenStreetMap way in the downloaded source snapshot inside the documented Mumbai and Navi Mumbai coverage polygons: 452,466 physical segments and 12,124.31 km. It cannot guarantee roads that were unmapped, private, newly built, outside the polygons, or incorrectly tagged. The Android app currently uses a small controlled hazard subset; full dataset runtime integration is next.
+The dataset covers every eligible road-like OpenStreetMap way in the downloaded source snapshot inside the documented Mumbai and Navi Mumbai coverage polygons: 452,466 physical segments and 12,124.31 km. It cannot guarantee roads that were unmapped, private, newly built, outside the polygons, or incorrectly tagged. The Android app now uses the dataset's complete 1 km area-cell aggregation through SQLite and FastAPI; exact street-segment PostGIS lookup is next.
 
 ## Is the full Parquet dataset used by the Android app?
 
-Not yet. The full `road_segments.parquet` file is approximately 158 MB and is intended for training, analytics, and server-side spatial lookup. Embedding and scanning it directly on a phone would make the APK unnecessarily large and inefficient. The current app uses controlled synthetic hazards to prove the interface and workflow. The next phase exposes Parquet-derived segment risk through FastAPI/PostGIS or a compact indexed mobile export.
+The app uses a runtime product derived from it. The full `road_segments.parquet` file is approximately 158 MB and remains the training/future PostGIS source. Embedding and scanning it directly on a phone would be inefficient. For the working milestone, all 6,508 one-kilometre area/time aggregates were converted into a 2.2 MB SQLite database with an RTree index. FastAPI queries that database, and the Android route screen displays `Dataset API`, time period, coverage and leading factors. The next phase changes spatial resolution from area cells to exact road segments.
 
 ## Why not use Google Maps?
 

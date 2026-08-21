@@ -10,7 +10,7 @@
 
 ## Why this is the 30% milestone — 55 seconds
 
-“We are measuring progress against the full system: secure backend integration, trained and evaluated ML, production map infrastructure, admin operations, privacy controls, and Android/iOS delivery. We have completed a city-scale synthetic dataset with 452,466 physical road segments and 1,809,864 rows across four time periods, plus the runnable feasibility layer and core interaction flow. The dataset and app are currently separate: the mobile demo uses controlled synthetic scenarios, while serving Parquet-derived road risk to the app is the next integration step.”
+“We are measuring progress against the full system: production authorization, trained and evaluated ML, production map infrastructure, admin operations, privacy controls, and Android/iOS delivery. We completed a city-scale synthetic dataset with 452,466 physical road segments and 1,809,864 rows across four time periods. We then derived a compact 1 km SQLite/RTree runtime, exposed it through FastAPI, and connected the Android map to it. Exact street-segment PostGIS lookup is the next resolution upgrade.”
 
 ## Dataset milestone — 50 seconds
 
@@ -18,7 +18,7 @@
 
 ## What works now — 70 seconds
 
-“The current Android prototype has citizen and government demo modes. A citizen can inspect a safety score, see controlled synthetic hazards, enter source and destination, choose driving, walking, or cycling, and compare fastest, balanced, and safest routes. These routes are generated from the real OpenStreetMap road graph through Valhalla; the app does not draw artificial straight lines. A citizen can also submit a synthetic report. In the government view, that report can be verified and published, retained for monitoring, or resolved. The city-scale Parquet data is not yet queried by this screen, and we state that openly.”
+“The current Android prototype has citizen and government demo modes. A citizen can inspect a dataset-backed point score, enter source and destination, choose driving, walking, or cycling, and compare fastest, balanced, and safest routes. Valhalla generates real OpenStreetMap road geometry. FastAPI samples each candidate route against the SQLite dataset and returns exposure, time period, coverage percentage, and leading factors. A citizen can also submit a synthetic report, which a government demo user can verify, monitor, or resolve.”
 
 ## Technology and rationale — 65 seconds
 
@@ -44,7 +44,7 @@ If the internet is slow, say: “The map-routing layer uses public community ser
 
 ## Roadmap — 55 seconds
 
-“The next phase is secure persistence, backend-enforced roles, a FastAPI or spatial service that exposes the completed Parquet-derived road risks, moderation, alerts, and device-level tests. After that, we will train baseline models using the supplied geographic split and compare them with the transparent rule engine for calibration, bias, and false reassurance. The final phase includes self-hosted map infrastructure, accessibility, privacy review, the government dashboard, and then Flutter for Android and iOS if the validated prototype supports that investment.”
+“The next phase upgrades the working FastAPI/SQLite service to PostgreSQL/PostGIS for exact road-segment intersections, adds secure persistence and server-enforced roles, and expands moderation, alerts, and device tests. After that, we will train baseline models using the supplied geographic split and compare them with the transparent rule engine for calibration, bias, and false reassurance. The final phase includes self-hosted map infrastructure, accessibility, privacy review, the government dashboard, and Flutter for Android and iOS.”
 
 ## Closing — 25 seconds
 

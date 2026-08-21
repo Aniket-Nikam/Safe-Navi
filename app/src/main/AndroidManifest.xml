@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
     <application
-        android:usesCleartextTraffic="false"
+        android:usesCleartextTraffic="true"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -16,14 +16,14 @@
         android:roundIcon="@drawable/ic_icon"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.XavierProject"
+        android:theme="@style/Theme.SafeNavi"
         tools:targetApi="31">
 
         <!-- Splash Activity (App Entry Point) -->
         <activity
             android:name=".SplashActivity"
             android:exported="true"
-            android:theme="@style/Theme.XavierProject.Splash">
+            android:theme="@style/Theme.SafeNavi.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -34,61 +34,61 @@
         <activity
             android:name=".LoginTypeActivity"
             android:exported="false"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <!-- Login Activity -->
         <activity
             android:name=".LoginActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <!-- SignUp Activity -->
         <activity
             android:name=".SignUpActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="false"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
             
         <activity
             android:name=".AdminMainActivity"
             android:exported="false"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
             
         <activity
             android:name=".GovMainActivity"
             android:exported="false"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <activity
             android:name=".GovernmentSafetyDashboardActivity"
             android:exported="false"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
             
         <activity
             android:name=".ManageUsersActivity"
             android:exported="false"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <!-- Maps Activity -->
         <activity
             android:name=".MapsActivity"
             android:label="Maps"
             android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <!-- Complaints Activity -->
         <activity
             android:name=".ComplaintsActivity"
             android:label="Complaints"
             android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
 
         <activity android:name=".DiscussionActivity" android:exported="false" />
         <activity android:name=".CommentsActivity" android:exported="false" />
@@ -100,7 +100,7 @@
             android:name=".SettingsActivity"
             android:exported="false"
             android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.XavierProject" />
+            android:theme="@style/Theme.SafeNavi" />
         <activity android:name=".ComplaintDetailActivity" />
     </application>
 
