@@ -39,6 +39,7 @@ The app currently queries the complete 1 km area-cell aggregation derived from t
 - `README.md` — architecture, limitations and setup
 - `docs/PRESENTATION_SCRIPT.md` — live speaking guide
 - `docs/PROFESSOR_QA.md` — defensible answers
+- `docs/TEAM_PRESENTATION_SCRIPTS.md` — complete three-member and four-member speaking scripts
 
 ## Next milestone
 
