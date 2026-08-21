@@ -1,4 +1,11 @@
 *.iml
+presentation-build/node_modules/
+presentation-build/rendered/
+presentation-build/temp/
+deliverables/*.apk
+deliverables/*.pptx
+deliverables/*.zip
+deliverables/*.ndjson
 .gradle
 /local.properties
 /.idea/caches
