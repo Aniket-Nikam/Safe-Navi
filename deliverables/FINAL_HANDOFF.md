@@ -9,6 +9,7 @@
 - SQLite/RTree runtime containing 6,508 Mumbai–Navi Mumbai area/time rows
 - Ten synthetic risk factors and four time periods
 - Dataset-backed point and route scoring with visible coverage and factor explanations
+- Original Safe-Navi visual system: route-and-shield mark, map-first planner, safety preference sheet and accessible high-contrast palette
 - Clearly labelled offline controlled-hazard fallback
 - Citizen reporting and government verification demonstration flows
 - 13 Android JVM tests, Android lint and APK assembly passing

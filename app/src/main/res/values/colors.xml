@@ -1,30 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Primary Colors -->
-    <color name="primary">#6366F1</color>
-    <color name="primary_dark">#4F46E5</color>
-    <color name="primary_light">#A5B4FC</color>
+    <!-- Safe-Navi brand: deep city teal + high-visibility route lime -->
+    <color name="primary">#087F6A</color>
+    <color name="primary_dark">#073D36</color>
+    <color name="primary_light">#CDEDE4</color>
 
     <!-- Accent Colors -->
-    <color name="accent">#EC4899</color>
-    <color name="accent_light">#F9A8D4</color>
+    <color name="accent">#D9F36A</color>
+    <color name="accent_light">#EFF8BE</color>
+    <color name="signal_coral">#F26B5E</color>
+    <color name="city_navy">#102B2A</color>
+    <color name="sand">#F6F3EB</color>
 
     <!-- Background Colors - Light Mode -->
-    <color name="background">#F8FAFC</color>
+    <color name="background">#F4F7F3</color>
     <color name="surface">#FFFFFF</color>
-    <color name="input_background">#F1F5F9</color>
+    <color name="input_background">#EDF3EF</color>
 
     <!-- Text Colors - Light Mode -->
-    <color name="text_primary">#0F172A</color>
-    <color name="text_secondary">#64748B</color>
-    <color name="text_hint">#94A3B8</color>
+    <color name="text_primary">#102B2A</color>
+    <color name="text_secondary">#61726D</color>
+    <color name="text_hint">#8A9994</color>
     <color name="button_default">#757575</color>
     <!-- Other Colors -->
-    <color name="divider">#E2E8F0</color>
-    <color name="error">#EF4444</color>
-    <color name="success">#10B981</color>
-    <color name="warning">#F59E0B</color>
-    <color name="warning_background">#FEF3C7</color>
+    <color name="divider">#DCE6E1</color>
+    <color name="error">#D95046</color>
+    <color name="success">#178B67</color>
+    <color name="warning">#D88A18</color>
+    <color name="warning_background">#FFF0CE</color>
     <color name="category_general">#E0E0E0</color>
     <color name="category_question">#2196F3</color>
     <color name="category_discussion">#9C27B0</color>

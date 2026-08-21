@@ -11,6 +11,8 @@ deliverables/*Dataset-Demo-Pack.zip
 deliverables/*Preview.png
 deliverables/*Dataset-Map.png
 deliverables/*Dataset-Route.png
+deliverables/*Redesign-*.png
+deliverables/safe_navi_*.xml
 backend/venv/
 backend/.venv/
 backend/.pytest_cache/

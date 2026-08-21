@@ -12,7 +12,9 @@ The Android namespace and application ID are `com.safenavi.app`. The repository 
 - FastAPI queries an included SQLite spatial runtime derived from the completed synthetic dataset.
 - Point scores and route exposure use the dataset's ten factors for the current time period.
 - The map visibly reports `Dataset API`, time period, coverage percentage and leading factors.
+- A purpose-built Safe-Navi interface uses a map-first hierarchy, route-and-shield identity, safety preference sheet and consistent city-teal/signal-lime design system.
 - If the local API is stopped, the Android app clearly labels and uses a controlled offline-hazard fallback.
+- Connected account screens remain optional and now fail gracefully when Firebase is not configured instead of closing the app.
 - Citizen reports and government-verified hazards remain separate domain concepts.
 - Thirteen Android JVM tests and three backend tests cover the current milestone.
 

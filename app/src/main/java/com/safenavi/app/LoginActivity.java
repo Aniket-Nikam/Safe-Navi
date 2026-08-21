@@ -79,6 +79,14 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void setupFirebase() {
+        if (!BuildConfig.HAS_FIREBASE_CONFIG || BuildConfig.FIREBASE_DATABASE_URL.trim().isEmpty()) {
+            loginButton.setEnabled(false);
+            forgotPasswordTextView.setEnabled(false);
+            Snackbar.make(rootView,
+                    "Connected sign-in is not configured. Use a prototype role from the previous screen.",
+                    Snackbar.LENGTH_INDEFINITE).show();
+            return;
+        }
         mAuth = FirebaseAuth.getInstance();
         usersRef = FirebaseDatabase.getInstance(BuildConfig.FIREBASE_DATABASE_URL).getReference("users");
     }
@@ -89,6 +97,10 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void loginWithEmail() {
+        if (mAuth == null || usersRef == null) {
+            Snackbar.make(rootView, "Connected sign-in is unavailable in this build.", Snackbar.LENGTH_LONG).show();
+            return;
+        }
         String email = emailEditText.getText().toString().trim();
         String password = passwordEditText.getText().toString().trim();
 
@@ -220,6 +232,10 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void resetPassword() {
+        if (mAuth == null) {
+            Snackbar.make(rootView, "Password reset requires Firebase configuration.", Snackbar.LENGTH_LONG).show();
+            return;
+        }
         String email = emailEditText.getText().toString().trim();
 
         if (TextUtils.isEmpty(email)) {
