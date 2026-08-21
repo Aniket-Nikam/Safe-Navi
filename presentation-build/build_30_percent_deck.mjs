@@ -103,17 +103,21 @@ function addProblem(p) {
 }
 
 function addThirty(p) {
-  const s = p.slides.add(); header(s, "02 • Honest progress definition", "What 30% complete means", 3);
-  textBox(s, "30%", 72, 198, 320, 170, { size: 116, bold: true, color: C.teal });
-  textBox(s, "Feasibility layer\nand core flow proven", 76, 375, 360, 95, { size: 28, bold: true, color: C.navy });
-  panel(s, 455, 190, 235, 380, "Foundation", "Runnable Android app\n\nCitizen + government demo\n\nSynthetic mode without private keys", C.white);
-  panel(s, 714, 190, 235, 380, "Navigation", "Open map\n\nReal road routes\n\n3 travel modes\n\n3 route preferences", C.bluePale);
-  panel(s, 973, 190, 235, 380, "Safety logic", "Explainable risk\n\nVerification lifecycle\n\nConfidence + reasons\n\nTests", C.amberPale);
-  textBox(s, "Remaining scope: secure persistence • scalable data pipeline • validated ML • production infrastructure • Flutter/iOS", 72, 610, 1136, 45, { size: 18, bold: true, color: C.muted });
+  const s = p.slides.add(); header(s, "02 • Data milestone", "City-scale synthetic dataset completed", 3);
+  textBox(s, "30%", 72, 190, 300, 150, { size: 108, bold: true, color: C.teal });
+  textBox(s, "Dataset + runnable\nfeasibility prototype", 76, 350, 330, 90, { size: 27, bold: true, color: C.navy });
+  panel(s, 430, 190, 240, 170, "452,466", "physical OSM road segments", C.white);
+  panel(s, 694, 190, 240, 170, "1,809,864", "segment–time rows", C.bluePale);
+  panel(s, 958, 190, 250, 170, "10 × 4", "factors × time periods", C.amberPale);
+  shape(s, "roundRect", 430, 390, 778, 162, C.mint, C.border, "rounded-xl");
+  textBox(s, "Quality checks passed", 456, 416, 320, 34, { size: 25, bold: true, color: C.green });
+  textBox(s, "No null factors • valid geometries • spatial ML split • balanced labels", 456, 466, 700, 58, { size: 19, color: C.ink });
+  textBox(s, "Current app: controlled synthetic scenarios  •  Next integration: serve Parquet-derived road risk through a backend/API", 72, 605, 1136, 52, { size: 18, bold: true, color: C.muted });
   note(s, [
     "Do not measure progress only by the number of screens. The complete denominator includes data governance, secure backend, ML validation, operations, production hosting, and cross-platform delivery.",
-    "This milestone proves feasibility. The remaining work is the scientific and production-hardening portion.",
-  ], ["Project repository docs/30_PERCENT_PROGRESS_REPORT.md"]);
+    "The separate Mumbai–Navi Mumbai dataset is complete: 452,466 physical road segments become 1,809,864 rows across four time periods, with exactly ten synthetic factors.",
+    "Be precise: the Android app currently uses controlled synthetic scenarios. The full Parquet table is prepared for training and backend integration; it is not embedded in the APK.",
+  ], ["Dataset manifest.json", "Dataset QUALITY_REPORT.json", "Project repository docs/30_PERCENT_PROGRESS_REPORT.md"]);
 }
 
 function addCurrentDemo(p) {
@@ -124,6 +128,7 @@ function addCurrentDemo(p) {
   note(s, [
     "Walk through the citizen and government sides as one connected lifecycle.",
     "Emphasize that routing uses genuine road geometry returned by Valhalla. Synthetic data applies only to hazard labels in this milestone.",
+    "The running mobile demo does not query the 158 MB Parquet file directly. It uses a small controlled scenario set while the full dataset remains the analytics/training source for the next backend integration.",
   ], ["Project repository README.md", "https://github.com/valhalla/valhalla/blob/master/README.md"]);
 }
 
@@ -200,7 +205,7 @@ function addRoadmap(p) {
   const s = p.slides.add(); header(s, "07 • Delivery roadmap", "From prototype to validated system", 8);
   const stages = [
     ["NOW • 30%", "Feasibility", "Android demo\nOSM routing\nExplainable baseline", C.teal],
-    ["NEXT • 55%", "Persistence", "Secure roles\nData generator\nModeration + tests", C.navy],
+    ["NEXT • 55%", "Integration", "Secure roles\nDataset risk API\nModeration + tests", C.navy],
     ["THEN • 80%", "Validation", "ML baselines\nBias + calibration\nHosted map stack", "#9A6500"],
     ["FINAL • 100%", "Productization", "Flutter Android/iOS\nAdmin + privacy\nPilot + monitoring", C.red],
   ];
@@ -261,7 +266,7 @@ function addClose(p) {
   textBox(s, "Real road routing + verified-hazard lifecycle + explainable safety objective", 92, 252, 980, 80, { size: 29, color: C.mint });
   shape(s, "roundRect", 92, 382, 1096, 134, C.white, "none", "rounded-xl");
   textBox(s, "Next review target", 120, 406, 280, 32, { size: 22, bold: true, color: C.teal });
-  textBox(s, "Secure persistence  •  documented city-scale synthetic pipeline  •  baseline evaluation protocol", 120, 454, 1020, 36, { size: 21, bold: true, color: C.navy });
+  textBox(s, "Secure persistence  •  dataset-backed route scoring  •  baseline ML evaluation protocol", 120, 454, 1020, 36, { size: 21, bold: true, color: C.navy });
   textBox(s, "Questions & feedback", 92, 604, 1096, 38, { size: 25, bold: true, color: C.white, align: "center" });
   note(s, [
     "Close by asking for feedback on three items: whether the ten factors are academically defensible, how the synthetic-data generator should be validated, and what evaluation metrics the department expects for the later ML comparison.",

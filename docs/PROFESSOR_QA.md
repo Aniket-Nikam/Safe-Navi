@@ -10,7 +10,11 @@ It proves software and workflow feasibility: real road routes can be obtained, h
 
 ## Are you claiming to cover every street of Mumbai?
 
-No. OpenStreetMap supplies broad public road geometry, but the current synthetic safety scenarios are limited demonstration records. A city-scale feature pipeline is planned; its completeness and OpenStreetMap coverage will be measured rather than assumed.
+The dataset covers every eligible road-like OpenStreetMap way in the downloaded source snapshot inside the documented Mumbai and Navi Mumbai coverage polygons: 452,466 physical segments and 12,124.31 km. It cannot guarantee roads that were unmapped, private, newly built, outside the polygons, or incorrectly tagged. The Android app currently uses a small controlled hazard subset; full dataset runtime integration is next.
+
+## Is the full Parquet dataset used by the Android app?
+
+Not yet. The full `road_segments.parquet` file is approximately 158 MB and is intended for training, analytics, and server-side spatial lookup. Embedding and scanning it directly on a phone would make the APK unnecessarily large and inefficient. The current app uses controlled synthetic hazards to prove the interface and workflow. The next phase exposes Parquet-derived segment risk through FastAPI/PostGIS or a compact indexed mobile export.
 
 ## Why not use Google Maps?
 

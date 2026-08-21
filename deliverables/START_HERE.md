@@ -8,6 +8,8 @@
 4. `../docs/PRESENTATION_SCRIPT.md` — the complete 8–10 minute speaking script.
 5. `../docs/PROFESSOR_QA.md` — likely questions and concise answers.
 6. `../docs/30_PERCENT_PROGRESS_REPORT.md` — detailed written explanation.
+7. `../docs/DATASET_AND_APP_DEMO_GUIDE.md` — exact dataset + application demonstration order.
+8. `Safe-Navi-Dataset-Demo-Pack.zip` — small professor-facing dataset proof pack; use this instead of opening the 158 MB Parquet file live.
 
 ## Tonight
 

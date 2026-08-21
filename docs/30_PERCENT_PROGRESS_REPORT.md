@@ -53,6 +53,16 @@ Safe-Navi therefore combines three ideas:
 - Tests cover risk behaviour, confidence, roles, lifecycle transitions, duplicate matching, route ranking, geocoding parsing, route parsing, and encoded-polyline decoding.
 - Android lint, unit-test, and debug APK build tasks pass.
 
+### F. City-scale synthetic dataset completed
+
+- OpenStreetMap-grounded coverage contains 452,466 physical road segments: 263,055 in Mumbai and 189,411 in the documented Navi Mumbai coverage envelope.
+- Four time periods produce 1,809,864 segment-time rows: morning peak, midday, evening peak, and night.
+- Every row has exactly ten synthetic model factors and a synthetic continuous/categorical target.
+- A 2 km spatial-block `train`/`validation`/`test` split is supplied to reduce geographic leakage.
+- Automated QA passed: no null or out-of-range factors, no duplicate segment-period keys, valid road geometries, positive lengths, all four periods per segment, and balanced risk labels.
+- The complete analytics table is stored separately as `road_segments.parquet` (approximately 158 MB), with CSV, GeoPackage, sample, manifest, quality report, data dictionary, and reproducible generator files.
+- This full table is not embedded inside the Android APK. The current mobile demo uses controlled synthetic hazard scenarios; backend/API integration of the Parquet-derived road risk is the next phase.
+
 ## 4. Technology used and why
 
 | Technology | Use in Safe-Navi | Reason for choosing it |
@@ -85,20 +95,22 @@ The displayed safety score is `100 - risk`. Confidence is independent: limited e
 
 ## 6. What the synthetic dataset represents
 
-The current milestone uses clearly labelled fictional scenarios around Mumbai and Navi Mumbai. The records are designed to exercise the complete workflow rather than claim true crime or safety conditions. Each hazard can carry ten modelling dimensions:
+The separate Mumbai–Navi Mumbai road dataset covers every eligible road-like OpenStreetMap way in its documented source snapshot and coverage polygons. “Every street” therefore means every eligible street mapped in that snapshot; it cannot guarantee unmapped, private, newly built, or incorrectly tagged streets. The dataset contains 12,124.31 km of physical road segments, 79,320 unique OSM way IDs, 3,869 unique street names, and 719 locality labels.
 
-1. category/type;
-2. severity;
-3. government verification state;
-4. spatial distance or route exposure;
-5. report age/time decay;
-6. lifecycle status;
-7. recurrence;
-8. citizen confirmations;
-9. nearby hazard density; and
-10. source reliability/confidence.
+Each segment-time row contains ten synthetic factors:
 
-Road geometry is public OpenStreetMap-derived data; safety labels are synthetic. No private victim, offender, or individual movement data is used.
+1. traffic congestion;
+2. crime risk;
+3. lighting quality;
+4. population density;
+5. road condition;
+6. pedestrian activity;
+7. emergency access;
+8. flood risk;
+9. isolation; and
+10. public-transport access.
+
+The factor values and target labels are deterministic, spatially correlated simulations—not observed measurements. OpenStreetMap supplies road geometry and selected tags only. The Android workflow additionally uses a small set of fictional hazard scenarios to demonstrate verification, lifecycle and route-exposure behaviour. No private victim, offender, or individual movement data is used.
 
 ## 7. Why this is called 30%, despite being runnable
 
@@ -111,7 +123,7 @@ The denominator is the complete proposed system, not merely an Android screen. T
 | Open map and multimodal routing | Working prototype |
 | Explainable risk and report lifecycle | Working with synthetic data |
 | Persistent secure backend | Partial foundation only |
-| Large synthetic/public feature pipeline | Not yet productionized |
+| City-scale synthetic/public feature pipeline | Dataset and QA completed; runtime API integration pending |
 | Trained and evaluated ML model | Not started; deliberately not faked |
 | Moderation, alerts, offline use, accessibility | Future work |
 | Flutter Android/iOS application | Future phase after validation |
@@ -123,7 +135,8 @@ The denominator is the complete proposed system, not merely an Android screen. T
 
 - Persist reports, hazards, history, and saved routes.
 - Enforce roles using Firebase custom claims/security rules or a FastAPI backend.
-- Expand the synthetic data generator and document data lineage.
+- Integrate Parquet-derived road risk through a FastAPI/PostGIS or compact spatial service rather than embedding the full table in the APK.
+- Preserve and publish the existing manifest, data dictionary, generator, OSM attribution, and quality checks.
 - Add report evidence, moderation, notification, and map-filter workflows.
 - Add Android instrumentation tests and conduct a usability study.
 
@@ -154,4 +167,4 @@ The denominator is the complete proposed system, not merely an Android screen. T
 
 ## 10. Tomorrow's presentation outcome
 
-The milestone should be evaluated on whether it proves the idea is technically buildable. The demonstration shows that Safe-Navi can obtain real road routes, attach explainable synthetic risk, recommend alternatives under three route preferences, and connect citizen reporting with government verification. The next academic decision is how to validate the data pipeline and compare deterministic and ML methods without presenting synthetic estimates as real public-safety facts.
+The milestone should be evaluated on whether it proves the idea is technically buildable. The work now includes both a quality-checked city-scale synthetic road dataset and a runnable Android feasibility prototype. The live application obtains real road routes, attaches controlled explainable synthetic hazard risk, recommends alternatives under three route preferences, and connects citizen reporting with government verification. The next academic decision is how to serve the road-segment dataset to runtime routing and compare deterministic and ML methods without presenting synthetic estimates as real public-safety facts.

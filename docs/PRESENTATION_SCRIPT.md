@@ -8,13 +8,17 @@
 
 “The problem has two parts. First, the fastest route may not match a traveller's safety preference. Second, citizen safety reports may be unverified and disconnected from navigation. Our proposed loop is citizen report, government verification, structured hazard, explainable risk calculation, and route comparison. We keep raw citizen reports separate from verified hazards so that an unverified claim does not automatically become an official map warning.”
 
-## Why this is the 30% milestone — 45 seconds
+## Why this is the 30% milestone — 55 seconds
 
-“We are measuring progress against the full system: secure backend, data pipeline, trained and evaluated ML, production map infrastructure, admin operations, privacy controls, and Android/iOS delivery. This milestone completes the feasibility layer and core interaction flow. It is runnable, but it is not production-ready and it does not claim real safety coverage.”
+“We are measuring progress against the full system: secure backend integration, trained and evaluated ML, production map infrastructure, admin operations, privacy controls, and Android/iOS delivery. We have completed a city-scale synthetic dataset with 452,466 physical road segments and 1,809,864 rows across four time periods, plus the runnable feasibility layer and core interaction flow. The dataset and app are currently separate: the mobile demo uses controlled synthetic scenarios, while serving Parquet-derived road risk to the app is the next integration step.”
+
+## Dataset milestone — 50 seconds
+
+“Our OpenStreetMap-grounded dataset covers every eligible mapped road segment inside the documented Mumbai and Navi Mumbai polygons. It contains exactly ten synthetic factors: traffic, crime risk, lighting, population density, road condition, pedestrian activity, emergency access, flood risk, isolation, and public-transport access. Automated checks passed for nulls, value ranges, duplicate keys, geometry, time-period completeness, spatial splits, and label balance. These are simulated factors—not observed safety measurements—so the dataset demonstrates a complete training and evaluation pipeline, not real neighbourhood safety.”
 
 ## What works now — 70 seconds
 
-“The current Android prototype has citizen and government demo modes. A citizen can inspect a safety score, see severity-coloured hazards, enter source and destination, choose driving, walking, or cycling, and compare fastest, balanced, and safest routes. These routes are generated from the real OpenStreetMap road graph through Valhalla; the app does not draw artificial straight lines. A citizen can also submit a synthetic report. In the government view, that report can be verified and published, retained for monitoring, or resolved. The underlying domain model also supports rejection, duplicates, role checks, and audit history.”
+“The current Android prototype has citizen and government demo modes. A citizen can inspect a safety score, see controlled synthetic hazards, enter source and destination, choose driving, walking, or cycling, and compare fastest, balanced, and safest routes. These routes are generated from the real OpenStreetMap road graph through Valhalla; the app does not draw artificial straight lines. A citizen can also submit a synthetic report. In the government view, that report can be verified and published, retained for monitoring, or resolved. The city-scale Parquet data is not yet queried by this screen, and we state that openly.”
 
 ## Technology and rationale — 65 seconds
 
@@ -40,7 +44,7 @@ If the internet is slow, say: “The map-routing layer uses public community ser
 
 ## Roadmap — 55 seconds
 
-“The next phase is secure persistence, backend-enforced roles, a larger reproducible synthetic-data pipeline, moderation, alerts, and device-level tests. After that, we will create geographically and temporally separated evaluation data, train baseline models, and compare them with the transparent rule engine for calibration, bias, and false reassurance. The final phase includes self-hosted map infrastructure, accessibility, privacy review, the government dashboard, and then Flutter for Android and iOS if the validated prototype supports that investment.”
+“The next phase is secure persistence, backend-enforced roles, a FastAPI or spatial service that exposes the completed Parquet-derived road risks, moderation, alerts, and device-level tests. After that, we will train baseline models using the supplied geographic split and compare them with the transparent rule engine for calibration, bias, and false reassurance. The final phase includes self-hosted map infrastructure, accessibility, privacy review, the government dashboard, and then Flutter for Android and iOS if the validated prototype supports that investment.”
 
 ## Closing — 25 seconds
 

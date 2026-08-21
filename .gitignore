@@ -6,6 +6,9 @@ deliverables/*.apk
 deliverables/*.pptx
 deliverables/*.zip
 deliverables/*.ndjson
+deliverables/dataset-demo-pack/
+deliverables/*Dataset-Demo-Pack.zip
+deliverables/*Preview.png
 .gradle
 /local.properties
 /.idea/caches
