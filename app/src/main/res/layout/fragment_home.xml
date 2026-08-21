@@ -14,7 +14,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="SAFE-NAVI · LIVE PROTOTYPE"
-            android:textColor="#08735C"
+            android:textColor="@color/primary"
             android:textSize="12sp"
             android:textStyle="bold"
             android:letterSpacing="0.12" />
@@ -24,7 +24,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="Good evening, Citizen"
-            android:textColor="#10231D"
+            android:textColor="@color/text_primary"
             android:textSize="28sp"
             android:textStyle="bold" />
         <TextView
@@ -32,7 +32,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:text="Safety context for every route, without hiding the trade-offs."
-            android:textColor="#647169"
+            android:textColor="@color/text_secondary"
             android:textSize="15sp" />
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
@@ -70,7 +70,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:text="Moderate risk · High confidence"
-                            android:textColor="#FFFFFF"
+                            android:textColor="@color/on_dark_surface"
                             android:textSize="18sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -92,7 +92,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="SCORE"
-                            android:textColor="#19483E"
+                            android:textColor="@color/on_accent"
                             android:textSize="8sp"
                             android:textStyle="bold" />
                     </LinearLayout>
@@ -103,7 +103,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
                     android:text="A verified hazard nearby contributes to this score."
-                    android:textColor="#C7D6D1"
+                    android:textColor="@color/dark_surface_secondary"
                     android:textSize="13sp"
                     android:lineSpacingExtra="3dp" />
                 <com.google.android.material.button.MaterialButton
@@ -126,7 +126,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:text="Take action"
-            android:textColor="#10231D"
+            android:textColor="@color/text_primary"
             android:textSize="19sp"
             android:textStyle="bold" />
         <LinearLayout
@@ -143,9 +143,9 @@
                 android:layout_weight="1"
                 android:text="Report danger"
                 android:textAllCaps="false"
-                android:textColor="#B83A32"
+                android:textColor="@color/danger_text"
                 app:cornerRadius="16dp"
-                app:strokeColor="#E8B4AF" />
+                app:strokeColor="@color/danger_border" />
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/openCommunityButton"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -155,9 +155,9 @@
                 android:layout_weight="1"
                 android:text="Local community"
                 android:textAllCaps="false"
-                android:textColor="#08735C"
+                android:textColor="@color/primary"
                 app:cornerRadius="16dp"
-                app:strokeColor="#A8D6C9" />
+                app:strokeColor="@color/positive_border" />
         </LinearLayout>
         <com.google.android.material.button.MaterialButton
             android:id="@+id/openAssistantButton"
@@ -166,11 +166,11 @@
             android:layout_marginTop="12dp"
             android:text="Ask the Safe-Navi assistant"
             android:textAllCaps="false"
-            android:textColor="#FFFFFF"
-            app:backgroundTint="#51645C"
+            android:textColor="@color/on_dark_surface"
+            app:backgroundTint="@color/secondary_button"
             app:cornerRadius="14dp"
             app:icon="@drawable/ic_chatbot"
-            app:iconTint="#FFFFFF" />
+            app:iconTint="@color/on_dark_surface" />
         <com.google.android.material.button.MaterialButton
             android:id="@+id/demoDisclosureButton"
             style="@style/Widget.MaterialComponents.Button.TextButton"
@@ -180,6 +180,6 @@
             android:layout_marginTop="14dp"
             android:text="Synthetic demo data · Learn more"
             android:textAllCaps="false"
-            android:textColor="#66756D" />
+            android:textColor="@color/text_secondary" />
     </LinearLayout>
 </ScrollView>

@@ -20,7 +20,7 @@
             android:text="Submit Report"
             android:textSize="28sp"
             android:textStyle="bold"
-            android:textColor="#333333"
+            android:textColor="@color/text_primary"
             android:layout_marginBottom="8dp" />
 
         <TextView
@@ -28,7 +28,7 @@
             android:layout_height="wrap_content"
             android:text="Fill in the details below to submit your report"
             android:textSize="14sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:layout_marginBottom="24dp" />
 
         <!-- Title Input -->
@@ -36,8 +36,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:boxStrokeColor="#2196F3"
-            app:hintTextColor="#2196F3"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/primary"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -55,8 +55,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            app:boxStrokeColor="#2196F3"
-            app:hintTextColor="#2196F3"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/primary"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
 
             <AutoCompleteTextView
@@ -74,8 +74,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
-            app:boxStrokeColor="#2196F3"
-            app:hintTextColor="#2196F3"
+            app:boxStrokeColor="@color/primary"
+            app:hintTextColor="@color/primary"
             app:counterEnabled="true"
             app:counterMaxLength="500"
             style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
@@ -101,7 +101,7 @@
             android:text="Upload Image"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#333333"
+            android:textColor="@color/text_primary"
             android:layout_marginBottom="12dp" />
 
         <!-- Select Image Button -->
@@ -111,13 +111,13 @@
             android:layout_height="56dp"
             android:text="Select Image"
             android:textSize="16sp"
-            android:textColor="#FFFFFF"
-            android:backgroundTint="#2196F3"
+            android:textColor="@color/on_primary"
+            android:backgroundTint="@color/primary"
             android:layout_marginBottom="16dp"
             app:cornerRadius="8dp"
             app:icon="@android:drawable/ic_menu_gallery"
             app:iconGravity="textStart"
-            app:iconTint="#FFFFFF" />
+            app:iconTint="@color/on_primary" />
 
         <!-- Image Preview -->
         <androidx.cardview.widget.CardView
@@ -139,7 +139,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="No image selected"
-                android:textColor="#999999"
+                android:textColor="@color/text_hint"
                 android:textSize="14sp"
                 android:layout_gravity="center"
                 android:id="@+id/textViewNoImage" />
@@ -153,7 +153,7 @@
             android:text="Current Location"
             android:textSize="16sp"
             android:textStyle="bold"
-            android:textColor="#333333"
+            android:textColor="@color/text_primary"
             android:layout_marginBottom="12dp" />
 
         <!-- Map Container -->
@@ -178,7 +178,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:textSize="12sp"
-            android:textColor="#666666"
+            android:textColor="@color/text_secondary"
             android:layout_marginBottom="24dp"
             android:visibility="gone"
             android:drawableStart="@android:drawable/ic_dialog_map"
@@ -204,12 +204,12 @@
                 android:layout_marginEnd="8dp"
                 android:text="View History"
                 android:textSize="14sp"
-                android:textColor="#2196F3"
-                android:backgroundTint="#E3F2FD"
+                android:textColor="@color/primary"
+                android:backgroundTint="@color/primary_light"
                 app:cornerRadius="8dp"
                 app:icon="@android:drawable/ic_menu_recent_history"
                 app:iconGravity="textStart"
-                app:iconTint="#2196F3" />
+                app:iconTint="@color/primary" />
 
             <!-- Submit Button -->
             <Button
@@ -221,12 +221,12 @@
                 android:text="Submit"
                 android:textSize="14sp"
                 android:textStyle="bold"
-                android:textColor="#FFFFFF"
-                android:backgroundTint="#4CAF50"
+                android:textColor="@color/on_dark_surface"
+                android:backgroundTint="@color/success"
                 app:cornerRadius="8dp"
                 app:icon="@android:drawable/ic_menu_upload"
                 app:iconGravity="textStart"
-                app:iconTint="#FFFFFF" />
+                app:iconTint="@color/on_dark_surface" />
 
         </LinearLayout>
 
@@ -243,7 +243,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:visibility="gone"
-                android:indeterminateTint="#2196F3" />
+                android:indeterminateTint="@color/primary" />
 
             <TextView
                 android:id="@+id/textViewUploadProgress"
@@ -251,7 +251,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:textSize="14sp"
-                android:textColor="#2196F3"
+                android:textColor="@color/primary"
                 android:visibility="gone" />
 
         </LinearLayout>

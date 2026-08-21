@@ -16,7 +16,7 @@
         android:text="Report Title"
         android:textSize="16sp"
         android:textStyle="bold"
-        android:textColor="#333333"
+        android:textColor="@color/text_primary"
         android:maxLines="2"
         android:ellipsize="end" />
 
@@ -34,8 +34,8 @@
             android:layout_weight="1"
             android:text="Category"
             android:textSize="12sp"
-            android:textColor="#666666"
-            android:background="#F5F5F5"
+            android:textColor="@color/text_secondary"
+            android:background="@color/surface_variant"
             android:padding="4dp"
             android:layout_marginEnd="4dp" />
 
@@ -57,7 +57,7 @@
         android:layout_marginTop="8dp"
         android:scaleType="centerCrop"
         android:contentDescription="Report Image"
-        android:background="#E0E0E0" />
+        android:background="@color/divider" />
 
     <!-- Description -->
     <TextView
@@ -67,7 +67,7 @@
         android:layout_marginTop="8dp"
         android:text="Description"
         android:textSize="13sp"
-        android:textColor="#555555"
+        android:textColor="@color/text_secondary"
         android:maxLines="3"
         android:ellipsize="end" />
 
@@ -79,7 +79,7 @@
         android:layout_marginTop="6dp"
         android:text="Jan 15, 2026"
         android:textSize="11sp"
-        android:textColor="#888888"
+        android:textColor="@color/text_hint"
         android:gravity="end" />
 
     <!-- Tap instruction -->
@@ -89,7 +89,7 @@
         android:layout_marginTop="8dp"
         android:text="Double-tap for details"
         android:textSize="10sp"
-        android:textColor="#2196F3"
+        android:textColor="@color/primary"
         android:textStyle="italic"
         android:gravity="center" />
 

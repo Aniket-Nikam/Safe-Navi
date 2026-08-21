@@ -15,12 +15,19 @@
     <!-- Background Colors - Light Mode -->
     <color name="background">#F4F7F3</color>
     <color name="surface">#FFFFFF</color>
+    <color name="surface_elevated">#FBFDFB</color>
+    <color name="surface_variant">#EDF4F0</color>
+    <color name="surface_tint">#E7F4EF</color>
     <color name="input_background">#EDF3EF</color>
 
     <!-- Text Colors - Light Mode -->
     <color name="text_primary">#102B2A</color>
     <color name="text_secondary">#61726D</color>
     <color name="text_hint">#8A9994</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_accent">#073D36</color>
+    <color name="on_dark_surface">#FFFFFF</color>
+    <color name="dark_surface_secondary">#BCD4CE</color>
     <color name="button_default">#757575</color>
     <!-- Other Colors -->
     <color name="divider">#DCE6E1</color>
@@ -28,6 +35,24 @@
     <color name="success">#178B67</color>
     <color name="warning">#D88A18</color>
     <color name="warning_background">#FFF0CE</color>
+    <color name="route_result_background">#ECF7F2</color>
+    <color name="route_result_border">#CBE6DB</color>
+    <color name="route_result_title">#0D4B3D</color>
+    <color name="route_risk_text">#78611C</color>
+    <color name="official_card_background">#E7F4EF</color>
+    <color name="official_card_text">#174A3D</color>
+    <color name="admin_card_background">#FFF0E8</color>
+    <color name="admin_card_text">#82362F</color>
+    <color name="danger_text">#B83A32</color>
+    <color name="on_danger">#FFFFFF</color>
+    <color name="danger_border">#E8B4AF</color>
+    <color name="positive_border">#A8D6C9</color>
+    <color name="secondary_button">#51645C</color>
+    <color name="hazard_meta">#B5453B</color>
+    <color name="metric_pending_background">#FFF2D9</color>
+    <color name="metric_pending_text">#8E5819</color>
+    <color name="metric_active_background">#DDF2E9</color>
+    <color name="metric_critical_background">#F9E2E0</color>
     <color name="category_general">#E0E0E0</color>
     <color name="category_question">#2196F3</color>
     <color name="category_discussion">#9C27B0</color>

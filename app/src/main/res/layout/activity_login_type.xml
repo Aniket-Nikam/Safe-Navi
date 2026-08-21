@@ -40,14 +40,14 @@
                         android:layout_height="wrap_content"
                         android:letterSpacing="0.08"
                         android:text="SAFE-NAVI"
-                        android:textColor="#FFFFFF"
+                        android:textColor="@color/on_dark_surface"
                         android:textSize="17sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Mumbai · Navi Mumbai"
-                        android:textColor="#9FC4BA"
+                        android:textColor="@color/dark_surface_secondary"
                         android:textSize="12sp" />
                 </LinearLayout>
                 <TextView
@@ -55,7 +55,7 @@
                     android:layout_height="wrap_content"
                     android:background="@drawable/bg_prototype_pill"
                     android:text="30% MVP"
-                    android:textColor="#D9F36A"
+                    android:textColor="@color/accent"
                     android:textSize="9sp"
                     android:textStyle="bold" />
             </LinearLayout>
@@ -65,7 +65,7 @@
                 android:layout_marginTop="34dp"
                 android:lineSpacingExtra="1dp"
                 android:text="Move with context,\nnot just directions."
-                android:textColor="#FFFFFF"
+                android:textColor="@color/on_dark_surface"
                 android:textSize="31sp"
                 android:textStyle="bold" />
             <TextView
@@ -74,16 +74,16 @@
                 android:layout_marginTop="12dp"
                 android:lineSpacingExtra="4dp"
                 android:text="Compare real OpenStreetMap routes using explainable synthetic safety factors."
-                android:textColor="#BCD4CE"
+                android:textColor="@color/dark_surface_secondary"
                 android:textSize="14sp" />
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="24dp"
                 android:orientation="horizontal">
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="10\nFACTORS" android:textColor="#D9F36A" android:textSize="12sp" android:textStyle="bold" />
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="4\nTIME WINDOWS" android:textColor="#D9F36A" android:textSize="12sp" android:textStyle="bold" />
-                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="3\nROUTE MODES" android:textColor="#D9F36A" android:textSize="12sp" android:textStyle="bold" />
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="10\nFACTORS" android:textColor="@color/accent" android:textSize="12sp" android:textStyle="bold" />
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="4\nTIME WINDOWS" android:textColor="@color/accent" android:textSize="12sp" android:textStyle="bold" />
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="3\nROUTE MODES" android:textColor="@color/accent" android:textSize="12sp" android:textStyle="bold" />
             </LinearLayout>
         </LinearLayout>
         <LinearLayout
@@ -183,20 +183,20 @@
                     android:id="@+id/govLoginCard"
                     android:layout_width="0dp" android:layout_height="96dp" android:layout_marginEnd="5dp" android:layout_weight="1"
                     android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="#E7F4EF" app:cardCornerRadius="18dp" app:cardElevation="0dp">
+                    app:cardBackgroundColor="@color/official_card_background" app:cardCornerRadius="18dp" app:cardElevation="0dp">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:padding="12dp">
                         <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_government" app:tint="@color/primary" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Official sign in" android:textColor="@color/primary_dark" android:textSize="12sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Official sign in" android:textColor="@color/official_card_text" android:textSize="12sp" android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/adminLoginCard"
                     android:layout_width="0dp" android:layout_height="96dp" android:layout_marginStart="5dp" android:layout_weight="1"
                     android:clickable="true" android:focusable="true" android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="#FFF0E8" app:cardCornerRadius="18dp" app:cardElevation="0dp">
+                    app:cardBackgroundColor="@color/admin_card_background" app:cardCornerRadius="18dp" app:cardElevation="0dp">
                     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center" android:orientation="vertical" android:padding="12dp">
                         <ImageView android:layout_width="28dp" android:layout_height="28dp" android:src="@drawable/ic_admin" app:tint="@color/signal_coral" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Admin sign in" android:textColor="#82362F" android:textSize="12sp" android:textStyle="bold" />
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Admin sign in" android:textColor="@color/admin_card_text" android:textSize="12sp" android:textStyle="bold" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>

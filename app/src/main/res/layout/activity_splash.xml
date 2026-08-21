@@ -21,7 +21,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
             android:text="Safe-Navi"
-            android:textColor="#FFFFFF"
+            android:textColor="@color/on_dark_surface"
             android:textSize="36sp"
             android:textStyle="bold" />
         <TextView
@@ -30,7 +30,7 @@
             android:layout_marginTop="6dp"
             android:gravity="center"
             android:text="Routes that consider more than time."
-            android:textColor="#CDE5DE"
+            android:textColor="@color/dark_surface_secondary"
             android:textSize="15sp" />
         <TextView
             android:layout_width="wrap_content"
@@ -39,13 +39,13 @@
             android:background="@drawable/bg_prototype_pill"
             android:letterSpacing="0.12"
             android:text="SYNTHETIC DATA PROTOTYPE"
-            android:textColor="#D9F36A"
+            android:textColor="@color/accent"
             android:textSize="10sp"
             android:textStyle="bold" />
         <ProgressBar
             android:layout_width="28dp"
             android:layout_height="28dp"
             android:layout_marginTop="24dp"
-            android:indeterminateTint="#D9F36A" />
+            android:indeterminateTint="@color/accent" />
     </LinearLayout>
 </FrameLayout>

@@ -16,10 +16,10 @@
         android:layout_marginStart="10dp"
         android:layout_marginTop="10dp"
         android:layout_marginEnd="10dp"
-        app:cardBackgroundColor="#FBFDFB"
+        app:cardBackgroundColor="@color/surface_elevated"
         app:cardCornerRadius="24dp"
         app:cardElevation="6dp"
-        app:strokeColor="#DCE8E2"
+        app:strokeColor="@color/divider"
         app:strokeWidth="1dp">
 
         <LinearLayout
@@ -45,7 +45,7 @@
                     android:contentDescription="Back"
                     android:rotation="180"
                     android:src="@drawable/ic_arrow_forward"
-                    app:tint="#15352C" />
+                    app:tint="@color/text_primary" />
 
                 <LinearLayout
                     android:layout_width="0dp"
@@ -56,14 +56,14 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Plan a safer route"
-                        android:textColor="#10231D"
+                        android:textColor="@color/text_primary"
                         android:textSize="19sp"
                         android:textStyle="bold" />
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="OSM network · Synthetic safety intelligence"
-                        android:textColor="#718078"
+                        android:textColor="@color/text_secondary"
                         android:textSize="10sp"
                         android:textStyle="bold" />
                 </LinearLayout>
@@ -75,7 +75,7 @@
                     android:background="@android:color/transparent"
                     android:contentDescription="Use my location"
                     android:src="@drawable/ic_location"
-                    app:tint="#08735C" />
+                    app:tint="@color/primary" />
             </LinearLayout>
 
             <com.google.android.material.textfield.TextInputLayout
@@ -83,7 +83,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:hint="Source"
-                app:boxBackgroundColor="#EDF4F0"
+                app:boxBackgroundColor="@color/surface_variant"
                 app:boxBackgroundMode="filled"
                 app:boxCornerRadiusBottomEnd="14dp"
                 app:boxCornerRadiusBottomStart="14dp"
@@ -91,8 +91,8 @@
                 app:boxCornerRadiusTopStart="14dp"
                 app:boxStrokeWidth="0dp"
                 app:boxStrokeWidthFocused="1dp"
-                app:hintTextColor="#61726D"
-                app:startIconTint="#087F6A"
+                app:hintTextColor="@color/text_secondary"
+                app:startIconTint="@color/primary"
                 app:startIconDrawable="@drawable/ic_location">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/sourceInput"
@@ -110,7 +110,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="7dp"
                 android:hint="Destination"
-                app:boxBackgroundColor="#EDF4F0"
+                app:boxBackgroundColor="@color/surface_variant"
                 app:boxBackgroundMode="filled"
                 app:boxCornerRadiusBottomEnd="14dp"
                 app:boxCornerRadiusBottomStart="14dp"
@@ -119,10 +119,10 @@
                 app:boxStrokeWidth="0dp"
                 app:boxStrokeWidthFocused="1dp"
                 app:endIconDrawable="@drawable/ic_more"
-                app:endIconTint="#087F6A"
+                app:endIconTint="@color/primary"
                 app:endIconMode="custom"
-                app:hintTextColor="#61726D"
-                app:startIconTint="#F26B5E"
+                app:hintTextColor="@color/text_secondary"
+                app:startIconTint="@color/signal_coral"
                 app:startIconDrawable="@drawable/ic_pin">
                 <com.google.android.material.textfield.TextInputEditText
                     android:id="@+id/destinationInput"
@@ -178,7 +178,7 @@
         android:layout_gravity="top|end"
         android:layout_marginTop="286dp"
         android:layout_marginEnd="10dp"
-        app:cardBackgroundColor="#073D36"
+        app:cardBackgroundColor="@color/primary_dark"
         app:cardCornerRadius="20dp"
         app:cardElevation="5dp">
         <LinearLayout
@@ -194,7 +194,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="AREA SCORE"
-                android:textColor="#9FC4BA"
+                android:textColor="@color/dark_surface_secondary"
                 android:textSize="8sp"
                 android:textStyle="bold"
                 android:letterSpacing="0.08" />
@@ -203,7 +203,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="72"
-                android:textColor="#D9F36A"
+                android:textColor="@color/accent"
                 android:textSize="24sp"
                 android:textStyle="bold" />
             <TextView
@@ -212,7 +212,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:text="Moderate risk"
-                android:textColor="#E7F0EC"
+                android:textColor="@color/on_dark_surface"
                 android:textSize="9sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -223,10 +223,10 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:layout_margin="10dp"
-        app:cardBackgroundColor="#FFFFFF"
+        app:cardBackgroundColor="@color/surface"
         app:cardCornerRadius="26dp"
         app:cardElevation="12dp"
-        app:strokeColor="#DCE8E2"
+        app:strokeColor="@color/divider"
         app:strokeWidth="1dp">
         <LinearLayout
             android:layout_width="match_parent"
@@ -240,7 +240,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Safety preference"
-                android:textColor="#10231D"
+                android:textColor="@color/text_primary"
                 android:textSize="16sp"
                 android:textStyle="bold" />
             <TextView
@@ -248,7 +248,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="Choose how strongly risk exposure affects ranking"
-                android:textColor="#718078"
+                android:textColor="@color/text_secondary"
                 android:textSize="10sp" />
             <com.google.android.material.chip.ChipGroup
                 android:id="@+id/routeProfileGroup"
@@ -284,12 +284,12 @@
                 android:layout_marginTop="4dp"
                 android:text="Compare route options"
                 android:textAllCaps="false"
-                android:textColor="#073D36"
+                android:textColor="@color/on_accent"
                 android:textStyle="bold"
-                app:backgroundTint="#D9F36A"
+                app:backgroundTint="@color/accent"
                 app:cornerRadius="16dp"
                 app:icon="@drawable/ic_explore"
-                app:iconTint="#073D36" />
+                app:iconTint="@color/on_accent" />
             <ProgressBar
                 android:id="@+id/routeProgress"
                 android:layout_width="24dp"
@@ -310,7 +310,7 @@
                     android:id="@+id/routeResultTitle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="#0D4B3D"
+                    android:textColor="@color/route_result_title"
                     android:textSize="15sp"
                     android:textStyle="bold" />
                 <TextView
@@ -318,14 +318,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:textColor="#506159"
+                    android:textColor="@color/text_secondary"
                     android:textSize="12sp" />
                 <TextView
                     android:id="@+id/routeResultRisk"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="2dp"
-                    android:textColor="#78611C"
+                    android:textColor="@color/route_risk_text"
                     android:textSize="11sp"
                     android:lineSpacingExtra="2dp" />
             </LinearLayout>
@@ -335,7 +335,7 @@
                 android:layout_marginTop="6dp"
                 android:gravity="center"
                 android:text="Map: OpenStreetMap · Safety layer: synthetic"
-                android:textColor="#718078"
+                android:textColor="@color/text_secondary"
                 android:textSize="8sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -347,7 +347,7 @@
         android:layout_gravity="center_vertical"
         android:layout_margin="14dp"
         android:visibility="gone"
-        app:cardBackgroundColor="#FFFFFF"
+        app:cardBackgroundColor="@color/surface"
         app:cardCornerRadius="20dp"
         app:cardElevation="10dp">
         <LinearLayout
@@ -366,7 +366,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Hazard"
-                    android:textColor="#10231D"
+                    android:textColor="@color/text_primary"
                     android:textSize="18sp"
                     android:textStyle="bold" />
                 <ImageButton
@@ -376,14 +376,14 @@
                     android:background="@android:color/transparent"
                     android:contentDescription="Close details"
                     android:src="@drawable/ic_delete"
-                    app:tint="#718078" />
+                    app:tint="@color/text_secondary" />
             </LinearLayout>
             <TextView
                 android:id="@+id/hazardMeta"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:textColor="#B5453B"
+                android:textColor="@color/hazard_meta"
                 android:textSize="11sp"
                 android:textStyle="bold" />
             <TextView
@@ -392,7 +392,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:lineSpacingExtra="3dp"
-                android:textColor="#506159"
+                android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="24dp"
-        android:background="#2196F3"
+        android:background="@color/primary"
         android:elevation="4dp">
 
         <TextView
@@ -21,14 +21,14 @@
             android:text="Report History"
             android:textSize="28sp"
             android:textStyle="bold"
-            android:textColor="#FFFFFF" />
+            android:textColor="@color/on_primary" />
 
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="View all your submitted reports"
             android:textSize="14sp"
-            android:textColor="#E3F2FD"
+            android:textColor="@color/on_primary"
             android:layout_marginTop="4dp" />
 
     </LinearLayout>
@@ -51,7 +51,7 @@
         android:layout_centerInParent="true"
         android:text="No reports found"
         android:textSize="16sp"
-        android:textColor="#999999"
+        android:textColor="@color/text_hint"
         android:visibility="gone"
         android:drawableTop="@android:drawable/ic_menu_report_image"
         android:drawablePadding="16dp"
@@ -64,6 +64,6 @@
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:visibility="gone"
-        android:indeterminateTint="#2196F3" />
+        android:indeterminateTint="@color/primary" />
 
 </RelativeLayout>

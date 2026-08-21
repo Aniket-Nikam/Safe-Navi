@@ -15,20 +15,45 @@
     <!-- Background Colors - Dark Mode -->
     <color name="background">#081714</color>
     <color name="surface">#102722</color>
+    <color name="surface_elevated">#142D28</color>
+    <color name="surface_variant">#19352F</color>
+    <color name="surface_tint">#15352E</color>
     <color name="input_background">#19352F</color>
 
     <!-- Text Colors - Dark Mode -->
     <color name="text_primary">#EEF8F5</color>
     <color name="text_secondary">#A7BBB5</color>
     <color name="text_hint">#789089</color>
+    <color name="on_primary">#062F2A</color>
+    <color name="on_accent">#073D36</color>
+    <color name="on_dark_surface">#F4FFFB</color>
+    <color name="dark_surface_secondary">#A7C8BE</color>
     <color name="button_default">#94A3B8</color>
     
     <!-- Other Colors -->
-    <color name="divider">#334155</color>
+    <color name="divider">#2A4841</color>
     <color name="error">#F87171</color>
     <color name="success">#34D399</color>
     <color name="warning">#FBBF24</color>
     <color name="warning_background">#78350F</color>
+    <color name="route_result_background">#15352E</color>
+    <color name="route_result_border">#28594D</color>
+    <color name="route_result_title">#76DABD</color>
+    <color name="route_risk_text">#F4D66C</color>
+    <color name="official_card_background">#15352E</color>
+    <color name="official_card_text">#9FE6D2</color>
+    <color name="admin_card_background">#35231F</color>
+    <color name="admin_card_text">#FFB4AA</color>
+    <color name="danger_text">#FF9388</color>
+    <color name="on_danger">#35100C</color>
+    <color name="danger_border">#75433E</color>
+    <color name="positive_border">#33685A</color>
+    <color name="secondary_button">#31564C</color>
+    <color name="hazard_meta">#FF9D92</color>
+    <color name="metric_pending_background">#493718</color>
+    <color name="metric_pending_text">#FFD083</color>
+    <color name="metric_active_background">#173A31</color>
+    <color name="metric_critical_background">#422522</color>
     
     <color name="category_general">#334155</color>
     <color name="category_question">#3B82F6</color>
