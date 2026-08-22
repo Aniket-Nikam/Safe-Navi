@@ -16,8 +16,10 @@ The Android namespace and application ID are `com.safenavi.app`. The repository 
 - Light and dark themes share semantic surface, text, route-risk and status colors; the app follows Android night mode and also exposes a Dark Mode switch under Settings.
 - If the local API is stopped, the Android app clearly labels and uses a controlled offline-hazard fallback.
 - Connected account screens remain optional and now fail gracefully when Firebase is not configured instead of closing the app.
+- The citizen profile is safe in classroom-demo mode, map screens stay portrait-stable, and stale network responses cannot replace a newer route or point-risk request.
+- Vashi Railway Station → CBD Belapur resolves locally and has a clearly labelled controlled fallback route when the public routing service is unavailable; OSM/Valhalla remains the primary provider.
 - Citizen reports and government-verified hazards remain separate domain concepts.
-- Thirteen Android JVM tests and three backend tests cover the current milestone.
+- Fifteen Android JVM tests and three backend tests cover the current milestone.
 
 ## Dataset boundary
 

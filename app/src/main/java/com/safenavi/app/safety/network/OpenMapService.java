@@ -10,6 +10,7 @@ import com.safenavi.app.safety.model.TravelMode;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.HttpUrl;
@@ -31,7 +32,11 @@ public class OpenMapService {
     private long lastSearchAt;
 
     public OpenMapService() {
-        client = new OkHttpClient.Builder().build();
+        client = new OkHttpClient.Builder()
+                .connectTimeout(5, TimeUnit.SECONDS)
+                .readTimeout(8, TimeUnit.SECONDS)
+                .callTimeout(10, TimeUnit.SECONDS)
+                .build();
     }
 
     public interface ResultCallback<T> {

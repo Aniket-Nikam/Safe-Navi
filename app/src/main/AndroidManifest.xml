@@ -23,6 +23,7 @@
         <activity
             android:name=".SplashActivity"
             android:exported="true"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -34,12 +35,14 @@
         <activity
             android:name=".LoginTypeActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi" />
 
         <!-- Login Activity -->
         <activity
             android:name=".LoginActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.SafeNavi" />
 
@@ -47,6 +50,7 @@
         <activity
             android:name=".SignUpActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:windowSoftInputMode="adjustResize"
             android:theme="@style/Theme.SafeNavi" />
 
@@ -54,6 +58,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi" />
             
         <activity
@@ -69,6 +74,7 @@
         <activity
             android:name=".GovernmentSafetyDashboardActivity"
             android:exported="false"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi" />
             
         <activity
@@ -81,6 +87,7 @@
             android:name=".MapsActivity"
             android:label="Maps"
             android:parentActivityName=".MainActivity"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi" />
 
         <!-- Complaints Activity -->

@@ -9,10 +9,12 @@ import static org.maplibre.android.style.layers.PropertyFactory.lineOpacity;
 import static org.maplibre.android.style.layers.PropertyFactory.lineWidth;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,6 +22,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import com.safenavi.app.safety.demo.SafetyDemoStore;
+import com.safenavi.app.safety.demo.DemoRouteFallback;
 import com.safenavi.app.safety.model.DatasetPointRisk;
 import com.safenavi.app.safety.model.DatasetRouteEvaluation;
 import com.safenavi.app.safety.model.Hazard;
@@ -37,6 +40,7 @@ import com.safenavi.app.safety.service.RouteSafetyEvaluator;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 import java.util.ArrayList;
@@ -79,7 +83,7 @@ public class MapsActivity extends AppCompatActivity {
     private TextInputEditText sourceInput;
     private TextInputEditText destinationInput;
     private ProgressBar routeProgress;
-    private View findRouteButton;
+    private MaterialButton findRouteButton;
     private View routeResultCard;
     private View detailCard;
     private TextView scoreText;
@@ -90,6 +94,8 @@ public class MapsActivity extends AppCompatActivity {
     private TextView detailTitle;
     private TextView detailMeta;
     private TextView detailReason;
+    private int activeRouteRequest;
+    private int activeScoreRequest;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -207,58 +213,85 @@ public class MapsActivity extends AppCompatActivity {
             Toast.makeText(this, "Enter both source and destination.", Toast.LENGTH_SHORT).show();
             return;
         }
+        int requestId = ++activeRouteRequest;
+        sourceInput.clearFocus();
+        destinationInput.clearFocus();
+        InputMethodManager keyboard = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        View focused = getCurrentFocus();
+        if (keyboard != null && focused != null) keyboard.hideSoftInputFromWindow(focused.getWindowToken(), 0);
         setRouteBusy(true);
-        resolvePlace(sourceText, source -> resolvePlace(destinationText, destination ->
-                requestRoutes(source, destination)));
+        resolvePlace(sourceText, requestId, source -> resolvePlace(destinationText, requestId,
+                destination -> requestRoutes(source, destination, requestId)));
     }
 
-    private void requestRoutes(PlaceSearchResult source, PlaceSearchResult destination) {
+    private void requestRoutes(PlaceSearchResult source, PlaceSearchResult destination, int requestId) {
+        TravelMode mode = selectedTravelMode();
         openMapService.routes(source.getLatitude(), source.getLongitude(), destination.getLatitude(),
-                destination.getLongitude(), selectedTravelMode(),
+                destination.getLongitude(), mode,
                 new OpenMapService.ResultCallback<List<RouteCandidate>>() {
                     @Override public void onSuccess(List<RouteCandidate> candidates) {
-                        runOnUiThread(() -> showRankedRoutes(candidates, source, destination));
+                        runOnUiThread(() -> {
+                            if (isRouteRequestActive(requestId)) showRankedRoutes(candidates, source,
+                                    destination, requestId, "OpenStreetMap/Valhalla");
+                        });
                     }
 
                     @Override public void onError(String message) {
-                        runOnUiThread(() -> showRouteError(message));
+                        List<RouteCandidate> fallback = DemoRouteFallback.routes(source, destination, mode);
+                        runOnUiThread(() -> {
+                            if (!isRouteRequestActive(requestId)) return;
+                            if (!fallback.isEmpty()) {
+                                showRankedRoutes(fallback, source, destination, requestId,
+                                        "Controlled offline demo route");
+                            } else {
+                                showRouteError(requestId, message);
+                            }
+                        });
                     }
                 });
     }
 
     private void showRankedRoutes(List<RouteCandidate> candidates, PlaceSearchResult source,
-                                  PlaceSearchResult destination) {
+                                  PlaceSearchResult destination, int requestId,
+                                  String routeProviderLabel) {
         if (candidates.isEmpty()) {
-            showRouteError("No route was returned for this travel mode.");
+            showRouteError(requestId, "No route was returned for this travel mode.");
             return;
         }
         RouteProfile profile = selectedRouteProfile();
         datasetRiskService.evaluateRoutes(candidates, profile, currentTimePeriod(),
                 new DatasetRiskService.ResultCallback<DatasetRouteEvaluation>() {
                     @Override public void onSuccess(DatasetRouteEvaluation evaluation) {
-                        runOnUiThread(() -> renderRankedRoutes(evaluation.getRankedResults(), candidates,
-                                profile, source, destination, "Dataset API · "
-                                        + readable(evaluation.getTimePeriod()) + " · "
-                                        + Math.round(evaluation.getCoverageRatio() * 100) + "% coverage · "
-                                        + evaluation.getFactorSummary()));
+                        runOnUiThread(() -> {
+                            if (isRouteRequestActive(requestId)) renderRankedRoutes(
+                                    evaluation.getRankedResults(), candidates, profile, source,
+                                    destination, routeProviderLabel, "Dataset API · "
+                                            + readable(evaluation.getTimePeriod()) + " · "
+                                            + Math.round(evaluation.getCoverageRatio() * 100)
+                                            + "% coverage · " + evaluation.getFactorSummary());
+                        });
                     }
 
                     @Override public void onError(String message) {
                         List<RouteSafetyResult> fallback = new RouteSafetyEvaluator(SafetyDemoStore.riskEngine())
                                 .rank(candidates, SafetyDemoStore.repository().getHazards(), profile,
                                         System.currentTimeMillis());
-                        runOnUiThread(() -> renderRankedRoutes(fallback, candidates, profile, source,
-                                destination, "Offline controlled-hazard fallback · Start the FastAPI service for dataset scoring"));
+                        runOnUiThread(() -> {
+                            if (isRouteRequestActive(requestId)) renderRankedRoutes(fallback,
+                                    candidates, profile, source, destination, routeProviderLabel,
+                                    "Offline controlled-hazard fallback · Start the FastAPI service for dataset scoring");
+                        });
                     }
                 });
     }
 
     private void renderRankedRoutes(List<RouteSafetyResult> ranked, List<RouteCandidate> candidates,
                                     RouteProfile profile, PlaceSearchResult source,
-                                    PlaceSearchResult destination, String sourceLabel) {
+                                    PlaceSearchResult destination, String routeProviderLabel,
+                                    String sourceLabel) {
         setRouteBusy(false);
         if (ranked.isEmpty()) {
-            showRouteError("The risk service returned no ranked route.");
+            showRouteError(activeRouteRequest, "The risk service returned no ranked route.");
             return;
         }
         RouteSafetyResult best = ranked.get(0);
@@ -269,8 +302,8 @@ public class MapsActivity extends AppCompatActivity {
                 best.getRoute().getDistanceMeters() / 1000.0, best.getRoute().getTravelMinutes(),
                 candidates.size(), candidates.size() == 1 ? "" : "s"));
         routeResultRisk.setText(String.format(Locale.US,
-                "Synthetic dataset exposure: %.0f/100 · %s · Route: OpenStreetMap/Valhalla",
-                best.getRiskExposure(), sourceLabel));
+                "Synthetic dataset exposure: %.0f/100 · %s · Route: %s",
+                best.getRiskExposure(), sourceLabel, routeProviderLabel));
         routeResultCard.setVisibility(View.VISIBLE);
         sourceInput.setText(shortName(source.getDisplayName()));
         destinationInput.setText(shortName(destination.getDisplayName()));
@@ -318,22 +351,31 @@ public class MapsActivity extends AppCompatActivity {
 
     private interface PlaceCallback { void accept(PlaceSearchResult place); }
 
-    private void resolvePlace(String text, PlaceCallback callback) {
+    private void resolvePlace(String text, int requestId, PlaceCallback callback) {
         PlaceSearchResult coordinates = parseCoordinates(text);
         if (coordinates != null) {
             callback.accept(coordinates);
             return;
         }
+        PlaceSearchResult knownDemoPlace = DemoRouteFallback.resolveKnownPlace(text);
+        if (knownDemoPlace != null) {
+            callback.accept(knownDemoPlace);
+            return;
+        }
         openMapService.search(text, new OpenMapService.ResultCallback<List<PlaceSearchResult>>() {
             @Override public void onSuccess(List<PlaceSearchResult> results) {
                 runOnUiThread(() -> {
-                    if (results.isEmpty()) showRouteError("No matching place was found for: " + text);
+                    if (!isRouteRequestActive(requestId)) return;
+                    if (results.isEmpty()) showRouteError(requestId,
+                            "No matching place was found for: " + text);
                     else callback.accept(results.get(0));
                 });
             }
 
             @Override public void onError(String message) {
-                runOnUiThread(() -> showRouteError(message));
+                runOnUiThread(() -> {
+                    if (isRouteRequestActive(requestId)) showRouteError(requestId, message);
+                });
             }
         });
     }
@@ -368,6 +410,7 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void renderScore(double latitude, double longitude) {
+        int requestId = ++activeScoreRequest;
         SafetyScore score = SafetyDemoStore.riskEngine().calculate(latitude, longitude,
                 System.currentTimeMillis(), SafetyDemoStore.repository().getHazards());
         scoreText.setText(String.format(Locale.US, "%.0f", score.getSafetyScore()));
@@ -377,6 +420,7 @@ public class MapsActivity extends AppCompatActivity {
                 new DatasetRiskService.ResultCallback<DatasetPointRisk>() {
                     @Override public void onSuccess(DatasetPointRisk risk) {
                         runOnUiThread(() -> {
+                            if (requestId != activeScoreRequest || isFinishing() || isDestroyed()) return;
                             scoreText.setText(String.format(Locale.US, "%.0f", risk.getSafetyScore()));
                             scoreLabel.setText(readable(risk.getRiskLabel()) + " · "
                                     + risk.getAreaName() + " · dataset");
@@ -384,8 +428,12 @@ public class MapsActivity extends AppCompatActivity {
                     }
 
                     @Override public void onError(String message) {
-                        runOnUiThread(() -> scoreLabel.setText(readable(score.getRiskLevel().name())
-                                + " · offline fallback"));
+                        runOnUiThread(() -> {
+                            if (requestId == activeScoreRequest && !isFinishing() && !isDestroyed()) {
+                                scoreLabel.setText(readable(score.getRiskLevel().name())
+                                        + " · offline fallback");
+                            }
+                        });
                     }
                 });
     }
@@ -439,17 +487,23 @@ public class MapsActivity extends AppCompatActivity {
 
     private void setRouteBusy(boolean busy) {
         findRouteButton.setEnabled(!busy);
+        findRouteButton.setText(busy ? "Comparing routes…" : "Compare route options");
         routeProgress.setVisibility(busy ? View.VISIBLE : View.GONE);
         if (busy) routeResultCard.setVisibility(View.GONE);
     }
 
-    private void showRouteError(String message) {
+    private void showRouteError(int requestId, String message) {
+        if (!isRouteRequestActive(requestId)) return;
         setRouteBusy(false);
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Route unavailable")
                 .setMessage(message + "\n\nThe bundled public endpoints are for light demonstration use. A production routing/geocoding provider can be configured later without changing the safety engine.")
                 .setPositiveButton("OK", null)
                 .show();
+    }
+
+    private boolean isRouteRequestActive(int requestId) {
+        return requestId == activeRouteRequest && !isFinishing() && !isDestroyed();
     }
 
     private int severityColor(HazardSeverity severity) {
@@ -474,6 +528,7 @@ public class MapsActivity extends AppCompatActivity {
 
     private String readable(String value) {
         String lower = value.toLowerCase(Locale.US).replace('_', ' ');
+        if (lower.isEmpty()) return "Unknown";
         return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
     }
 
@@ -482,7 +537,12 @@ public class MapsActivity extends AppCompatActivity {
     @Override protected void onPause() { mapView.onPause(); super.onPause(); }
     @Override protected void onStop() { mapView.onStop(); super.onStop(); }
     @Override public void onLowMemory() { super.onLowMemory(); mapView.onLowMemory(); }
-    @Override protected void onDestroy() { mapView.onDestroy(); super.onDestroy(); }
+    @Override protected void onDestroy() {
+        activeRouteRequest++;
+        activeScoreRequest++;
+        mapView.onDestroy();
+        super.onDestroy();
+    }
     @Override protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
         mapView.onSaveInstanceState(outState);

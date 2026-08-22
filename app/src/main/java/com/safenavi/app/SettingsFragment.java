@@ -2,6 +2,7 @@ package com.safenavi.app;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -21,6 +22,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.safenavi.app.safety.demo.DemoSession;
 import de.hdodenhof.circleimageview.CircleImageView;
 
 public class SettingsFragment extends Fragment {
@@ -34,14 +36,20 @@ public class SettingsFragment extends Fragment {
     private SwitchCompat notificationsSwitch, darkModeSwitch;
     private LinearLayout changePasswordLayout, deleteAccountLayout, logoutLayout;
     private MaterialCardView verificationCard;
+    private boolean firebaseEnabled;
 
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_settings, container, false);
 
-        mAuth = FirebaseAuth.getInstance();
-        usersRef = FirebaseDatabase.getInstance(BuildConfig.FIREBASE_DATABASE_URL).getReference("users");
+        firebaseEnabled = !DemoSession.isActive() && BuildConfig.HAS_FIREBASE_CONFIG
+                && !BuildConfig.FIREBASE_DATABASE_URL.trim().isEmpty();
+        if (firebaseEnabled) {
+            mAuth = FirebaseAuth.getInstance();
+            usersRef = FirebaseDatabase.getInstance(BuildConfig.FIREBASE_DATABASE_URL)
+                    .getReference("users");
+        }
         sharedPreferences = requireActivity().getSharedPreferences("AppPreferences", 0);
 
         initializeViews(view);
@@ -66,6 +74,18 @@ public class SettingsFragment extends Fragment {
     }
 
     private void loadUserData() {
+        if (DemoSession.isActive()) {
+            usernameTextView.setText("Citizen demo");
+            emailTextView.setText("Synthetic classroom profile");
+            verificationCard.setVisibility(View.GONE);
+            return;
+        }
+        if (!firebaseEnabled || mAuth == null) {
+            usernameTextView.setText("Local prototype");
+            emailTextView.setText("Connect Firebase in a later phase");
+            verificationCard.setVisibility(View.GONE);
+            return;
+        }
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
             usernameTextView.setText(user.getDisplayName() != null ? user.getDisplayName() : "User");
@@ -84,8 +104,9 @@ public class SettingsFragment extends Fragment {
         boolean notificationsEnabled = sharedPreferences.getBoolean("notifications_enabled", true);
         notificationsSwitch.setChecked(notificationsEnabled);
 
-        int nightMode = AppCompatDelegate.getDefaultNightMode();
-        darkModeSwitch.setChecked(nightMode == AppCompatDelegate.MODE_NIGHT_YES);
+        int currentNightMode = getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK;
+        darkModeSwitch.setChecked(currentNightMode == Configuration.UI_MODE_NIGHT_YES);
     }
 
     private void setupClickListeners() {
@@ -109,6 +130,10 @@ public class SettingsFragment extends Fragment {
     }
 
     private void sendVerificationEmail() {
+        if (!firebaseEnabled || mAuth == null) {
+            showConnectedFeatureMessage();
+            return;
+        }
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null && !user.isEmailVerified()) {
             user.sendEmailVerification()
@@ -125,8 +150,8 @@ public class SettingsFragment extends Fragment {
     private void saveNotificationPreference(boolean enabled) {
         sharedPreferences.edit().putBoolean("notifications_enabled", enabled).apply();
 
-        FirebaseUser user = mAuth.getCurrentUser();
-        if (user != null) {
+        FirebaseUser user = mAuth == null ? null : mAuth.getCurrentUser();
+        if (user != null && usersRef != null) {
             usersRef.child(user.getUid())
                     .child("notificationsEnabled").setValue(enabled)
                     .addOnSuccessListener(aVoid -> {
@@ -152,6 +177,10 @@ public class SettingsFragment extends Fragment {
     }
 
     private void changePassword() {
+        if (!firebaseEnabled || mAuth == null) {
+            showConnectedFeatureMessage();
+            return;
+        }
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null && user.getEmail() != null) {
             mAuth.sendPasswordResetEmail(user.getEmail())
@@ -170,6 +199,10 @@ public class SettingsFragment extends Fragment {
     }
 
     private void showDeleteAccountDialog() {
+        if (!firebaseEnabled || mAuth == null) {
+            showConnectedFeatureMessage();
+            return;
+        }
         new AlertDialog.Builder(requireContext())
                 .setTitle("Delete Account")
                 .setMessage("Are you sure you want to delete your account? This action cannot be undone.")
@@ -179,6 +212,7 @@ public class SettingsFragment extends Fragment {
     }
 
     private void deleteAccount() {
+        if (mAuth == null || usersRef == null) return;
         FirebaseUser user = mAuth.getCurrentUser();
         if (user != null) {
             String userId = user.getUid();
@@ -215,14 +249,23 @@ public class SettingsFragment extends Fragment {
 
     private void logout() {
         new AlertDialog.Builder(requireContext())
-                .setTitle("Logout")
-                .setMessage("Are you sure you want to logout?")
-                .setPositiveButton("Logout", (dialog, which) -> {
-                    mAuth.signOut();
+                .setTitle(DemoSession.isActive() ? "Exit demo" : "Logout")
+                .setMessage(DemoSession.isActive()
+                        ? "Return to the Safe-Navi role selection screen?"
+                        : "Are you sure you want to logout?")
+                .setPositiveButton(DemoSession.isActive() ? "Exit demo" : "Logout", (dialog, which) -> {
+                    if (DemoSession.isActive()) DemoSession.stop();
+                    if (mAuth != null) mAuth.signOut();
                     navigateToLogin();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
+    }
+
+    private void showConnectedFeatureMessage() {
+        Snackbar.make(requireView(),
+                "Connected account management is planned for a later phase. The 30% demo remains local and synthetic.",
+                Snackbar.LENGTH_LONG).show();
     }
 
     private void navigateToLogin() {
