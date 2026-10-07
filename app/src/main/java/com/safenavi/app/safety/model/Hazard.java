@@ -10,7 +10,6 @@ public class Hazard {
     private HazardSeverity severity = HazardSeverity.LOW;
     private HazardStatus status = HazardStatus.REPORTED;
     private boolean governmentVerified;
-    private boolean synthetic;
     private String source = "CITIZEN";
     private String governmentEmployeeId;
     private int linkedReportCount;
@@ -41,8 +40,6 @@ public class Hazard {
     public void setStatus(HazardStatus status) { this.status = status; }
     public boolean isGovernmentVerified() { return governmentVerified; }
     public void setGovernmentVerified(boolean governmentVerified) { this.governmentVerified = governmentVerified; }
-    public boolean isSynthetic() { return synthetic; }
-    public void setSynthetic(boolean synthetic) { this.synthetic = synthetic; }
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
     public String getGovernmentEmployeeId() { return governmentEmployeeId; }

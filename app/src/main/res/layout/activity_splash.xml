@@ -11,16 +11,23 @@
         android:gravity="center"
         android:orientation="vertical"
         android:padding="36dp">
-        <ImageView
-            android:layout_width="104dp"
-            android:layout_height="104dp"
-            android:contentDescription="@string/app_name"
-            android:src="@drawable/ic_safe_navi_mark" />
+        <FrameLayout
+            android:layout_width="142dp"
+            android:layout_height="142dp"
+            android:background="@drawable/circle_white_background"
+            android:elevation="12dp"
+            android:padding="18dp">
+            <ImageView
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@string/app_name"
+                android:src="@drawable/ic_safenavi_beacon" />
+        </FrameLayout>
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="22dp"
-            android:text="Safe-Navi"
+            android:text="SAFE–NAVI"
             android:textColor="@color/on_dark_surface"
             android:textSize="36sp"
             android:textStyle="bold" />
@@ -29,17 +36,21 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
             android:gravity="center"
-            android:text="Routes that consider more than time."
+            android:text="Safety, routed."
             android:textColor="@color/dark_surface_secondary"
             android:textSize="15sp" />
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="30dp"
-            android:background="@drawable/bg_prototype_pill"
+            android:background="@drawable/bg_label"
             android:letterSpacing="0.12"
-            android:text="SYNTHETIC DATA PROTOTYPE"
-            android:textColor="@color/accent"
+            android:paddingStart="12dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="12dp"
+            android:paddingBottom="6dp"
+            android:text="MAPS · COMMUNITY · VERIFIED INTELLIGENCE"
+            android:textColor="@color/primary_dark"
             android:textSize="10sp"
             android:textStyle="bold" />
         <ProgressBar

@@ -1,0 +1,4 @@
+model,rmse_mean,rmse_std,mae_mean,mae_std,r2_mean,r2_std
+LightGBM,1.4973,0.0296,1.279,0.0153,0.9273,0.0057
+Linear Regression,1.4434,0.0015,1.2496,0.0015,0.9325,0.0033
+XGBoost,1.5019,0.0323,1.2818,0.0176,0.9268,0.0058

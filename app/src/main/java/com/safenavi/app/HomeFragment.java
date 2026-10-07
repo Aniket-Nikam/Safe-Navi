@@ -9,75 +9,62 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
-import com.safenavi.app.safety.demo.SafetyDemoStore;
-import com.safenavi.app.safety.demo.DemoSession;
-import com.safenavi.app.safety.model.SafetyScore;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.safenavi.app.product.ProductSession;
+import com.safenavi.app.safety.model.DatasetPointRisk;
+import com.safenavi.app.safety.network.DatasetRiskService;
+import java.util.Calendar;
+import java.util.Locale;
 
 public class HomeFragment extends Fragment {
-    private TextView welcomeTextView;
-    private TextView safetyScoreText;
-    private TextView riskLevelText;
-    private TextView safetyExplanationText;
+    private TextView safetyScoreText, riskLevelText, safetyExplanationText;
 
-    @Nullable
-    @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+    @Nullable @Override public View onCreateView(@NonNull LayoutInflater inflater,
+                                                  @Nullable ViewGroup container,
+                                                  @Nullable Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_home, container, false);
-        welcomeTextView = view.findViewById(R.id.welcomeTextView);
+        ((TextView) view.findViewById(R.id.welcomeTextView)).setText("Good evening, " + ProductSession.name(requireContext()));
         safetyScoreText = view.findViewById(R.id.safetyScoreText);
         riskLevelText = view.findViewById(R.id.riskLevelText);
         safetyExplanationText = view.findViewById(R.id.safetyExplanationText);
-        view.findViewById(R.id.openSafetyMapButton)
-                .setOnClickListener(v -> startActivity(new Intent(requireContext(), MapsActivity.class)));
-        view.findViewById(R.id.openCommunityButton)
-                .setOnClickListener(v -> startActivity(new Intent(requireContext(), DiscussionActivity.class)));
-        view.findViewById(R.id.openAssistantButton)
-                .setOnClickListener(v -> requireActivity().getSupportFragmentManager().beginTransaction()
-                        .replace(R.id.fragmentContainer, new ChatbotFragment())
-                        .addToBackStack("assistant")
-                        .commit());
-        view.findViewById(R.id.reportDangerButton)
-                .setOnClickListener(v -> ((MainActivity) requireActivity()).openReport());
-        view.findViewById(R.id.demoDisclosureButton)
-                .setOnClickListener(v -> new com.google.android.material.dialog.MaterialAlertDialogBuilder(requireContext())
-                        .setTitle("Synthetic demonstration data")
-                        .setMessage("The hazards and scores shown in demo mode are synthetic. They demonstrate the complete Safe-Navi workflow and are not claims about current real-world safety.")
-                        .setPositiveButton("Understood", null)
-                        .show());
-        loadUser();
+        view.findViewById(R.id.openSafetyMapButton).setOnClickListener(v -> startActivity(new Intent(requireContext(), MapsActivity.class)));
+        view.findViewById(R.id.openCommunityButton).setOnClickListener(v -> ((MainActivity) requireActivity()).openCommunity());
+        view.findViewById(R.id.openAssistantButton).setOnClickListener(v -> ((MainActivity) requireActivity()).openAssistant());
+        view.findViewById(R.id.reportDangerButton).setOnClickListener(v -> ((MainActivity) requireActivity()).openReport());
+        view.findViewById(R.id.scoreDisclosureButton).setOnClickListener(v -> new MaterialAlertDialogBuilder(requireContext())
+                .setTitle("How the score works")
+                .setMessage("Safe-Navi combines the baseline road-risk dataset with active government-verified hazards. Citizen reports remain private to the review workflow until an authorized official verifies them.")
+                .setPositiveButton("Got it", null).show());
         renderSafetySummary();
         return view;
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (safetyScoreText != null) renderSafetySummary();
-    }
-
-    private void loadUser() {
-        FirebaseUser user = DemoSession.isActive() || !BuildConfig.HAS_FIREBASE_CONFIG
-                ? null : FirebaseAuth.getInstance().getCurrentUser();
-        String name = user == null ? "Citizen" : user.getDisplayName();
-        if (name == null || name.trim().isEmpty()) name = "Citizen";
-        welcomeTextView.setText("Good evening, " + name);
-    }
+    @Override public void onResume() { super.onResume(); if (safetyScoreText != null) renderSafetySummary(); }
 
     private void renderSafetySummary() {
-        SafetyScore score = SafetyDemoStore.riskEngine().calculate(
-                19.0657, 72.9986, System.currentTimeMillis(),
-                SafetyDemoStore.repository().getHazards());
-        safetyScoreText.setText(String.valueOf(Math.round(score.getSafetyScore())));
-        riskLevelText.setText(readable(score.getRiskLevel().name()) + " · "
-                + score.getConfidence().name() + " confidence");
-        safetyExplanationText.setText(score.getExplanations().get(0));
+        riskLevelText.setText("Refreshing live intelligence…");
+        new DatasetRiskService().pointRisk(19.0657, 72.9986, currentPeriod(), new DatasetRiskService.ResultCallback<DatasetPointRisk>() {
+            @Override public void onSuccess(DatasetPointRisk risk) {
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> {
+                    safetyScoreText.setText(String.valueOf(Math.round(risk.getSafetyScore())));
+                    riskLevelText.setText(readable(risk.getRiskLabel()) + " · " + risk.getAreaName());
+                    safetyExplanationText.setText("Baseline road intelligence and current verified hazards · " + readable(risk.getTimePeriod()));
+                });
+            }
+            @Override public void onError(String message) {
+                if (!isAdded()) return;
+                requireActivity().runOnUiThread(() -> { safetyScoreText.setText("—"); riskLevelText.setText("Live service unavailable"); safetyExplanationText.setText(message); });
+            }
+        });
     }
 
-    private String readable(String value) {
-        String lower = value.toLowerCase().replace('_', ' ');
-        return Character.toUpperCase(lower.charAt(0)) + lower.substring(1);
+    private String currentPeriod() {
+        int hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY);
+        if (hour >= 7 && hour < 11) return "morning_peak";
+        if (hour >= 11 && hour < 17) return "midday";
+        if (hour >= 17 && hour < 22) return "evening_peak";
+        return "night";
     }
+    private String readable(String value) { String lower = value.toLowerCase(Locale.US).replace('_', ' '); return lower.isEmpty() ? "Unknown" : Character.toUpperCase(lower.charAt(0)) + lower.substring(1); }
 }

@@ -37,6 +37,21 @@ public class DatasetRiskServiceParserTest {
         assertTrue(result.getFactorSummary().contains("crime risk"));
     }
 
+    @Test public void parsesBundledTrainedModelMetadata() throws Exception {
+        RouteCandidate route = route("ml-route", 18);
+        String body = "{\"time_period\":\"evening_peak\",\"risk_provider\":\"trained_ml\",\"results\":["
+                + "{\"route_id\":\"ml-route\",\"risk_exposure\":46.2,\"ranking_score\":34.17,"
+                + "\"coverage_ratio\":0.95,\"model_version\":\"safe-route-linear-2026.10\","
+                + "\"model_confidence\":0.797,\"model_factor_contributions\":{"
+                + "\"crime_risk_index\":18.4,\"lighting_quality_index\":-8.1,\"isolation_index\":7.2}}]}";
+        DatasetRouteEvaluation result = DatasetRiskService.parseRouteEvaluation(body,
+                Collections.singletonList(route), RouteProfile.BALANCED);
+        assertEquals("trained_ml", result.getProvider());
+        assertEquals("safe-route-linear-2026.10", result.getModelVersion());
+        assertEquals(0.797, result.getConfidence(), 0.001);
+        assertTrue(result.getFactorSummary().contains("crime risk"));
+    }
+
     private RouteCandidate route(String id, double minutes) {
         return new RouteCandidate(id, minutes, 1000, Collections.singletonList(
                 new HazardLocation.GeoPoint(19.0, 73.0)));

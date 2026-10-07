@@ -5,8 +5,6 @@ import android.os.Bundle;
 import android.view.View;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.card.MaterialCardView;
-import com.safenavi.app.safety.demo.DemoSession;
-import com.safenavi.app.safety.model.UserRole;
 
 public class LoginTypeActivity extends AppCompatActivity {
 
@@ -31,14 +29,6 @@ public class LoginTypeActivity extends AppCompatActivity {
         userLoginCard.setOnClickListener(v -> openLogin("user"));
         adminLoginCard.setOnClickListener(v -> openLogin("admin"));
         govLoginCard.setOnClickListener(v -> openLogin("government"));
-        findViewById(R.id.citizenDemoButton).setOnClickListener(v -> {
-            DemoSession.start(UserRole.CITIZEN);
-            startActivity(new Intent(this, MainActivity.class));
-        });
-        findViewById(R.id.governmentDemoButton).setOnClickListener(v -> {
-            DemoSession.start(UserRole.GOVERNMENT);
-            startActivity(new Intent(this, GovernmentSafetyDashboardActivity.class));
-        });
     }
 
     private void openLogin(String loginType) {

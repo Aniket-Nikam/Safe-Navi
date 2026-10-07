@@ -1,261 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="@android:color/white">
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp">
-
-        <!-- Header -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Submit Report"
-            android:textSize="28sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:layout_marginBottom="8dp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Fill in the details below to submit your report"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="24dp" />
-
-        <!-- Title Input -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:boxStrokeColor="@color/primary"
-            app:hintTextColor="@color/primary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/editTextTitle"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Report Title"
-                android:inputType="textCapSentences"
-                android:textSize="16sp" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Category Dropdown -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            app:boxStrokeColor="@color/primary"
-            app:hintTextColor="@color/primary"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
-
-            <AutoCompleteTextView
-                android:id="@+id/autoCompleteCategory"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Select Category"
-                android:inputType="none"
-                android:textSize="16sp" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Description Input -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="24dp"
-            app:boxStrokeColor="@color/primary"
-            app:hintTextColor="@color/primary"
-            app:counterEnabled="true"
-            app:counterMaxLength="500"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/editTextDescription"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="Description"
-                android:inputType="textMultiLine|textCapSentences"
-                android:minLines="4"
-                android:maxLines="8"
-                android:maxLength="500"
-                android:gravity="top|start"
-                android:textSize="16sp" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Image Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Upload Image"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:layout_marginBottom="12dp" />
-
-        <!-- Select Image Button -->
-        <Button
-            android:id="@+id/buttonSelectImage"
-            android:layout_width="match_parent"
-            android:layout_height="56dp"
-            android:text="Select Image"
-            android:textSize="16sp"
-            android:textColor="@color/on_primary"
-            android:backgroundTint="@color/primary"
-            android:layout_marginBottom="16dp"
-            app:cornerRadius="8dp"
-            app:icon="@android:drawable/ic_menu_gallery"
-            app:iconGravity="textStart"
-            app:iconTint="@color/on_primary" />
-
-        <!-- Image Preview -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="200dp"
-            android:layout_marginBottom="24dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
-
-            <ImageView
-                android:id="@+id/imageViewPreview"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:scaleType="centerCrop"
-                android:visibility="gone"
-                android:contentDescription="Selected image preview" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="No image selected"
-                android:textColor="@color/text_hint"
-                android:textSize="14sp"
-                android:layout_gravity="center"
-                android:id="@+id/textViewNoImage" />
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- Location Section -->
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Current Location"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@color/text_primary"
-            android:layout_marginBottom="12dp" />
-
-        <!-- Map Container -->
-        <androidx.cardview.widget.CardView
-            android:layout_width="match_parent"
-            android:layout_height="250dp"
-            android:layout_marginBottom="12dp"
-            app:cardCornerRadius="12dp"
-            app:cardElevation="4dp">
-
-            <org.maplibre.android.maps.MapView
-                android:id="@+id/mapFragment"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                tools:context=".ReportFragment" />
-
-        </androidx.cardview.widget.CardView>
-
-        <!-- Location Info Text -->
-        <TextView
-            android:id="@+id/textViewLocationInfo"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="12sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="24dp"
-            android:visibility="gone"
-            android:drawableStart="@android:drawable/ic_dialog_map"
-            android:drawablePadding="8dp"
-            android:gravity="center_vertical"
-            tools:text="Lat: 19.076090, Lng: 72.877426"
-            tools:visibility="visible" />
-
-        <!-- Action Buttons -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:weightSum="2"
-            android:layout_marginBottom="16dp">
-
-            <!-- View History Button -->
-            <Button
-                android:id="@+id/buttonViewHistory"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="8dp"
-                android:text="View History"
-                android:textSize="14sp"
-                android:textColor="@color/primary"
-                android:backgroundTint="@color/primary_light"
-                app:cornerRadius="8dp"
-                app:icon="@android:drawable/ic_menu_recent_history"
-                app:iconGravity="textStart"
-                app:iconTint="@color/primary" />
-
-            <!-- Submit Button -->
-            <Button
-                android:id="@+id/buttonSubmitReport"
-                android:layout_width="0dp"
-                android:layout_height="56dp"
-                android:layout_weight="1"
-                android:layout_marginStart="8dp"
-                android:text="Submit"
-                android:textSize="14sp"
-                android:textStyle="bold"
-                android:textColor="@color/on_dark_surface"
-                android:backgroundTint="@color/success"
-                app:cornerRadius="8dp"
-                app:icon="@android:drawable/ic_menu_upload"
-                app:iconGravity="textStart"
-                app:iconTint="@color/on_dark_surface" />
-
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/background" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:letterSpacing="0.12" android:text="COMMUNITY SIGNAL" android:textColor="@color/primary" android:textSize="11sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Report what you see" android:textColor="@color/text_primary" android:textSize="28sp" android:textStyle="bold" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Your report enters an official review queue. It affects public routes only after verification." android:textColor="@color/text_secondary" android:textSize="13sp" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" app:cardBackgroundColor="@color/surface" app:cardCornerRadius="22dp" app:cardElevation="1dp" app:strokeColor="@color/divider" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Issue title" app:boxBackgroundMode="outline" app:boxCornerRadiusTopStart="14dp" app:boxCornerRadiusTopEnd="14dp" app:boxCornerRadiusBottomStart="14dp" app:boxCornerRadiusBottomEnd="14dp">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editTextTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:maxLength="140" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Category" app:boxBackgroundMode="outline" app:boxCornerRadiusTopStart="14dp" app:boxCornerRadiusTopEnd="14dp" app:boxCornerRadiusBottomStart="14dp" app:boxCornerRadiusBottomEnd="14dp" app:endIconMode="dropdown_menu">
+                    <AutoCompleteTextView android:id="@+id/autoCompleteCategory" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:hint="Describe the issue and immediate risk" app:boxBackgroundMode="outline" app:boxCornerRadiusTopStart="14dp" app:boxCornerRadiusTopEnd="14dp" app:boxCornerRadiusBottomStart="14dp" app:boxCornerRadiusBottomEnd="14dp">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/editTextDescription" android:layout_width="match_parent" android:layout_height="120dp" android:gravity="top" android:inputType="textMultiLine" android:maxLength="4000" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.button.MaterialButton android:id="@+id/buttonAddEvidence" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="12dp" android:text="Add photos or short video" android:textAllCaps="false" app:cornerRadius="14dp" />
+                <TextView android:id="@+id/textEvidenceStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="Optional · up to 5 files · 15 MB each" android:textColor="@color/text_secondary" android:textSize="11sp" />
+                <CheckBox android:id="@+id/checkAnonymous" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Hide my identity from operational report views" android:textColor="@color/text_primary" android:textSize="12sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp" android:gravity="center_vertical" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Pin the exact location" android:textColor="@color/text_primary" android:textSize="18sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Tap the map or use your position" android:textColor="@color/text_secondary" android:textSize="12sp" />
+            </LinearLayout>
+            <com.google.android.material.button.MaterialButton android:id="@+id/useCurrentLocationButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="44dp" android:text="My location" android:textAllCaps="false" app:cornerRadius="13dp" app:icon="@drawable/ic_location" />
         </LinearLayout>
-
-        <!-- Progress Section -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:layout_marginTop="8dp">
-
-            <ProgressBar
-                android:id="@+id/progressBar"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:visibility="gone"
-                android:indeterminateTint="@color/primary" />
-
-            <TextView
-                android:id="@+id/textViewUploadProgress"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:textSize="14sp"
-                android:textColor="@color/primary"
-                android:visibility="gone" />
-
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="260dp" android:layout_marginTop="12dp" app:cardCornerRadius="20dp" app:cardElevation="1dp">
+            <org.maplibre.android.maps.MapView android:id="@+id/mapFragment" android:layout_width="match_parent" android:layout_height="match_parent" />
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:id="@+id/textViewLocationInfo" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:background="@drawable/bg_label" android:padding="12dp" android:text="Select a precise location on the map" android:textColor="@color/text_secondary" android:textSize="12sp" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:orientation="horizontal">
+            <com.google.android.material.button.MaterialButton android:id="@+id/buttonViewHistory" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="54dp" android:layout_marginEnd="6dp" android:layout_weight="1" android:text="My reports" android:textAllCaps="false" app:cornerRadius="16dp" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/buttonSubmitReport" android:layout_width="0dp" android:layout_height="54dp" android:layout_marginStart="6dp" android:layout_weight="1" android:text="Send for review" android:textAllCaps="false" android:textStyle="bold" app:backgroundTint="@color/primary" app:cornerRadius="16dp" />
         </LinearLayout>
-
+        <ProgressBar android:id="@+id/progressBar" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_gravity="center_horizontal" android:layout_marginTop="14dp" android:visibility="gone" />
     </LinearLayout>
-
 </ScrollView>

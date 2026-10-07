@@ -23,9 +23,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/** Small provider boundary for OSM-backed search and routing demo services. */
+/** Provider boundary for OpenStreetMap-backed search and routing services. */
 public class OpenMapService {
-    private static final String USER_AGENT = "Safe-Navi-College-Demo/1.0 (github.com/Aniket-Nikam/Safe-Navi)";
+    private static final String USER_AGENT = "Safe-Navi/1.0 (github.com/Aniket-Nikam/Safe-Navi)";
     private static final long NOMINATIM_INTERVAL_MS = 1_100L;
     private final OkHttpClient client;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -67,6 +67,24 @@ public class OpenMapService {
                 .addQueryParameter("accept-language", "en")
                 .build();
         execute(url, body -> parsePlaces(body), callback);
+    }
+
+    public synchronized void reverse(double latitude, double longitude, ResultCallback<String> callback) {
+        long now = System.currentTimeMillis();
+        long delay = Math.max(0, NOMINATIM_INTERVAL_MS - (now - lastSearchAt));
+        lastSearchAt = now + delay;
+        handler.postDelayed(() -> {
+            HttpUrl base = HttpUrl.parse(BuildConfig.NOMINATIM_BASE_URL);
+            if (base == null) { callback.onError("Invalid geocoding service configuration."); return; }
+            HttpUrl url = base.newBuilder().addPathSegment("reverse")
+                    .addQueryParameter("lat", String.valueOf(latitude))
+                    .addQueryParameter("lon", String.valueOf(longitude))
+                    .addQueryParameter("format", "jsonv2")
+                    .addQueryParameter("zoom", "18")
+                    .addQueryParameter("accept-language", "en")
+                    .build();
+            execute(url, OpenMapService::parseReverse, callback);
+        }, delay);
     }
 
     public void routes(double fromLat, double fromLon, double toLat, double toLon,
@@ -154,6 +172,13 @@ public class OpenMapService {
                     Double.parseDouble(item.getString("lon"))));
         }
         return results;
+    }
+
+    public static String parseReverse(String body) throws JSONException {
+        JSONObject item = new JSONObject(body);
+        String displayName = item.optString("display_name").trim();
+        if (displayName.isEmpty()) throw new JSONException("No address was returned.");
+        return displayName;
     }
 
     public static List<RouteCandidate> parseRoutes(String body) throws JSONException {

@@ -13,7 +13,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="SAFE-NAVI · LIVE PROTOTYPE"
+            android:text="SAFE-NAVI · LIVE SAFETY INTELLIGENCE"
             android:textColor="@color/primary"
             android:textSize="12sp"
             android:textStyle="bold"
@@ -172,13 +172,13 @@
             app:icon="@drawable/ic_chatbot"
             app:iconTint="@color/on_dark_surface" />
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/demoDisclosureButton"
+            android:id="@+id/scoreDisclosureButton"
             style="@style/Widget.MaterialComponents.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
             android:layout_marginTop="14dp"
-            android:text="Synthetic demo data · Learn more"
+            android:text="How Safe-Navi calculates this score"
             android:textAllCaps="false"
             android:textColor="@color/text_secondary" />
     </LinearLayout>

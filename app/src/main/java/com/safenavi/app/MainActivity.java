@@ -2,6 +2,8 @@ package com.safenavi.app;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Build;
+import android.content.pm.PackageManager;
 import android.view.MenuItem;
 import android.widget.FrameLayout;
 import androidx.annotation.NonNull;
@@ -9,12 +11,10 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentTransaction;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
-import com.google.firebase.auth.FirebaseAuth;
-import com.safenavi.app.safety.demo.DemoSession;
+import com.safenavi.app.product.SafetySyncWorker;
 
 public class MainActivity extends AppCompatActivity {
 
-    private FirebaseAuth mAuth;
     private BottomNavigationView bottomNavigationView;
     private FrameLayout fragmentContainer;
 
@@ -23,16 +23,25 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        if (!DemoSession.isActive() && BuildConfig.HAS_FIREBASE_CONFIG) {
-            mAuth = FirebaseAuth.getInstance();
-        }
-
         initializeViews();
         setupBottomNavigation();
+        SafetySyncWorker.schedule(this);
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 902);
 
         // Load home fragment by default
         if (savedInstanceState == null) {
-            loadFragment(new HomeFragment());
+            if (getIntent().hasExtra("reportLatitude") && getIntent().hasExtra("reportLongitude")) {
+                ReportFragment report = new ReportFragment();
+                Bundle arguments = new Bundle();
+                arguments.putDouble("latitude", getIntent().getDoubleExtra("reportLatitude", 0));
+                arguments.putDouble("longitude", getIntent().getDoubleExtra("reportLongitude", 0));
+                report.setArguments(arguments);
+                loadFragment(report);
+                bottomNavigationView.setSelectedItemId(R.id.nav_report);
+            } else {
+                loadFragment(new HomeFragment());
+            }
         }
     }
 
@@ -54,18 +63,9 @@ public class MainActivity extends AppCompatActivity {
                     startActivity(new Intent(MainActivity.this, MapsActivity.class));
                     return false;
                 } else if (itemId == R.id.nav_report) {
-                    selectedFragment = DemoSession.isActive() ? new DemoReportFragment() : new ReportFragment();
+                    selectedFragment = new ReportFragment();
                 } else if (itemId == R.id.nav_community) {
-                    if (DemoSession.isActive()) {
-                        new com.google.android.material.dialog.MaterialAlertDialogBuilder(MainActivity.this)
-                                .setTitle("Community demo")
-                                .setMessage("The full community feature was migrated from SafeNavi and uses Firebase. Add google-services.json to connect live posts and comments.")
-                                .setPositiveButton("Understood", null)
-                                .show();
-                    } else {
-                        startActivity(new Intent(MainActivity.this, DiscussionActivity.class));
-                    }
-                    return false;
+                    selectedFragment = new CommunityFragment();
                 } else if (itemId == R.id.nav_profile) {
                     selectedFragment = new SettingsFragment();
                 }
@@ -87,5 +87,16 @@ public class MainActivity extends AppCompatActivity {
 
     public void openReport() {
         bottomNavigationView.setSelectedItemId(R.id.nav_report);
+    }
+
+    public void openCommunity() {
+        bottomNavigationView.setSelectedItemId(R.id.nav_community);
+    }
+
+    public void openAssistant() {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragmentContainer, new ChatbotFragment())
+                .addToBackStack("assistant")
+                .commit();
     }
 }

@@ -4,23 +4,16 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
 import androidx.appcompat.app.AppCompatActivity;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseUser;
+import com.safenavi.app.product.ProductSession;
 
 public class SplashActivity extends AppCompatActivity {
 
-    private static final int SPLASH_DURATION = 2000; // 2 seconds
-    private FirebaseAuth mAuth;
-
+    private static final int SPLASH_DURATION = 1400;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
-        if (BuildConfig.HAS_FIREBASE_CONFIG) {
-            mAuth = FirebaseAuth.getInstance();
-        }
-        
         android.view.View contentLayout = findViewById(R.id.splashContentLayout);
         if (contentLayout != null) {
             contentLayout.setTranslationY(50f);
@@ -33,15 +26,13 @@ public class SplashActivity extends AppCompatActivity {
         }
 
         new Handler().postDelayed(() -> {
-            FirebaseUser currentUser = mAuth == null ? null : mAuth.getCurrentUser();
             Intent intent;
-
-            if (currentUser != null) {
-                // User is signed in, go to MainActivity
-                intent = new Intent(SplashActivity.this, MainActivity.class);
+            if (ProductSession.isSignedIn(this)) {
+                String role = ProductSession.role(this);
+                intent = new Intent(this, role.equals("government") || role.equals("admin")
+                        ? GovernmentSafetyDashboardActivity.class : MainActivity.class);
             } else {
-                // No user signed in, go to LoginActivity
-                intent = new Intent(SplashActivity.this, LoginTypeActivity.class);
+                intent = new Intent(this, LoginTypeActivity.class);
             }
 
             startActivity(intent);

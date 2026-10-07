@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/background"
+    android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SAFE-NAVI COMMUNITY" android:textColor="@color/primary" android:textSize="11sp" android:textStyle="bold" android:letterSpacing="0.12" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Neighbourhood pulse" android:textColor="@color/text_primary" android:textSize="28sp" android:textStyle="bold" />
+            </LinearLayout>
+            <com.google.android.material.button.MaterialButton android:id="@+id/communityRefresh" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="48dp" android:text="Refresh" android:textAllCaps="false" android:textColor="@color/primary" />
+        </LinearLayout>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Share useful local context. Community posts are clearly separated from government-verified alerts." android:textColor="@color/text_secondary" android:textSize="14sp" android:lineSpacingExtra="3dp" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" app:cardBackgroundColor="@color/primary_dark" app:cardCornerRadius="24dp" app:cardElevation="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="START A CONVERSATION" android:textColor="@color/accent" android:textSize="10sp" android:textStyle="bold" android:letterSpacing="0.1" />
+                <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" app:boxBackgroundColor="@color/surface" app:boxBackgroundMode="filled" app:boxCornerRadiusTopStart="16dp" app:boxCornerRadiusTopEnd="16dp" app:boxCornerRadiusBottomStart="16dp" app:boxCornerRadiusBottomEnd="16dp" app:boxStrokeWidth="0dp">
+                    <com.google.android.material.textfield.TextInputEditText android:id="@+id/communityComposer" android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Ask, share an update, or help a neighbour…" android:maxLength="1500" android:minLines="3" android:gravity="top" android:textColor="@color/text_primary" android:textColorHint="@color/text_hint" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <com.google.android.material.button.MaterialButton android:id="@+id/communityAddPhoto" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="10dp" android:text="Attach a photograph" android:textAllCaps="false" android:textColor="@color/accent" app:strokeColor="@color/accent" app:cornerRadius="14dp" />
+                <TextView android:id="@+id/communityPhotoStatus" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="Optional · JPEG, PNG or WebP · authenticated members only" android:textColor="@color/surface_variant" android:textSize="11sp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center_vertical" android:orientation="horizontal">
+                    <com.google.android.material.textfield.TextInputLayout style="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.ExposedDropdownMenu" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" app:boxBackgroundColor="@color/surface_variant" app:boxStrokeWidth="0dp">
+                        <AutoCompleteTextView android:id="@+id/communityCategory" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" android:textColor="@color/text_primary" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                    <com.google.android.material.button.MaterialButton android:id="@+id/communityPublish" android:layout_width="wrap_content" android:layout_height="56dp" android:layout_marginStart="10dp" android:text="Publish" android:textAllCaps="false" android:textColor="@color/primary_dark" android:textStyle="bold" app:backgroundTint="@color/accent" app:cornerRadius="16dp" />
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="@color/surface_tint" app:cardCornerRadius="18dp" app:cardElevation="0dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal" android:padding="14dp">
+                <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Need private guidance? Ask Navi, your AI safety assistant." android:textColor="@color/text_primary" android:textSize="13sp" android:textStyle="bold" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/communityAskAi" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="wrap_content" android:layout_height="44dp" android:text="Ask Navi" android:textAllCaps="false" android:textColor="@color/primary" app:icon="@drawable/ic_chatbot" app:iconTint="@color/primary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="22dp" android:layout_marginBottom="10dp" android:text="Latest conversations" android:textColor="@color/text_primary" android:textSize="19sp" android:textStyle="bold" />
+        <ProgressBar android:id="@+id/communityProgress" android:layout_width="28dp" android:layout_height="28dp" android:layout_gravity="center_horizontal" android:indeterminateTint="@color/primary" />
+        <TextView android:id="@+id/communityEmpty" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="28dp" android:gravity="center" android:text="No posts yet. Start the first useful local conversation." android:textColor="@color/text_secondary" android:visibility="gone" />
+        <androidx.recyclerview.widget.RecyclerView android:id="@+id/communityList" android:layout_width="match_parent" android:layout_height="wrap_content" />
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

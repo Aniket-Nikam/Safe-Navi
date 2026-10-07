@@ -28,7 +28,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-/** Client for the SQLite/FastAPI runtime derived from the city-scale synthetic dataset. */
+/** Client for the Safe-Navi baseline and verified-hazard risk service. */
 public class DatasetRiskService {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private final OkHttpClient client = new OkHttpClient.Builder().build();
@@ -72,11 +72,14 @@ public class DatasetRiskService {
 
                 @Override public void onResponse(Call call, Response response) {
                     try (Response closeable = response) {
-                        if (!response.isSuccessful() || response.body() == null) {
-                            callback.onError("Dataset API returned HTTP " + response.code() + ".");
+                        String body = response.body() == null ? "" : response.body().string();
+                        if (!response.isSuccessful()) {
+                            try { JSONObject detail = new JSONObject(body).optJSONObject("detail");
+                                callback.onError(detail == null ? "Dataset API returned HTTP " + response.code() + "." : detail.optString("message", "No confirmed safe alternative is available."));
+                            } catch (Exception ignored) { callback.onError("Dataset API returned HTTP " + response.code() + "."); }
                             return;
                         }
-                        callback.onSuccess(parseRouteEvaluation(response.body().string(), candidates, profile));
+                        callback.onSuccess(parseRouteEvaluation(body, candidates, profile));
                     } catch (Exception error) {
                         callback.onError("Dataset API returned an unreadable response.");
                     }
@@ -132,7 +135,10 @@ public class DatasetRiskService {
         for (RouteCandidate candidate : candidates) byId.put(candidate.getProviderRouteId(), candidate);
         List<RouteSafetyResult> ranked = new ArrayList<>();
         double coverage = 0;
-        String factorSummary = "10-factor synthetic dataset";
+        String factorSummary = "10-factor baseline dataset";
+        String provider = root.optString("risk_provider", "deterministic_baseline");
+        String modelVersion = "";
+        double confidence = 0;
         JSONArray results = root.getJSONArray("results");
         for (int i = 0; i < results.length(); i++) {
             JSONObject item = results.getJSONObject(i);
@@ -142,15 +148,19 @@ public class DatasetRiskService {
                     item.getDouble("ranking_score")));
             if (i == 0) {
                 coverage = item.optDouble("coverage_ratio", 0);
-                factorSummary = topFactors(item.optJSONObject("factor_averages"));
+                if (provider.endsWith("_ml")) {
+                    factorSummary = topFactors(item.optJSONObject("model_factor_contributions"));
+                    modelVersion = item.optString("model_version"); confidence = item.optDouble("model_confidence", 0);
+                } else factorSummary = topFactors(item.optJSONObject("factor_averages"));
             }
         }
         ranked.sort(Comparator.comparingDouble(RouteSafetyResult::getScore));
-        return new DatasetRouteEvaluation(ranked, root.getString("time_period"), coverage, factorSummary);
+        return new DatasetRouteEvaluation(ranked, root.getString("time_period"), coverage, factorSummary,
+                provider, modelVersion, confidence);
     }
 
     private static String topFactors(JSONObject factors) throws JSONException {
-        if (factors == null) return "10-factor synthetic dataset";
+        if (factors == null) return "10-factor baseline dataset";
         List<Map.Entry<String, Double>> values = new ArrayList<>();
         Iterator<String> keys = factors.keys();
         while (keys.hasNext()) {

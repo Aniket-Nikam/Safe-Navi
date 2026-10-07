@@ -1,299 +1,290 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
     <org.maplibre.android.maps.MapView
         android:id="@+id/mapView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
 
     <com.google.android.material.card.MaterialCardView
-        android:layout_width="match_parent"
+        android:id="@+id/routeSearchCard"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="top"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="10dp"
-        android:layout_marginEnd="10dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="12dp"
         app:cardBackgroundColor="@color/surface_elevated"
-        app:cardCornerRadius="24dp"
+        app:cardCornerRadius="18dp"
         app:cardElevation="6dp"
         app:strokeColor="@color/divider"
-        app:strokeWidth="1dp">
-
+        app:strokeWidth="1dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="14dp"
-            android:paddingTop="12dp"
-            android:paddingEnd="14dp"
-            android:paddingBottom="14dp">
+            android:paddingStart="10dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="10dp"
+            android:paddingBottom="10dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="40dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <ImageButton
+                    android:id="@+id/backButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Back"
+                    android:padding="8dp"
+                    android:rotation="180"
+                    android:src="@drawable/ic_arrow_forward"
+                    app:tint="@color/text_primary" />
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:layout_weight="1"
+                    android:text="@string/plan_safer_route"
+                    android:textColor="@color/text_primary"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+                <ImageButton
+                    android:id="@+id/locationButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Use my location"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_location"
+                    app:tint="@color/primary" />
+                <ImageButton
+                    android:id="@+id/mapToolsButton"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:background="@android:color/transparent"
+                    android:contentDescription="Map tools"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_more"
+                    app:tint="@color/primary" />
+            </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <ImageButton
-                    android:id="@+id/backButton"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="Back"
-                    android:rotation="180"
-                    android:src="@drawable/ic_arrow_forward"
-                    app:tint="@color/text_primary" />
-
-                <LinearLayout
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:orientation="vertical">
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Plan a safer route"
-                        android:textColor="@color/text_primary"
-                        android:textSize="19sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="OSM network · Synthetic safety intelligence"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="10sp"
-                        android:textStyle="bold" />
-                </LinearLayout>
-
-                <ImageButton
-                    android:id="@+id/locationButton"
-                    android:layout_width="42dp"
-                    android:layout_height="42dp"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="Use my location"
-                    android:src="@drawable/ic_location"
-                    app:tint="@color/primary" />
+                android:layout_marginTop="4dp"
+                android:background="@drawable/bg_map_search_group"
+                android:orientation="vertical">
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:hint="@string/source"
+                    app:boxBackgroundColor="@android:color/transparent"
+                    app:boxBackgroundMode="filled"
+                    app:boxStrokeWidth="0dp"
+                    app:boxStrokeWidthFocused="0dp"
+                    app:hintTextColor="@color/text_secondary"
+                    app:startIconDrawable="@drawable/ic_location"
+                    app:startIconTint="@color/primary">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/sourceInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:imeOptions="actionNext"
+                        android:inputType="textPostalAddress"
+                        android:singleLine="true"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="48dp"
+                    android:background="@color/divider" />
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/destinationInputLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:hint="@string/destination"
+                    app:boxBackgroundColor="@android:color/transparent"
+                    app:boxBackgroundMode="filled"
+                    app:boxStrokeWidth="0dp"
+                    app:boxStrokeWidthFocused="0dp"
+                    app:endIconDrawable="@drawable/ic_activity"
+                    app:endIconMode="custom"
+                    app:endIconTint="@color/primary"
+                    app:hintTextColor="@color/text_secondary"
+                    app:startIconDrawable="@drawable/ic_pin"
+                    app:startIconTint="@color/signal_coral">
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/destinationInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:imeOptions="actionDone"
+                        android:inputType="textPostalAddress"
+                        android:singleLine="true"
+                        android:textSize="15sp" />
+                </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:hint="Source"
-                app:boxBackgroundColor="@color/surface_variant"
-                app:boxBackgroundMode="filled"
-                app:boxCornerRadiusBottomEnd="14dp"
-                app:boxCornerRadiusBottomStart="14dp"
-                app:boxCornerRadiusTopEnd="14dp"
-                app:boxCornerRadiusTopStart="14dp"
-                app:boxStrokeWidth="0dp"
-                app:boxStrokeWidthFocused="1dp"
-                app:hintTextColor="@color/text_secondary"
-                app:startIconTint="@color/primary"
-                app:startIconDrawable="@drawable/ic_location">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/sourceInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:imeOptions="actionNext"
-                    android:inputType="textPostalAddress"
-                    android:singleLine="true"
-                    android:text="Vashi Railway Station" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:id="@+id/destinationInputLayout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="7dp"
-                android:hint="Destination"
-                app:boxBackgroundColor="@color/surface_variant"
-                app:boxBackgroundMode="filled"
-                app:boxCornerRadiusBottomEnd="14dp"
-                app:boxCornerRadiusBottomStart="14dp"
-                app:boxCornerRadiusTopEnd="14dp"
-                app:boxCornerRadiusTopStart="14dp"
-                app:boxStrokeWidth="0dp"
-                app:boxStrokeWidthFocused="1dp"
-                app:endIconDrawable="@drawable/ic_more"
-                app:endIconTint="@color/primary"
-                app:endIconMode="custom"
-                app:hintTextColor="@color/text_secondary"
-                app:startIconTint="@color/signal_coral"
-                app:startIconDrawable="@drawable/ic_pin">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/destinationInput"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:imeOptions="actionDone"
-                    android:inputType="textPostalAddress"
-                    android:singleLine="true"
-                    android:text="CBD Belapur" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:scrollbars="none">
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/travelModeGroup"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:selectionRequired="true"
-                    app:singleSelection="true">
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/modeDrive"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="Drive"
-                        app:checkedIconVisible="false" />
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/modeWalk"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Walk"
-                        app:checkedIconVisible="false" />
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/modeCycle"
-                        style="@style/Widget.MaterialComponents.Chip.Choice"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Cycle"
-                        app:checkedIconVisible="false" />
-                </com.google.android.material.chip.ChipGroup>
-            </HorizontalScrollView>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
+        android:id="@+id/safetyScoreCard"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="top|end"
-        android:layout_marginTop="286dp"
-        android:layout_marginEnd="10dp"
+        android:layout_height="48dp"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="12dp"
         app:cardBackgroundColor="@color/primary_dark"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="5dp">
+        app:cardCornerRadius="14dp"
+        app:cardElevation="4dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/routeSearchCard">
         <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:gravity="center"
-            android:orientation="vertical"
-                android:paddingStart="15dp"
-                android:paddingTop="9dp"
-                android:paddingEnd="15dp"
-                android:paddingBottom="10dp">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="AREA SCORE"
-                android:textColor="@color/dark_surface_secondary"
-                android:textSize="8sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.08" />
+            android:layout_height="match_parent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
             <TextView
                 android:id="@+id/mapSafetyScore"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="72"
                 android:textColor="@color/accent"
-                android:textSize="24sp"
+                android:textSize="20sp"
                 android:textStyle="bold" />
-            <TextView
-                android:id="@+id/mapSafetyLabel"
+            <View
+                android:layout_width="1dp"
+                android:layout_height="22dp"
+                android:layout_marginStart="9dp"
+                android:layout_marginEnd="9dp"
+                android:background="@color/dark_surface_secondary" />
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:gravity="center"
-                android:text="Moderate risk"
-                android:textColor="@color/on_dark_surface"
-                android:textSize="9sp" />
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="@string/area_safety"
+                    android:textColor="@color/dark_surface_secondary"
+                    android:textSize="7sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:id="@+id/mapSafetyLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="118dp"
+                    android:ellipsize="end"
+                    android:singleLine="true"
+                    android:text="Moderate risk"
+                    android:textColor="@color/on_dark_surface"
+                    android:textSize="9sp" />
+            </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+        android:id="@+id/emergencyButton"
+        android:layout_width="wrap_content"
+        android:layout_height="46dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
+        android:contentDescription="Open emergency tools"
+        android:text="SOS"
+        android:textAllCaps="false"
+        android:textColor="@color/on_danger"
+        android:textStyle="bold"
+        app:backgroundTint="@color/danger_text"
+        app:cornerRadius="14dp"
+        app:icon="@drawable/ic_warning"
+        app:iconTint="@color/on_danger"
+        app:layout_constraintBottom_toTopOf="@id/routeControlCard"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/routeControlCard"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:layout_margin="10dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="12dp"
         app:cardBackgroundColor="@color/surface"
-        app:cardCornerRadius="26dp"
-        app:cardElevation="12dp"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="8dp"
         app:strokeColor="@color/divider"
-        app:strokeWidth="1dp">
+        app:strokeWidth="1dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingStart="17dp"
-            android:paddingTop="15dp"
-            android:paddingEnd="17dp"
-            android:paddingBottom="13dp">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Safety preference"
-                android:textColor="@color/text_primary"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-            <TextView
+            android:padding="10dp">
+            <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:text="Choose how strongly risk exposure affects ranking"
-                android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/routeProfileGroup"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                app:selectionRequired="true"
-                app:singleSelection="true">
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/profileFastest"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Fastest" />
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/profileBalanced"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:checked="true"
-                    android:text="Balanced" />
-                <com.google.android.material.chip.Chip
-                    android:id="@+id/profileSafest"
-                    style="@style/Widget.MaterialComponents.Chip.Choice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Safest" />
-            </com.google.android.material.chip.ChipGroup>
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/findRouteButton"
-                android:layout_width="match_parent"
-                android:layout_height="52dp"
-                android:layout_marginTop="4dp"
-                android:text="Compare route options"
-                android:textAllCaps="false"
-                android:textColor="@color/on_accent"
-                android:textStyle="bold"
-                app:backgroundTint="@color/accent"
-                app:cornerRadius="16dp"
-                app:icon="@drawable/ic_explore"
-                app:iconTint="@color/on_accent" />
+                android:layout_height="48dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/travelModeButton"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:text="@string/drive"
+                    android:textAllCaps="false"
+                    android:textColor="@color/text_primary"
+                    android:textSize="13sp"
+                    app:cornerRadius="13dp"
+                    app:strokeColor="@color/divider" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/routeProfileButton"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:text="@string/balanced"
+                    android:textAllCaps="false"
+                    android:textColor="@color/primary"
+                    android:textSize="13sp"
+                    app:cornerRadius="13dp"
+                    app:strokeColor="@color/positive_border" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/findRouteButton"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1.35"
+                    android:text="@string/compare_short"
+                    android:textAllCaps="false"
+                    android:textColor="@color/on_accent"
+                    android:textStyle="bold"
+                    app:backgroundTint="@color/accent"
+                    app:cornerRadius="13dp"
+                    app:icon="@drawable/ic_explore"
+                    app:iconTint="@color/on_accent" />
+            </LinearLayout>
             <ProgressBar
                 android:id="@+id/routeProgress"
-                android:layout_width="24dp"
-                android:layout_height="24dp"
+                android:layout_width="22dp"
+                android:layout_height="22dp"
                 android:layout_gravity="center"
                 android:layout_marginTop="6dp"
                 android:visibility="gone" />
@@ -301,99 +292,47 @@
                 android:id="@+id/routeResultCard"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
+                android:layout_marginTop="8dp"
                 android:background="@drawable/bg_route_result"
                 android:orientation="vertical"
                 android:padding="13dp"
                 android:visibility="gone">
-                <TextView
-                    android:id="@+id/routeResultTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/route_result_title"
-                    android:textSize="15sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:id="@+id/routeResultMeta"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
-                <TextView
-                    android:id="@+id/routeResultRisk"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textColor="@color/route_risk_text"
-                    android:textSize="11sp"
-                    android:lineSpacingExtra="2dp" />
+                <TextView android:id="@+id/routeResultTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/route_result_title" android:textSize="15sp" android:textStyle="bold" />
+                <TextView android:id="@+id/routeResultMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                <TextView android:id="@+id/routeResultRisk" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:lineSpacingExtra="2dp" android:textColor="@color/route_risk_text" android:textSize="11sp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal">
+                    <com.google.android.material.button.MaterialButton android:id="@+id/shareRouteButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="42dp" android:layout_weight="1" android:text="Share" android:textAllCaps="false" app:icon="@drawable/ic_share" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/openNavigationButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="42dp" android:layout_weight="1" android:text="Navigate" android:textAllCaps="false" app:icon="@drawable/ic_explore" />
+                </LinearLayout>
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal">
+                    <com.google.android.material.button.MaterialButton android:id="@+id/saveDestinationButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="Save place" android:textAllCaps="false" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/startJourneyButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="Share journey" android:textAllCaps="false" app:cornerRadius="12dp" />
+                </LinearLayout>
             </LinearLayout>
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:gravity="center"
-                android:text="Map: OpenStreetMap · Safety layer: synthetic"
-                android:textColor="@color/text_secondary"
-                android:textSize="8sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/hazardDetailCard"
-        android:layout_width="match_parent"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="center_vertical"
-        android:layout_margin="14dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="12dp"
+        android:layout_marginBottom="10dp"
         android:visibility="gone"
         app:cardBackgroundColor="@color/surface"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="10dp">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="18dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-                <TextView
-                    android:id="@+id/hazardTitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Hazard"
-                    android:textColor="@color/text_primary"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
-                <ImageButton
-                    android:id="@+id/closeDetailButton"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:background="@android:color/transparent"
-                    android:contentDescription="Close details"
-                    android:src="@drawable/ic_delete"
-                    app:tint="@color/text_secondary" />
+        app:cardCornerRadius="18dp"
+        app:cardElevation="8dp"
+        app:layout_constraintBottom_toTopOf="@id/routeControlCard"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                <TextView android:id="@+id/hazardTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Hazard" android:textColor="@color/text_primary" android:textSize="17sp" android:textStyle="bold" />
+                <ImageButton android:id="@+id/closeDetailButton" android:layout_width="36dp" android:layout_height="36dp" android:background="@android:color/transparent" android:contentDescription="Close details" android:src="@drawable/ic_delete" app:tint="@color/text_secondary" />
             </LinearLayout>
-            <TextView
-                android:id="@+id/hazardMeta"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="5dp"
-                android:textColor="@color/hazard_meta"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-            <TextView
-                android:id="@+id/hazardReason"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:lineSpacingExtra="3dp"
-                android:textColor="@color/text_secondary"
-                android:textSize="13sp" />
+            <TextView android:id="@+id/hazardMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/hazard_meta" android:textSize="11sp" android:textStyle="bold" />
+            <TextView android:id="@+id/hazardReason" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:lineSpacingExtra="2dp" android:textColor="@color/text_secondary" android:textSize="13sp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
-</FrameLayout>
+</androidx.constraintlayout.widget.ConstraintLayout>

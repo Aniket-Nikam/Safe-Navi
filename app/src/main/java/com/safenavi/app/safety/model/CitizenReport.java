@@ -10,7 +10,6 @@ public class CitizenReport {
     private HazardStatus status = HazardStatus.REPORTED;
     private String linkedHazardId;
     private int confirmationCount;
-    private boolean synthetic;
     private long createdAt;
     private long updatedAt;
 
@@ -35,8 +34,6 @@ public class CitizenReport {
     public void setLinkedHazardId(String linkedHazardId) { this.linkedHazardId = linkedHazardId; }
     public int getConfirmationCount() { return confirmationCount; }
     public void setConfirmationCount(int confirmationCount) { this.confirmationCount = confirmationCount; }
-    public boolean isSynthetic() { return synthetic; }
-    public void setSynthetic(boolean synthetic) { this.synthetic = synthetic; }
     public long getCreatedAt() { return createdAt; }
     public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
     public long getUpdatedAt() { return updatedAt; }

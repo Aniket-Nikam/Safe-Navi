@@ -6,18 +6,29 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
-        android:usesCleartextTraffic="true"
-        android:allowBackup="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
-        android:icon="@drawable/ic_icon"
-        android:roundIcon="@drawable/ic_icon"
+        android:name=".SafeNaviApplication"
+        android:usesCleartextTraffic="${usesCleartextTraffic}"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.SafeNavi"
         tools:targetApi="31">
+
+        <receiver
+            android:name=".product.SafetyCheckInReceiver"
+            android:exported="false" />
+
+        <service
+            android:name=".product.JourneyTrackingService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <!-- Splash Activity (App Entry Point) -->
         <activity
@@ -62,26 +73,11 @@
             android:theme="@style/Theme.SafeNavi" />
             
         <activity
-            android:name=".AdminMainActivity"
-            android:exported="false"
-            android:theme="@style/Theme.SafeNavi" />
-            
-        <activity
-            android:name=".GovMainActivity"
-            android:exported="false"
-            android:theme="@style/Theme.SafeNavi" />
-
-        <activity
             android:name=".GovernmentSafetyDashboardActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi" />
             
-        <activity
-            android:name=".ManageUsersActivity"
-            android:exported="false"
-            android:theme="@style/Theme.SafeNavi" />
-
         <!-- Maps Activity -->
         <activity
             android:name=".MapsActivity"
@@ -90,25 +86,6 @@
             android:screenOrientation="portrait"
             android:theme="@style/Theme.SafeNavi" />
 
-        <!-- Complaints Activity -->
-        <activity
-            android:name=".ComplaintsActivity"
-            android:label="Complaints"
-            android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.SafeNavi" />
-
-        <activity android:name=".DiscussionActivity" android:exported="false" />
-        <activity android:name=".CommentsActivity" android:exported="false" />
-        <activity android:name=".chatMainActivity" android:exported="false" />
-
-
-        <!-- Settings Activity -->
-        <activity
-            android:name=".SettingsActivity"
-            android:exported="false"
-            android:parentActivityName=".MainActivity"
-            android:theme="@style/Theme.SafeNavi" />
-        <activity android:name=".ComplaintDetailActivity" />
     </application>
 
 </manifest>

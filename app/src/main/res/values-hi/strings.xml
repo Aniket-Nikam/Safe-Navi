@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="email_hint">ईमेल</string><string name="password_hint">पासवर्ड</string><string name="confirm_password_hint">पासवर्ड की पुष्टि करें</string>
+    <string name="username_hint">उपयोगकर्ता नाम</string><string name="login">लॉग इन</string><string name="signup">खाता बनाएं</string>
+    <string name="forgot_password">पासवर्ड भूल गए?</string><string name="continue_with_google">Google से जारी रखें</string><string name="or">या</string>
+    <string name="dont_have_account">खाता नहीं है?</string><string name="already_have_account">पहले से खाता है?</string>
+    <string name="welcome">स्वागत है!</string><string name="explore">देखें</string><string name="settings">सेटिंग्स</string>
+    <string name="enable_notifications">सूचनाएं चालू करें</string><string name="action_settings">सेटिंग्स</string><string name="action_logout">साइन आउट</string>
+    <string name="error_invalid_email">मान्य ईमेल दर्ज करें</string><string name="error_empty_email">ईमेल आवश्यक है</string>
+    <string name="error_empty_password">पासवर्ड आवश्यक है</string><string name="error_short_password">पासवर्ड कम से कम 10 अक्षरों का होना चाहिए</string>
+    <string name="error_empty_username">उपयोगकर्ता नाम आवश्यक है</string><string name="error_password_mismatch">पासवर्ड मेल नहीं खाते</string>
+    <string name="success_registration">पंजीकरण सफल</string>
+    <string name="app_name">Safe-Navi</string><string name="home">होम</string><string name="map">मानचित्र</string>
+    <string name="report">रिपोर्ट</string><string name="community">समुदाय</string><string name="profile">प्रोफ़ाइल</string>
+    <string name="preferences">प्राथमिकताएं</string><string name="account">खाता</string><string name="notifications">सूचनाएं</string>
+    <string name="dark_mode">डार्क मोड</string><string name="dark_mode_subtitle">गहरे रंग की थीम चुनें</string>
+    <string name="language">भाषा</string><string name="language_subtitle">अंग्रेज़ी, हिंदी या मराठी</string>
+    <string name="offline_maps">ऑफ़लाइन मानचित्र</string><string name="offline_maps_subtitle">नवी मुंबई के मानचित्र डाउनलोड करें</string>
+    <string name="plan_safer_route">सुरक्षित मार्ग चुनें</string><string name="verified_route_intelligence">सत्यापित मार्ग सुरक्षा जानकारी</string>
+    <string name="source">प्रस्थान</string><string name="destination">गंतव्य</string><string name="drive">कार</string>
+    <string name="walk">पैदल</string><string name="cycle">साइकिल</string><string name="area_safety">क्षेत्र सुरक्षा</string>
+    <string name="emergency">आपातकाल</string><string name="route_priority">मार्ग प्राथमिकता</string>
+    <string name="live_risk_ranking">लाइव जोखिम क्रम</string><string name="fastest">सबसे तेज़</string>
+    <string name="balanced">संतुलित</string><string name="safest">सबसे सुरक्षित</string>
+    <string name="compare_routes">मार्गों की तुलना करें</string><string name="compare_short">तुलना</string><string name="emergency_contacts">आपातकालीन संपर्क</string>
+    <string name="journey_history">यात्रा इतिहास</string><string name="safety_checkins">सुरक्षा चेक-इन</string>
+    <string name="safety_checkins_subtitle">नियमित सुरक्षा पुष्टि निर्धारित करें</string>
+    <string name="change_password">पासवर्ड बदलें</string><string name="delete_account">खाता हटाएं</string><string name="logout">साइन आउट</string>
+</resources>

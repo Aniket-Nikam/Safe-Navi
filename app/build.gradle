@@ -2,10 +2,6 @@ plugins {
     id 'com.android.application'
 }
 
-if (file('google-services.json').exists()) {
-    apply plugin: 'com.google.gms.google-services'
-}
-
 def localProperties = new Properties()
 def localPropertiesFile = rootProject.file('local.properties')
 if (localPropertiesFile.exists()) {
@@ -28,18 +24,17 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Inject keys into BuildConfig
-        buildConfigField "String", "CLOUD_NAME", "\"${localProperties.getProperty('CLOUD_NAME', '')}\""
-        buildConfigField "String", "UPLOAD_PRESET", "\"${localProperties.getProperty('UPLOAD_PRESET', '')}\""
-        buildConfigField "String", "GEMINI_API_KEY", "\"${localProperties.getProperty('GEMINI_API_KEY', '')}\""
-        buildConfigField "String", "FIREBASE_DATABASE_URL", "\"${localProperties.getProperty('FIREBASE_DATABASE_URL', '')}\""
         buildConfigField "String", "NOMINATIM_BASE_URL", "\"${localProperties.getProperty('NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org')}\""
         buildConfigField "String", "VALHALLA_BASE_URL", "\"${localProperties.getProperty('VALHALLA_BASE_URL', 'https://valhalla1.openstreetmap.de')}\""
         buildConfigField "String", "RISK_API_BASE_URL", "\"${localProperties.getProperty('RISK_API_BASE_URL', 'http://10.0.2.2:8000')}\""
-        buildConfigField "boolean", "HAS_FIREBASE_CONFIG", file('google-services.json').exists().toString()
+        manifestPlaceholders = [usesCleartextTraffic: "false"]
         
     }
 
     buildTypes {
+        debug {
+            manifestPlaceholders = [usesCleartextTraffic: "true"]
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
@@ -61,8 +56,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     buildFeatures {
@@ -77,45 +72,18 @@ dependencies {
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     implementation 'androidx.cardview:cardview:1.0.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
+    implementation 'androidx.work:work-runtime:2.9.1'
     implementation 'com.google.android.material:material:1.11.0'
-
-    // Firebase (SINGLE BOM)
-    implementation platform('com.google.firebase:firebase-bom:34.7.0')
-    implementation 'com.google.firebase:firebase-auth'
-    implementation 'com.google.firebase:firebase-firestore'
-    implementation 'com.google.firebase:firebase-database'
-    implementation 'com.google.firebase:firebase-storage'
-    implementation 'com.google.firebase:firebase-analytics'
-
-    // Google Sign-In
-    implementation 'com.google.android.gms:play-services-auth:20.7.0'
 
     // OpenStreetMap rendering through MapLibre.
     implementation 'org.maplibre.gl:android-sdk:13.4.1'
     implementation 'com.google.android.gms:play-services-location:21.1.0'
 
-    // CameraX (STABLE)
-    def camerax_version = "1.3.4"
-    implementation "androidx.camera:camera-core:$camerax_version"
-    implementation "androidx.camera:camera-camera2:$camerax_version"
-    implementation "androidx.camera:camera-lifecycle:$camerax_version"
-    implementation "androidx.camera:camera-view:$camerax_version"
-
-    // Glide
-    implementation 'com.github.bumptech.glide:glide:4.16.0'
-    annotationProcessor 'com.github.bumptech.glide:compiler:4.16.0'
-
     // Circle ImageView
     implementation 'de.hdodenhof:circleimageview:3.1.0'
 
-    // OkHttp (for Gemini API and general networking)
+    // HTTP client for the authenticated Safe-Navi API and open map services.
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
-
-    // Unirest
-    implementation 'com.mashape.unirest:unirest-java:1.4.9'
-    implementation 'org.apache.httpcomponents:httpclient:4.5.13'
-    implementation 'org.apache.httpcomponents:httpasyncclient:4.1.4'
-    implementation 'org.apache.httpcomponents:httpmime:4.5.13'
     implementation 'org.json:json:20210307'
 
     // Testing

@@ -1,194 +1,45 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@color/background"
-    android:fillViewport="true">
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="20dp">
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-            <ImageButton
-                android:id="@+id/govBackButton"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="Back"
-                android:rotation="180"
-                android:src="@drawable/ic_arrow_forward"
-                app:tint="@color/text_primary" />
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:layout_weight="1"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Safety operations"
-                    android:textColor="@color/text_primary"
-                    android:textSize="25sp"
-                    android:textStyle="bold" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Authorized workflow · Synthetic demo"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/background" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+            <ImageButton android:id="@+id/govBackButton" android:layout_width="44dp" android:layout_height="44dp" android:background="@android:color/transparent" android:contentDescription="Back" android:rotation="180" android:src="@drawable/ic_arrow_forward" app:tint="@color/text_primary" />
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:layout_weight="1" android:orientation="vertical">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Safety command" android:textColor="@color/text_primary" android:textSize="27sp" android:textStyle="bold" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Live review and road-status operations" android:textColor="@color/text_secondary" android:textSize="12sp" />
             </LinearLayout>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:background="@drawable/bg_label" android:paddingHorizontal="10dp" android:paddingVertical="6dp" android:text="AUTHORIZED" android:textColor="@color/primary" android:textSize="9sp" android:textStyle="bold" />
         </LinearLayout>
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:orientation="horizontal">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:orientation="horizontal">
             <include layout="@layout/item_government_metric" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
             <include layout="@layout/item_government_metric_active" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
             <include layout="@layout/item_government_metric_critical" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" />
         </LinearLayout>
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Pending review"
-            android:textColor="@color/text_primary"
-            android:textSize="19sp"
-            android:textStyle="bold" />
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            app:cardBackgroundColor="@color/surface"
-            app:cardCornerRadius="18dp"
-            app:cardElevation="1dp">
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="18dp">
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-                    <TextView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="Road heavily flooded after rainfall"
-                        android:textColor="@color/text_primary"
-                        android:textSize="16sp"
-                        android:textStyle="bold" />
-                    <TextView
-                        android:id="@+id/pendingReportStatus"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="UNDER REVIEW"
-                        android:textColor="@color/route_risk_text"
-                        android:textSize="9sp"
-                        android:textStyle="bold" />
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="26dp" android:gravity="center_vertical" android:orientation="horizontal">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Priority review" android:textColor="@color/text_primary" android:textSize="20sp" android:textStyle="bold" />
+            <TextView android:id="@+id/auditCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Live queue" android:textColor="@color/text_secondary" android:textSize="11sp" />
+        </LinearLayout>
+        <Spinner android:id="@+id/governmentQueueSpinner" android:layout_width="match_parent" android:layout_height="52dp" android:layout_marginTop="10dp" android:background="@drawable/bg_label" android:paddingHorizontal="12dp" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/filterGovernmentQueueButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="46dp" android:layout_marginTop="8dp" android:text="Filter by status, department, ward, severity, age or SLA" android:textAllCaps="false" app:cornerRadius="14dp" />
+        <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="@color/surface" app:cardCornerRadius="22dp" app:cardElevation="2dp" app:strokeColor="@color/divider" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical" android:orientation="horizontal">
+                    <TextView android:id="@+id/pendingReportTitle" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="Loading review queue…" android:textColor="@color/text_primary" android:textSize="17sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/pendingReportStatus" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="SYNCING" android:textColor="@color/route_risk_text" android:textSize="9sp" android:textStyle="bold" />
                 </LinearLayout>
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:text="Flooding · Sion Circle service road · 4 citizen confirmations"
-                    android:textColor="@color/text_secondary"
-                    android:textSize="12sp" />
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/verifyReportButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="14dp"
-                    android:text="Review and verify"
-                    android:textAllCaps="false"
-                    android:textStyle="bold"
-                    app:backgroundTint="@color/primary"
-                    app:cornerRadius="13dp" />
+                <TextView android:id="@+id/pendingReportMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="Connecting to Safe-Navi operations…" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/reduceSeverityButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="16dp" android:text="Start review" android:textAllCaps="false" app:cornerRadius="14dp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                    <com.google.android.material.button.MaterialButton android:id="@+id/assignReportButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginEnd="4dp" android:layout_weight="1" android:text="Assign" android:textAllCaps="false" app:cornerRadius="14dp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/requestInfoButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="48dp" android:layout_marginStart="4dp" android:layout_weight="1" android:text="Request info" android:textAllCaps="false" app:cornerRadius="14dp" />
+                </LinearLayout>
+                <com.google.android.material.button.MaterialButton android:id="@+id/viewAuditButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="match_parent" android:layout_height="44dp" android:text="Evidence, duplicates and audit timeline" android:textAllCaps="false" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/verifyReportButton" android:layout_width="match_parent" android:layout_height="50dp" android:layout_marginTop="8dp" android:text="Verify and publish hazard" android:textAllCaps="false" android:textStyle="bold" app:backgroundTint="@color/primary" app:cornerRadius="14dp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/resolveHazardButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="match_parent" android:layout_height="46dp" android:layout_marginTop="4dp" android:text="Reject report" android:textAllCaps="false" android:textColor="@color/danger_text" />
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="Hazard lifecycle demo"
-            android:textColor="@color/text_primary"
-            android:textSize="19sp"
-            android:textStyle="bold" />
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:text="Update the verified Vashi flooding hazard. Each action changes the risk engine and is preserved in history."
-            android:textColor="@color/text_secondary"
-            android:textSize="12sp" />
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/reduceSeverityButton"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_marginEnd="6dp"
-                android:layout_weight="1"
-                android:text="HIGH → MODERATE"
-                android:textAllCaps="false"
-                android:textColor="@color/metric_pending_text"
-                app:cornerRadius="14dp"
-                app:strokeColor="@color/route_risk_text" />
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/resolveHazardButton"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                android:layout_width="0dp"
-                android:layout_height="52dp"
-                android:layout_marginStart="6dp"
-                android:layout_weight="1"
-                android:text="Mark resolved"
-                android:textAllCaps="false"
-                android:textColor="@color/primary"
-                app:cornerRadius="14dp"
-                app:strokeColor="@color/positive_border" />
-        </LinearLayout>
-        <TextView
-            android:id="@+id/auditCount"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="center"
-            android:text="0 recorded actions"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/openGovernmentMapButton"
-            android:layout_width="match_parent"
-            android:layout_height="52dp"
-            android:layout_marginTop="20dp"
-            android:text="Open government hazard map"
-            android:textAllCaps="false"
-            android:textStyle="bold"
-            app:backgroundTint="@color/primary_dark"
-            app:cornerRadius="14dp"
-            app:icon="@drawable/ic_map" />
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/resetDemoButton"
-            style="@style/Widget.MaterialComponents.Button.TextButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginTop="8dp"
-            android:text="Reset synthetic workflow"
-            android:textAllCaps="false"
-            android:textColor="@color/text_secondary" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/openGovernmentMapButton" android:layout_width="match_parent" android:layout_height="56dp" android:layout_marginTop="22dp" android:text="Open live operations map" android:textAllCaps="false" android:textStyle="bold" app:backgroundTint="@color/primary_dark" app:cornerRadius="17dp" app:icon="@drawable/ic_map" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/reviewNewsSignalsButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="54dp" android:layout_marginTop="10dp" android:text="Review external news signals" android:textAllCaps="false" app:cornerRadius="17dp" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:gravity="center" android:text="Only verified decisions can affect citizen route guidance." android:textColor="@color/text_hint" android:textSize="11sp" />
     </LinearLayout>
 </ScrollView>
