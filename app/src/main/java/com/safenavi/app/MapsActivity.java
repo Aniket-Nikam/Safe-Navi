@@ -116,6 +116,7 @@ public class MapsActivity extends AppCompatActivity {
             "hazard-low-point", "hazard-moderate-point", "hazard-high-point", "hazard-critical-point",
             "hazard-geometry-line", "hazard-geometry-fill", "pending-report-point", RISK_POINTS_LAYER, RISK_SECTIONS_LAYER);
     private boolean risksVisible;
+    private boolean displayedOffline;
     private RouteSafetyResult displayedRoute;
     private com.google.android.material.bottomsheet.BottomSheetDialog activeMapSheet;
 
@@ -463,7 +464,7 @@ public class MapsActivity extends AppCompatActivity {
         }
         ((MaterialButton)findViewById(R.id.riskLayerButton)).setText(risksVisible?"Hide route risks":"Route risks");
         if(risksVisible && displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText("Estimates only. Grey = unassessed, not safe.");
-        else if(displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText(profileName(routeProfile)+" · "+String.format(Locale.US,"%.1f km",displayedRoute.getRoute().getDistanceMeters()/1000));
+        else if(displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText((displayedOffline?"Offline snapshot · ":"")+profileName(routeProfile)+" · "+String.format(Locale.US,"%.1f km",displayedRoute.getRoute().getDistanceMeters()/1000));
     }
     private void renderRiskSections(RouteSafetyResult result) {
         if(mapStyle==null) return;
@@ -993,6 +994,7 @@ public class MapsActivity extends AppCompatActivity {
         ranked = RouteRecommendations.rank(ranked, profile);
         RouteSafetyResult best = ranked.get(0);
         displayedRoute=best;
+        displayedOffline=sourceLabel.startsWith("Offline");
         findViewById(R.id.endpointEditor).setVisibility(View.GONE);
         RouteSafetyResult fastest = best;
         for (RouteSafetyResult result : ranked) if (result.getRoute().getTravelMinutes() < fastest.getRoute().getTravelMinutes()) fastest = result;
@@ -1055,7 +1057,7 @@ public class MapsActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.routeRiskSummary)).setText((distinct.size() == 1
                 ? "Same road wins all 3. " : distinct.size() + " recommended roads. ")
                 + verified + " official hazard(s) · " + estimates + " estimated risk zone(s). Tap a pin for why.");
-        ((TextView)findViewById(R.id.routeStatusText)).setText(profileName(profile)+" · "+String.format(Locale.US,"%.1f km",best.getRoute().getDistanceMeters()/1000));
+        ((TextView)findViewById(R.id.routeStatusText)).setText(risksVisible?"Estimates only. Grey = unassessed, not safe.":(displayedOffline?"Offline snapshot · ":"")+profileName(profile)+" · "+String.format(Locale.US,"%.1f km",best.getRoute().getDistanceMeters()/1000));
         findRouteButton.setText(String.format(Locale.US,"Routes · %.0f min",best.getRoute().getTravelMinutes()));
         comparison.append("\n\nSelected-route explanations:\n");
         for (RouteRiskPoint point : selectedRiskPoints.values()) comparison.append(point.isVerified() ? "Official: " : "Estimate: ")

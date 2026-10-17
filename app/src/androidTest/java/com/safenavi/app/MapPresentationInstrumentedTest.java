@@ -136,6 +136,22 @@ public class MapPresentationInstrumentedTest {
         }
         return false;
     }
+    @Test public void goUsesRelevantCampusWithoutTappingAResult() throws Exception {
+        try(ActivityScenario<MapsActivity> scenario=ActivityScenario.launch(new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(),MapsActivity.class))) {
+            AtomicReference<PlaceSearchResult> selected=new AtomicReference<>();
+            scenario.onActivity(activity -> {
+                com.safenavi.app.product.PlaceSearchSheet sheet=new com.safenavi.app.product.PlaceSearchSheet(activity,new com.safenavi.app.safety.network.OpenMapService(),new com.safenavi.app.safety.network.OfflineRouter(activity),"Destination","SIES",19.04,73.02,new com.safenavi.app.product.PlaceSearchSheet.Listener() {
+                    public void onPlace(PlaceSearchResult place) { selected.set(place); }
+                    public void onMapPin() { }
+                    public void onDeviceLocation() { }
+                });
+                sheet.showResults(Arrays.asList(new PlaceSearchResult("SIES College Parking, Nerul",19.04,73.02),new PlaceSearchResult("SIES College, Nerul",19.042,73.023)));
+                try { Method go=sheet.getClass().getDeclaredMethod("submitBest"); go.setAccessible(true); go.invoke(sheet); }
+                catch(Exception e) { throw new AssertionError(e); }
+            });
+            assertNotNull(selected.get()); assertEquals("SIES College",selected.get().getPrimaryText());
+        }
+    }
     private static void screenshot(String name) throws Exception {
         android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         java.io.File output=new java.io.File(InstrumentationRegistry.getInstrumentation().getTargetContext().getExternalFilesDir(null),name);

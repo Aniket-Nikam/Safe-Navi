@@ -387,8 +387,6 @@ def combine_risk(dataset_risk: float, verified_risk: float) -> float:
     return combined_contributions([dataset_risk, verified_risk])
 
 
-
-
 @app.post("/api/v1/risk/route")
 def route_risk(request: RouteRiskRequest) -> dict:
     results = []

@@ -19,6 +19,9 @@ import org.junit.runner.RunWith;
 public class LiveMapSmokeInstrumentedTest {
     @Test public void realSearchRoutesAndCloudModelRender() throws Exception {
         Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("liveProviders")));
+        boolean dark="true".equals(InstrumentationRegistry.getArguments().getString("dark"));
+        int previous=androidx.appcompat.app.AppCompatDelegate.getDefaultNightMode();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(dark?androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES:androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO));
         try (ActivityScenario<MapsActivity> scenario = ActivityScenario.launch(new Intent(
                 InstrumentationRegistry.getInstrumentation().getTargetContext(), MapsActivity.class))) {
             AtomicReference<OpenMapService> provider=new AtomicReference<>();
@@ -35,7 +38,7 @@ public class LiveMapSmokeInstrumentedTest {
             assertTrue(searchReady.await(30,TimeUnit.SECONDS)); assertNull(error.get()); assertFalse(places.get().isEmpty());
             PlaceSearchResult destination=places.get().get(0);
             assertTrue(destination.getDisplayName(),destination.getDisplayName().toLowerCase(Locale.ROOT).contains("sies"));
-            PlaceSearchResult source=new PlaceSearchResult("Vashi Railway Station, Navi Mumbai",19.0657,72.9986);
+            PlaceSearchResult source=new PlaceSearchResult("Nahur Railway Station, Mumbai",19.157,72.948);
             CountDownLatch routesReady=new CountDownLatch(1); AtomicReference<List<RouteCandidate>> roads=new AtomicReference<>();
             provider.get().routes(source.getLatitude(),source.getLongitude(),destination.getLatitude(),destination.getLongitude(),TravelMode.DRIVING,
                     new OpenMapService.ResultCallback<List<RouteCandidate>>() {
@@ -49,6 +52,7 @@ public class LiveMapSmokeInstrumentedTest {
                 public void onError(String message) { error.set(message); riskReady.countDown(); }
             });
             assertTrue(riskReady.await(125,TimeUnit.SECONDS)); assertNull(error.get()); assertEquals("trained_ml",evaluation.get().getProvider());
+            assertFalse("Updated cloud server must return full-route coverage",evaluation.get().getRankedResults().get(0).getRiskSections().isEmpty());
             for(int i=0;i<120;i++) {
                 AtomicReference<Boolean> ready=new AtomicReference<>(false);
                 scenario.onActivity(activity -> { try { Field f=MapsActivity.class.getDeclaredField("mapStyle"); f.setAccessible(true); ready.set(f.get(activity)!=null); } catch(Exception e) { throw new AssertionError(e); } });
@@ -60,10 +64,17 @@ public class LiveMapSmokeInstrumentedTest {
                 render.setAccessible(true); render.invoke(activity,evaluation.get().getRankedResults(),roads.get(),RouteProfile.BALANCED,source,destination,"OpenStreetMap / Valhalla","Trained ML · live smoke check");
             } catch(Exception e) { throw new AssertionError(e); } });
             android.os.SystemClock.sleep(5000); // Let the real map renderer complete its camera/tile frame.
-            android.graphics.Bitmap image=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
-            java.io.File file=new java.io.File(InstrumentationRegistry.getInstrumentation().getTargetContext().getExternalFilesDir(null),"map-live-1.2.png");
-            try(java.io.FileOutputStream stream=new java.io.FileOutputStream(file)) { image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream); }
-            image.recycle();
-        }
+            save("map-live-1.3"+(dark?"-dark":"")+".png");
+            scenario.onActivity(activity -> { activity.findViewById(R.id.riskLayerButton).performClick(); try {
+                Field field=MapsActivity.class.getDeclaredField("activeMapSheet"); field.setAccessible(true); ((android.app.Dialog)field.get(activity)).dismiss();
+            } catch(Exception e) { throw new AssertionError(e); } });
+            android.os.SystemClock.sleep(1500);
+            save("map-risk-1.3"+(dark?"-dark":"")+".png");
+        } finally { InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(previous)); }
+    }
+    private static void save(String name) throws Exception {
+        android.graphics.Bitmap image=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        java.io.File file=new java.io.File(InstrumentationRegistry.getInstrumentation().getTargetContext().getExternalFilesDir(null),name);
+        try(java.io.FileOutputStream stream=new java.io.FileOutputStream(file)) { image.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream); } image.recycle();
     }
 }

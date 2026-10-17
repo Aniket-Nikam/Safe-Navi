@@ -48,5 +48,3 @@ def test_empty_crime_information_is_unknown_not_safe(monkeypatch):
     value = main.area_crime(19, 73, 3000)
     assert value["types"] == []
     assert "does not mean no crime" in value["notice"]
-
-
