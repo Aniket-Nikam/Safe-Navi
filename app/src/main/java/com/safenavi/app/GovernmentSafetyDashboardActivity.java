@@ -20,6 +20,8 @@ import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.safenavi.app.product.ProductApiClient;
+import com.safenavi.app.product.EvidenceViewer;
+import com.safenavi.app.product.JsonDisplay;
 import com.safenavi.app.product.ProductSession;
 import java.util.Locale;
 import org.json.JSONArray;
@@ -56,9 +58,33 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         requestInfoButton = findViewById(R.id.requestInfoButton);
         auditButton = findViewById(R.id.viewAuditButton);
         queueSpinner = findViewById(R.id.governmentQueueSpinner);
+        if (isAdmin()) {
+            findViewById(R.id.adminControlsPanel).setVisibility(View.VISIBLE);
+            findViewById(R.id.manageAccountsButton).setOnClickListener(v -> showAdminAccounts());
+            findViewById(R.id.adminAppSettingsButton).setOnClickListener(v -> showAdminAppSettings());
+            findViewById(R.id.adminAuditButton).setOnClickListener(v -> showAdminAudit());
+            findViewById(R.id.adminPasswordButton).setOnClickListener(v -> showAdminPassword());
+            ((TextView) findViewById(R.id.operationsRoleTitle)).setText("Administration");
+            ((TextView) findViewById(R.id.operationsRoleDescription)).setText("Accounts, app settings and read-only case oversight");
+            for (int id : new int[]{R.id.reduceSeverityButton, R.id.assignReportButton, R.id.requestInfoButton,
+                    R.id.verifyReportButton, R.id.resolveHazardButton, R.id.reportConversationButton})
+                findViewById(id).setVisibility(View.GONE);
+            ((MaterialButton) findViewById(R.id.openGovernmentMapButton)).setText("View safety map (read-only)");
+            ((MaterialButton) findViewById(R.id.reviewNewsSignalsButton)).setText("Manage news and schedule");
+        }
         findViewById(R.id.govBackButton).setOnClickListener(v -> finish());
         findViewById(R.id.openGovernmentMapButton).setOnClickListener(v -> startActivity(new Intent(this, MapsActivity.class)));
         findViewById(R.id.reviewNewsSignalsButton).setOnClickListener(v -> openNewsSignals());
+        findViewById(R.id.governmentServerConnectionButton).setOnClickListener(v -> com.safenavi.app.product.ServerConnectionDialog.show(this));
+        findViewById(R.id.governmentSwitchAccountButton).setOnClickListener(v -> {
+            api.logout(new ProductApiClient.ObjectCallback() {
+                @Override public void onSuccess(JSONObject value) { }
+                @Override public void onError(String message) { }
+            });
+            ProductSession.clear(this);
+            startActivity(new Intent(this, LoginTypeActivity.class)
+                    .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+        });
         findViewById(R.id.filterGovernmentQueueButton).setOnClickListener(v -> showQueueFilters());
         triageButton.setOnClickListener(v -> triage());
         verifyButton.setOnClickListener(v -> showVerificationDialog());
@@ -66,6 +92,21 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         assignButton.setOnClickListener(v -> showAssignmentDialog());
         requestInfoButton.setOnClickListener(v -> showInformationDialog());
         auditButton.setOnClickListener(v -> showOperationalDetail());
+        findViewById(R.id.viewReportEvidenceButton).setOnClickListener(v -> {
+            if (currentReport == null) return;
+            api.reportDetail(currentReport.optString("id"), new ProductApiClient.ObjectCallback() {
+                @Override public void onSuccess(JSONObject report) { runOnUiThread(() -> {
+                    JSONArray evidence = report.optJSONArray("evidence");
+                    if (evidence == null || evidence.length() == 0)
+                        Toast.makeText(GovernmentSafetyDashboardActivity.this, "No evidence is attached to this report.", Toast.LENGTH_LONG).show();
+                    else EvidenceViewer.show(GovernmentSafetyDashboardActivity.this, evidence);
+                }); }
+                @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
+            });
+        });
+        findViewById(R.id.reportConversationButton).setOnClickListener(v -> {
+            if (currentReport != null) showReportConversation(currentReport.optString("id"));
+        });
         queueSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if (position >= 0 && position < actionableReports.length()) {
@@ -111,7 +152,7 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         form.addView(label("Status")); form.addView(status); form.addView(label("Category")); form.addView(category);
         form.addView(label("Department")); form.addView(department); form.addView(ward); form.addView(label("Verified severity")); form.addView(severity);
         form.addView(label("Report age")); form.addView(age); form.addView(overdue);
-        new MaterialAlertDialogBuilder(this).setTitle("Operational filters").setView(form).setNeutralButton("Clear", (d,w) -> {
+        new MaterialAlertDialogBuilder(this).setTitle("Operational filters").setView(scrollable(form)).setNeutralButton("Clear", (d,w) -> {
             filterStatus=filterCategory=filterDepartment=filterWard=filterSeverity=""; filterAgeHours=null; filterOverdue=false; refresh();
         }).setNegativeButton("Cancel", null).setPositiveButton("Apply", (d,w) -> {
             filterStatus = status.getSelectedItemPosition() == 0 ? "" : statuses[status.getSelectedItemPosition()];
@@ -124,6 +165,8 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
     }
 
     private void renderReports(JSONArray reports) {
+        String selectedId = currentReport == null ? "" : currentReport.optString("id");
+        int selectedIndex = 0;
         int pending = 0;
         currentReport = null; actionableReports = new JSONArray();
         java.util.ArrayList<String> labels = new java.util.ArrayList<>();
@@ -135,11 +178,16 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
             if (actionable || hasQueueFilters()) {
                 pending++;
                 actionableReports.put(report);
+                if (report.optString("id").equals(selectedId)) selectedIndex = actionableReports.length() - 1;
                 labels.add(report.optString("title") + " · " + status.replace('_', ' '));
                 if (currentReport == null) currentReport = report;
             }
         }
-        queueSpinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, labels));
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_dashboard_spinner, labels);
+        adapter.setDropDownViewResource(R.layout.item_dashboard_spinner);
+        queueSpinner.setAdapter(adapter);
+        queueSpinner.setSelection(selectedIndex);
+        if (actionableReports.length() > 0) currentReport = actionableReports.optJSONObject(selectedIndex);
         pendingCount.setText(String.valueOf(pending));
         queueLabel.setText(String.format(Locale.US, "%d awaiting decision", pending));
         if (currentReport == null) {
@@ -159,8 +207,12 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
                 + currentReport.optString("address") + "\n" + currentReport.optString("description"));
         setActions(true);
         triageButton.setEnabled(status.equals("REPORTED"));
+        triageButton.setText(status.equals("REPORTED") ? "Start review" : "Review already started");
         boolean finalState = status.equals("VERIFIED") || status.equals("REJECTED") || status.equals("DUPLICATE");
-        if (finalState) { setActions(false); auditButton.setEnabled(true); }
+        if (finalState) { setActions(false); auditButton.setEnabled(true);
+            findViewById(R.id.viewReportEvidenceButton).setEnabled(true);
+            findViewById(R.id.reportConversationButton).setEnabled(true);
+        }
     }
 
     private boolean hasQueueFilters() {
@@ -175,7 +227,7 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         TextInputEditText employee = new TextInputEditText(this); employee.setHint("Employee / field team (optional)");
         Spinner sla = spinner(new String[]{"4 hours", "12 hours", "24 hours", "48 hours", "72 hours"}); sla.setSelection(2);
         form.addView(label("Department")); form.addView(department); form.addView(employee); form.addView(label("Resolution target")); form.addView(sla);
-        new MaterialAlertDialogBuilder(this).setTitle("Assign operational owner").setView(form).setNegativeButton("Cancel", null)
+        new MaterialAlertDialogBuilder(this).setTitle("Assign operational owner").setView(scrollable(form)).setNegativeButton("Cancel", null)
                 .setPositiveButton("Assign", (d, w) -> {
                     int[] hours = {4,12,24,48,72};
                     api.assignReport(currentReport.optString("id"), department.getSelectedItem().toString(),
@@ -209,9 +261,9 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
     private void renderOperationalDetail(JSONObject detail, JSONArray duplicates) {
         StringBuilder text = new StringBuilder();
         text.append("Citizen: ").append(detail.optString("citizen_name", "Protected identity")).append("\n")
-                .append("Department: ").append(detail.optString("assigned_department", "Unassigned")).append("\n")
-                .append("Assigned to: ").append(detail.optString("assigned_to", "Unassigned")).append("\n")
-                .append("SLA due: ").append(detail.optString("due_at", "Not set")).append("\n")
+                .append("Department: ").append(JsonDisplay.text(detail, "assigned_department", "Unassigned")).append("\n")
+                .append("Assigned to: ").append(JsonDisplay.text(detail, "assigned_to", "Unassigned")).append("\n")
+                .append("SLA due: ").append(JsonDisplay.text(detail, "due_at", "Not set")).append("\n")
                 .append("Evidence: ").append(detail.optJSONArray("evidence") == null ? 0 : detail.optJSONArray("evidence").length()).append(" file(s)\n")
                 .append("Community confirmations: ").append(detail.optInt("confirmations")).append("\n")
                 .append("Possible nearby duplicates: ").append(duplicates.length()).append("\n\nAudit timeline\n");
@@ -222,8 +274,8 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         }
         JSONArray evidence = detail.optJSONArray("evidence");
         MaterialAlertDialogBuilder dialog = new MaterialAlertDialogBuilder(this).setTitle("Operational record")
-                .setMessage(text.toString()).setNegativeButton("Close", null)
-                .setPositiveButton("Conversation", (d, w) -> showReportConversation(detail.optString("id")));
+                .setMessage(text.toString()).setNegativeButton("Close", null);
+        if (!isAdmin()) dialog.setPositiveButton("Conversation", (d, w) -> showReportConversation(detail.optString("id")));
         if (evidence != null && evidence.length() > 0) dialog.setNeutralButton("View evidence", (d, w) -> showEvidencePicker(evidence));
         dialog.show();
     }
@@ -327,6 +379,112 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
 
     private boolean isAdmin() { return "admin".equals(ProductSession.role(this)); }
 
+    private void showAdminAccounts() {
+        api.adminAccounts(new ProductApiClient.ArrayCallback() {
+            @Override public void onSuccess(JSONArray users) { runOnUiThread(() -> {
+                String[] labels = new String[users.length()];
+                for (int i = 0; i < labels.length; i++) {
+                    JSONObject account = users.optJSONObject(i);
+                    labels[i] = account.optString("name") + " · " + account.optString("role")
+                            + (account.optInt("active") == 1 ? " · Active" : " · Suspended") + "\n" + account.optString("email");
+                }
+                new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this).setTitle("Manage accounts")
+                        .setItems(labels, (dialog, index) -> showAdminAccountActions(users.optJSONObject(index)))
+                        .setNegativeButton("Close", null).show();
+            }); }
+            @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
+        });
+    }
+
+    private void showAdminAccountActions(JSONObject account) {
+        if (account == null) return;
+        if ("admin".equals(account.optString("role"))) {
+            new MaterialAlertDialogBuilder(this).setTitle("Protected administrator")
+                    .setMessage("Administrator accounts cannot be suspended or reassigned here. Use Change my password for your own account.")
+                    .setPositiveButton("Close", null).show(); return;
+        }
+        boolean active = account.optInt("active") == 1;
+        boolean official = "government".equals(account.optString("role"));
+        String[] labels = {active ? "Suspend account access" : "Restore account access",
+                official ? "Return to citizen role" : "Promote to safety official", "Sign out all sessions"};
+        String[] actions = {active ? "suspend" : "restore", official ? "make_citizen" : "promote_official", "revoke_sessions"};
+        new MaterialAlertDialogBuilder(this).setTitle(account.optString("name"))
+                .setItems(labels, (dialog, which) -> {
+                    TextInputEditText reason = new TextInputEditText(this);
+                    reason.setHint("Reason for this account change (required)"); reason.setMinLines(2); reason.setPadding(40, 12, 40, 12);
+                    new MaterialAlertDialogBuilder(this).setTitle(labels[which]).setView(reason)
+                            .setMessage(account.optString("email") + "\nExisting sessions will be revoked. Historical reports and hazards are retained.")
+                            .setNegativeButton("Cancel", null).setPositiveButton("Confirm", (confirm, button) -> {
+                                String text = reason.getText() == null ? "" : reason.getText().toString().trim();
+                                if (text.length() < 3) { Toast.makeText(this, "Enter an audit reason.", Toast.LENGTH_LONG).show(); return; }
+                                api.adminAccountAction(account.optString("id"), actions[which], text, new ProductApiClient.ObjectCallback() {
+                                    @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
+                                        Toast.makeText(GovernmentSafetyDashboardActivity.this, "Account updated. The person must sign in again with the correct role.", Toast.LENGTH_LONG).show();
+                                        showAdminAccounts();
+                                    }); }
+                                    @Override public void onError(String message) { runOnUiThread(() -> Toast.makeText(GovernmentSafetyDashboardActivity.this, message, Toast.LENGTH_LONG).show()); }
+                                });
+                            }).show();
+                }).setNegativeButton("Close", null).show();
+    }
+
+    private void showAdminAppSettings() {
+        api.adminAppSettings(new ProductApiClient.ObjectCallback() {
+            @Override public void onSuccess(JSONObject settings) { runOnUiThread(() -> {
+                LinearLayout form = new LinearLayout(GovernmentSafetyDashboardActivity.this); form.setOrientation(LinearLayout.VERTICAL); form.setPadding(32, 8, 32, 8);
+                CheckBox registration = new CheckBox(GovernmentSafetyDashboardActivity.this); registration.setText("Allow new citizen registrations"); registration.setChecked(settings.optBoolean("registration_enabled"));
+                CheckBox community = new CheckBox(GovernmentSafetyDashboardActivity.this); community.setText("Allow community posts and replies"); community.setChecked(settings.optBoolean("community_posting_enabled"));
+                TextInputEditText reason = new TextInputEditText(GovernmentSafetyDashboardActivity.this); reason.setHint("Reason for settings change (required)");
+                form.addView(registration); form.addView(community); form.addView(reason);
+                new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this).setTitle("App settings").setView(scrollable(form))
+                        .setNegativeButton("Cancel", null).setPositiveButton("Save", (dialog, which) -> {
+                            String note = reason.getText() == null ? "" : reason.getText().toString().trim();
+                            if (note.length() < 3) { Toast.makeText(GovernmentSafetyDashboardActivity.this, "Enter an audit reason.", Toast.LENGTH_LONG).show(); return; }
+                            api.updateAdminAppSettings(registration.isChecked(), community.isChecked(), note, callback("Application settings saved"));
+                        }).show();
+            }); }
+            @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
+        });
+    }
+
+    private void showAdminAudit() {
+        api.adminAudit(new ProductApiClient.ArrayCallback() {
+            @Override public void onSuccess(JSONArray events) { runOnUiThread(() -> {
+                StringBuilder text = new StringBuilder();
+                for (int i = 0; i < events.length(); i++) {
+                    JSONObject event = events.optJSONObject(i);
+                    text.append(event.optString("action").replace('_', ' ')).append("\n")
+                            .append(event.optString("actor_name")).append(" · ").append(JsonDisplay.text(event, "target_email", "App settings"))
+                            .append("\n").append(event.optString("reason")).append("\n").append(event.optString("created_at")).append("\n\n");
+                }
+                new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this).setTitle("Administration audit")
+                        .setMessage(text.length() == 0 ? "No administrative changes recorded yet." : text.toString())
+                        .setPositiveButton("Close", null).show();
+            }); }
+            @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
+        });
+    }
+
+    private void showAdminPassword() {
+        LinearLayout form = new LinearLayout(this); form.setOrientation(LinearLayout.VERTICAL); form.setPadding(32, 8, 32, 8);
+        TextInputEditText current = new TextInputEditText(this), replacement = new TextInputEditText(this);
+        current.setHint("Current password"); replacement.setHint("New password (at least 10 characters)");
+        current.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        replacement.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        form.addView(current); form.addView(replacement);
+        new MaterialAlertDialogBuilder(this).setTitle("Change my password").setView(scrollable(form)).setNegativeButton("Cancel", null)
+                .setPositiveButton("Change", (dialog, which) -> api.changePassword(
+                        current.getText() == null ? "" : current.getText().toString(), replacement.getText() == null ? "" : replacement.getText().toString(),
+                        new ProductApiClient.ObjectCallback() {
+                            @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
+                                ProductSession.clear(GovernmentSafetyDashboardActivity.this);
+                                startActivity(new Intent(GovernmentSafetyDashboardActivity.this, LoginTypeActivity.class)
+                                        .setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+                            }); }
+                            @Override public void onError(String message) { runOnUiThread(() -> Toast.makeText(GovernmentSafetyDashboardActivity.this, message, Toast.LENGTH_LONG).show()); }
+                        })).show();
+    }
+
     private void configureNewsSchedule() {
         api.newsSettings(new ProductApiClient.ObjectCallback() {
             @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
@@ -413,7 +571,7 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         noGoRadius.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         form.addView(label("Severity")); form.addView(severity); form.addView(label("Road status")); form.addView(road);
         form.addView(label("Routing exclusion buffer")); form.addView(noGoRadius); form.addView(reason);
-        new MaterialAlertDialogBuilder(this).setTitle("Publish verified hazard").setView(form)
+        new MaterialAlertDialogBuilder(this).setTitle("Publish verified hazard").setView(scrollable(form))
                 .setNegativeButton("Cancel", null).setPositiveButton("Publish", (dialog, which) -> {
                     String note = reason.getText() == null ? "" : reason.getText().toString().trim();
                     if (note.length() < 3) { Toast.makeText(this, "Add a verification reason.", Toast.LENGTH_LONG).show(); return; }
@@ -457,9 +615,24 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
     }
 
     private Spinner spinner(String[] values) {
-        Spinner spinner = new Spinner(this); spinner.setAdapter(new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, values)); return spinner;
+        Spinner spinner = new Spinner(this);
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, R.layout.item_dashboard_spinner, values);
+        adapter.setDropDownViewResource(R.layout.item_dashboard_spinner);
+        spinner.setAdapter(adapter); return spinner;
+    }
+    private View scrollable(View form) {
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.addView(form);
+        LinearLayout container = new LinearLayout(this);
+        int height = Math.min(Math.round(360 * getResources().getDisplayMetrics().density),
+                getResources().getDisplayMetrics().heightPixels / 2);
+        container.addView(scroll, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, height));
+        return container;
     }
     private TextView label(String text) { TextView view = new TextView(this); view.setText(text); view.setPadding(0, 18, 0, 4); return view; }
-    private void setActions(boolean enabled) { triageButton.setEnabled(enabled); verifyButton.setEnabled(enabled); rejectButton.setEnabled(enabled); assignButton.setEnabled(enabled); requestInfoButton.setEnabled(enabled); auditButton.setEnabled(enabled); }
+    private void setActions(boolean enabled) { triageButton.setEnabled(enabled); verifyButton.setEnabled(enabled); rejectButton.setEnabled(enabled); assignButton.setEnabled(enabled); requestInfoButton.setEnabled(enabled); auditButton.setEnabled(enabled);
+        findViewById(R.id.viewReportEvidenceButton).setEnabled(enabled);
+        findViewById(R.id.reportConversationButton).setEnabled(enabled);
+    }
     private void showError(String message) { reportTitle.setText("Operations unavailable"); reportMeta.setText(message); setActions(false); }
 }

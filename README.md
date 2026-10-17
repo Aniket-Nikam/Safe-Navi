@@ -8,10 +8,16 @@ Safe-Navi is a map-first Android safety platform that combines OpenStreetMap rou
 
 The Android namespace and application ID are `com.safenavi.app`. The repository contains no previous project-name namespace or branding.
 
+Independent cloud deployment is prepared using Render Free plus Supabase PostgreSQL/private evidence storage. See [the setup and acceptance checklist](docs/RENDER_SUPABASE_SETUP.md). This is not live until the owner creates accounts, deploys and completes hosted testing; laptop SQLite mode remains supported.
+
 ## What is genuinely integrated
+
+- Admin-only account management supports suspension/restoration, promotion to safety official, return to citizen role, and session revocation. Administrator accounts are protected. Reasoned changes are audited; existing reports, evidence and hazards are retained. Admins may configure news, registration and community posting, but cannot alter official report decisions, assignments, conversations or hazard records. Only safety officials can perform those operations.
+- Community discussions support persistent parent-linked replies, author names and relative timestamps in a scrollable discussion sheet. Existing comments remain top-level; nested replies are restricted to the same post and bounded in depth. Refresh retrieves updates from other phones, and sending keeps the thread open.
 
 - MapLibre renders OpenStreetMap-derived OpenFreeMap tiles.
 - Nominatim resolves explicitly submitted source and destination names.
+- Explicit place searches use India-restricted Nominatim and a Mumbai–Navi Mumbai bounding box, with a bounded Photon fuzzy-search fallback. Returned coordinates are checked locally and comma-separated locality requirements are enforced. Users confirm the full address; missing building names can be routed using an exact source/destination map pin. Search is independent of ML and limited by provider coverage. Photon uses its public endpoint for low-volume presentation use.
 - Valhalla returns genuine driving, walking and cycling road routes.
 - FastAPI queries an included SQLite spatial runtime derived from the completed synthetic dataset.
 - Point scores and route exposure use the teammate-trained 90-feature linear regression model against the dataset's current-period factor aggregates.
@@ -42,7 +48,7 @@ The Android namespace and application ID are `com.safenavi.app`. The repository 
 - HTTPS RSS feeds configured by the operator can be ingested, deduplicated, classified and reviewed; news signals can never create public hazards automatically.
 - Configured news feeds are ingested on startup and then on a bounded schedule; government staff can also trigger ingestion manually.
 - The supplied best-performing model is bundled as a non-executable JSON coefficient artifact. It achieved held-out R² 0.9316 and street-grouped five-fold CV R² 0.9325 ± 0.0033. An optional HTTPS model service can still override it; failures fall back to this bundled trained model and then to the deterministic baseline.
-- Fourteen Android JVM tests, three on-device instrumentation tests and seventeen backend integration tests cover the current build.
+- Twenty-six Android JVM tests, six on-device routing tests and twenty-nine backend tests cover the current build, including complete-edge closure enforcement, polygon interiors, server-address validation and offline rerouting across all travel modes/profiles.
 
 ## Dataset boundary
 
@@ -117,6 +123,12 @@ Raw citizen reports never change public routing.
 
 For a physical phone, replace `10.0.2.2` in `local.properties` with the computer's LAN IP, keep both devices on the same network, and allow port 8000 through the local firewall.
 
+The app also provides **Server connection** on login, Profile and the operations dashboard.
+Enter the laptop URL shown by the launcher and choose **Test and save**. The setting is
+shared by account APIs, ML scoring, background workers and journey links. Changing it
+signs out the current session. HTTP overrides are restricted to private/loopback addresses
+in debug builds; otherwise use HTTPS. A changed hotspot IP no longer requires rebuilding.
+
 ### One-command helper
 
 From the repository root:
@@ -176,6 +188,13 @@ Official closure enforcement happens before ranking. A route intersecting a veri
 no-go buffer is excluded even when Fastest is selected. Offline A* applies the last
 successfully retrieved verified-hazard snapshot and identifies its result as conservative
 offline intelligence rather than a live government feed.
+
+Closure checks use the complete route polyline, including segment crossings and polygon
+containment; only dataset lookup is sampled. Offline A* shares a compact immutable
+in-memory graph, captures one hazard snapshot per calculation, checks complete road
+edges and endpoint connectors, and rejects unfinished searches rather than returning
+a partially explored route. The six-device-test suite passed in 6.45 seconds on the
+configured emulator; timings on physical phones may differ.
 
 ## Optional configuration
 

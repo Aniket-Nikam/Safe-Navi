@@ -30,6 +30,8 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.safenavi.app.product.ProductApiClient;
+import com.safenavi.app.product.JsonDisplay;
+import com.safenavi.app.product.EvidenceViewer;
 import com.safenavi.app.product.OfflineReportQueue;
 import com.safenavi.app.product.OfflineEvidenceStore;
 import com.safenavi.app.product.OfflineReportUploadWorker;
@@ -282,16 +284,20 @@ public class ReportFragment extends Fragment {
             @Override public void onSuccess(JSONObject report) { if (isAdded()) requireActivity().runOnUiThread(() -> {
                 StringBuilder message = new StringBuilder();
                 message.append(report.optString("description")).append("\n\nLocation\n").append(report.optString("address"))
-                        .append("\n\nDepartment\n").append(report.optString("assigned_department", "Awaiting assignment"))
-                        .append("\n\nExpected resolution\n").append(report.optString("due_at", "Not scheduled"));
-                if (!report.optString("requested_info").isEmpty()) message.append("\n\nInformation requested\n").append(report.optString("requested_info"));
+                        .append("\n\nDepartment\n").append(JsonDisplay.text(report, "assigned_department", "Awaiting official assignment"))
+                        .append("\n\nExpected resolution\n").append(JsonDisplay.text(report, "due_at", "Not scheduled by an official yet"));
+                String requestedInfo = JsonDisplay.text(report, "requested_info", "");
+                if (!requestedInfo.isEmpty()) message.append("\n\nInformation requested\n").append(requestedInfo);
                 JSONArray evidence = report.optJSONArray("evidence"); message.append("\n\nEvidence\n").append(evidence == null ? 0 : evidence.length()).append(" secure file(s)");
                 message.append("\n\nStatus timeline\n"); JSONArray timeline = report.optJSONArray("timeline");
+                if (timeline == null || timeline.length() == 0) message.append("Report submitted · Awaiting official review\n").append(JsonDisplay.text(report, "created_at", ""));
                 if (timeline != null) for (int i = 0; i < timeline.length(); i++) { JSONObject event = timeline.optJSONObject(i); if (event != null)
                     message.append("• ").append(event.optString("action").replace('_',' ')).append("\n  ").append(event.optString("reason")).append("\n  ").append(event.optString("created_at")).append("\n"); }
-                new MaterialAlertDialogBuilder(requireContext()).setTitle(report.optString("title")).setMessage(message.toString())
+                MaterialAlertDialogBuilder detailDialog = new MaterialAlertDialogBuilder(requireContext()).setTitle(report.optString("title")).setMessage(message.toString())
                         .setNegativeButton("Close", null)
-                        .setPositiveButton("Conversation", (dialog, which) -> showReportConversation(reportId)).show();
+                        .setPositiveButton("Conversation", (dialog, which) -> showReportConversation(reportId));
+                if (evidence != null && evidence.length() > 0) detailDialog.setNeutralButton("View evidence", (dialog, which) -> EvidenceViewer.show(requireActivity(), evidence));
+                detailDialog.show();
             }); }
             @Override public void onError(String message) { if (isAdded()) requireActivity().runOnUiThread(() -> Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()); }
         });
@@ -309,7 +315,7 @@ public class ReportFragment extends Fragment {
                     thread.append(official ? "OFFICIAL · " : "YOU · ")
                             .append(item.optString("author_name")).append("\n")
                             .append(item.optString("content"));
-                    if (!item.optString("evidence_id").isEmpty()) thread.append("\n📷 Photograph attached");
+                    if (!JsonDisplay.text(item, "evidence_id", "").isEmpty()) thread.append("\n📷 Photograph attached");
                     thread.append("\n").append(item.optString("created_at")).append("\n\n");
                 }
 

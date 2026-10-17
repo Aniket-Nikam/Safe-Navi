@@ -88,8 +88,8 @@
                 android:orientation="vertical">
                 <com.google.android.material.textfield.TextInputLayout
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:hint="@string/source"
+                    android:layout_height="wrap_content"
+                    android:hint="A · Source"
                     app:boxBackgroundColor="@android:color/transparent"
                     app:boxBackgroundMode="filled"
                     app:boxStrokeWidth="0dp"
@@ -100,7 +100,10 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/sourceInput"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:paddingTop="24dp"
+                        android:paddingBottom="8dp"
                         android:imeOptions="actionNext"
                         android:inputType="textPostalAddress"
                         android:singleLine="true"
@@ -114,8 +117,8 @@
                 <com.google.android.material.textfield.TextInputLayout
                     android:id="@+id/destinationInputLayout"
                     android:layout_width="match_parent"
-                    android:layout_height="52dp"
-                    android:hint="@string/destination"
+                    android:layout_height="wrap_content"
+                    android:hint="B · Destination"
                     app:boxBackgroundColor="@android:color/transparent"
                     app:boxBackgroundMode="filled"
                     app:boxStrokeWidth="0dp"
@@ -129,7 +132,10 @@
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/destinationInput"
                         android:layout_width="match_parent"
-                        android:layout_height="match_parent"
+                        android:layout_height="wrap_content"
+                        android:minHeight="64dp"
+                        android:paddingTop="24dp"
+                        android:paddingBottom="8dp"
                         android:imeOptions="actionDone"
                         android:inputType="textPostalAddress"
                         android:singleLine="true"
@@ -195,6 +201,22 @@
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/areaCrimeButton"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginBottom="8dp"
+        android:text="Area crime info"
+        android:textSize="12sp"
+        android:letterSpacing="0"
+        android:textAllCaps="false"
+        android:textColor="@color/text_primary"
+        app:backgroundTint="@color/surface_elevated"
+        app:cornerRadius="14dp"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/routeControlCard" />
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/emergencyButton"
@@ -273,12 +295,24 @@
                     android:layout_marginStart="6dp"
                     android:layout_weight="1.35"
                     android:text="@string/compare_short"
+                    android:maxLines="1"
+                    android:textSize="12sp"
+                    android:letterSpacing="0"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    app:autoSizeTextType="uniform"
+                    app:autoSizeMinTextSize="10sp"
+                    app:autoSizeMaxTextSize="12sp"
+                    app:autoSizeStepGranularity="1sp"
                     android:textAllCaps="false"
                     android:textColor="@color/on_accent"
                     android:textStyle="bold"
                     app:backgroundTint="@color/accent"
                     app:cornerRadius="13dp"
                     app:icon="@drawable/ic_explore"
+                    app:iconSize="16dp"
+                    app:iconPadding="4dp"
+                    app:iconGravity="textStart"
                     app:iconTint="@color/on_accent" />
             </LinearLayout>
             <ProgressBar
@@ -299,6 +333,17 @@
                 android:visibility="gone">
                 <TextView android:id="@+id/routeResultTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:textColor="@color/route_result_title" android:textSize="15sp" android:textStyle="bold" />
                 <TextView android:id="@+id/routeResultMeta" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textColor="@color/text_secondary" android:textSize="12sp" />
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:orientation="horizontal">
+                    <TextView android:id="@+id/fastestRecommendation" android:layout_width="0dp" android:layout_height="wrap_content" android:minHeight="80dp" android:layout_weight="1" android:padding="5dp" android:textSize="11sp" android:textColor="@color/text_primary" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackground" />
+                    <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/divider" />
+                    <TextView android:id="@+id/balancedRecommendation" android:layout_width="0dp" android:layout_height="wrap_content" android:minHeight="80dp" android:layout_weight="1" android:padding="5dp" android:textSize="11sp" android:textColor="@color/text_primary" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackground" />
+                    <View android:layout_width="1dp" android:layout_height="match_parent" android:background="@color/divider" />
+                    <TextView android:id="@+id/safestRecommendation" android:layout_width="0dp" android:layout_height="wrap_content" android:minHeight="80dp" android:layout_weight="1" android:padding="5dp" android:textSize="11sp" android:textColor="@color/text_primary" android:gravity="center" android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackground" />
+                </LinearLayout>
+                <TextView android:id="@+id/routeRiskSummary" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:textColor="@color/route_risk_text" android:textSize="12sp" />
+                <com.google.android.material.button.MaterialButton android:id="@+id/routeDetailsToggle" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="match_parent" android:layout_height="48dp" android:text="Route details and actions ▾" android:textAllCaps="false" android:textSize="12sp" android:letterSpacing="0" />
+                <ScrollView android:id="@+id/routeDetailsPanel" android:layout_width="match_parent" android:layout_height="180dp" android:visibility="gone" android:fillViewport="true">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
                 <TextView android:id="@+id/routeResultRisk" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:lineSpacingExtra="2dp" android:textColor="@color/route_risk_text" android:textSize="11sp" />
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal">
                     <com.google.android.material.button.MaterialButton android:id="@+id/shareRouteButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="42dp" android:layout_weight="1" android:text="Share" android:textAllCaps="false" app:icon="@drawable/ic_share" />
@@ -308,6 +353,8 @@
                     <com.google.android.material.button.MaterialButton android:id="@+id/saveDestinationButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="Save place" android:textAllCaps="false" />
                     <com.google.android.material.button.MaterialButton android:id="@+id/startJourneyButton" style="@style/Widget.MaterialComponents.Button.OutlinedButton" android:layout_width="0dp" android:layout_height="40dp" android:layout_weight="1" android:text="Share journey" android:textAllCaps="false" app:cornerRadius="12dp" />
                 </LinearLayout>
+                </LinearLayout>
+                </ScrollView>
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

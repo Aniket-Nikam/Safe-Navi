@@ -128,7 +128,7 @@ public final class SafetySyncWorker extends Worker {
     }
 
     private static String baseUrl() {
-        String value = BuildConfig.RISK_API_BASE_URL;
+        String value = ServerConnection.baseUrl();
         while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
         return value;
     }

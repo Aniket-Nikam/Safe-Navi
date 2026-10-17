@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import logging
 import os
 import secrets
 import sqlite3
@@ -17,6 +18,7 @@ DEFAULT_PRODUCT_DB = Path(__file__).resolve().parents[1] / "data" / "safe_navi_p
 PBKDF2_ITERATIONS = 310_000
 SESSION_DAYS = 30
 _initialized: set[Path] = set()
+_cloud_initialized: set[tuple[str, str]] = set()
 _schema_lock = threading.Lock()
 
 
@@ -29,6 +31,10 @@ def product_db_path() -> Path:
 
 
 def connect_product() -> sqlite3.Connection:
+    from .cloud_database import database_url, PostgresProductConnection
+    if database_url():
+        ensure_schema()
+        return PostgresProductConnection()
     path = product_db_path()
     ensure_schema(path)
     connection = sqlite3.connect(path)
@@ -38,6 +44,16 @@ def connect_product() -> sqlite3.Connection:
 
 
 def ensure_schema(path: Path | None = None) -> None:
+    from .cloud_database import database_url, schema_name, PostgresProductConnection
+    if database_url():
+        key = (database_url(), schema_name())
+        with _schema_lock:
+            if key not in _cloud_initialized:
+                with PostgresProductConnection(bootstrap=True) as connection:
+                    _initialize_product_schema(connection)
+                    connection.protect_schema()
+                _cloud_initialized.add(key)
+        return
     path = path or product_db_path()
     if path in _initialized and path.exists():
         return
@@ -47,229 +63,247 @@ def ensure_schema(path: Path | None = None) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(path) as connection:
             connection.execute("PRAGMA foreign_keys=ON")
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS users (
-                    id TEXT PRIMARY KEY,
-                    name TEXT NOT NULL,
-                    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-                    password_hash TEXT NOT NULL,
-                    role TEXT NOT NULL CHECK(role IN ('citizen','government','admin')),
-                    active INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS sessions (
-                    token_hash TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    expires_at TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS reports (
-                    id TEXT PRIMARY KEY,
-                    citizen_id TEXT NOT NULL REFERENCES users(id),
-                    title TEXT NOT NULL,
-                    category_key TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    latitude REAL NOT NULL,
-                    longitude REAL NOT NULL,
-                    address TEXT NOT NULL,
-                    evidence_url TEXT,
-                    status TEXT NOT NULL,
-                    linked_hazard_id TEXT,
-                    client_request_id TEXT,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS reports_status_idx ON reports(status, updated_at);
-                CREATE INDEX IF NOT EXISTS reports_citizen_idx ON reports(citizen_id, created_at);
-                CREATE TABLE IF NOT EXISTS hazards (
-                    id TEXT PRIMARY KEY,
-                    report_id TEXT REFERENCES reports(id),
-                    title TEXT NOT NULL,
-                    category_key TEXT NOT NULL,
-                    description TEXT NOT NULL,
-                    latitude REAL NOT NULL,
-                    longitude REAL NOT NULL,
-                    address TEXT NOT NULL,
-                    severity TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    road_status TEXT NOT NULL,
-                    reason TEXT NOT NULL,
-                    verified_by TEXT NOT NULL REFERENCES users(id),
-                    source TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    resolved_at TEXT,
-                    valid_until TEXT,
-                    geometry_type TEXT NOT NULL DEFAULT 'POINT',
-                    geometry_json TEXT
-                );
-                CREATE INDEX IF NOT EXISTS hazards_map_idx ON hazards(status, latitude, longitude);
-                CREATE TABLE IF NOT EXISTS hazard_history (
-                    id TEXT PRIMARY KEY,
-                    hazard_id TEXT REFERENCES hazards(id),
-                    report_id TEXT REFERENCES reports(id),
-                    actor_id TEXT NOT NULL REFERENCES users(id),
-                    action TEXT NOT NULL,
-                    previous_status TEXT,
-                    new_status TEXT,
-                    reason TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS history_hazard_idx ON hazard_history(hazard_id, created_at);
-                CREATE TABLE IF NOT EXISTS community_posts (
-                    id TEXT PRIMARY KEY,
-                    author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    category TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    pinned INTEGER NOT NULL DEFAULT 0,
-                    removed INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS community_posts_created_idx
-                    ON community_posts(removed, pinned, created_at);
-                CREATE TABLE IF NOT EXISTS community_votes (
-                    post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY(post_id, user_id)
-                );
-                CREATE TABLE IF NOT EXISTS community_comments (
-                    id TEXT PRIMARY KEY,
-                    post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-                    author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    content TEXT NOT NULL,
-                    removed INTEGER NOT NULL DEFAULT 0,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS community_comments_post_idx
-                    ON community_comments(post_id, created_at);
-                CREATE TABLE IF NOT EXISTS report_evidence (
-                    id TEXT PRIMARY KEY,
-                    report_id TEXT REFERENCES reports(id) ON DELETE CASCADE,
-                    owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    storage_key TEXT NOT NULL,
-                    media_type TEXT NOT NULL,
-                    original_name TEXT NOT NULL,
-                    size_bytes INTEGER NOT NULL,
-                    sha256 TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE TABLE IF NOT EXISTS report_messages (
-                    id TEXT PRIMARY KEY,
-                    report_id TEXT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
-                    author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    content TEXT NOT NULL,
-                    evidence_id TEXT REFERENCES report_evidence(id),
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS report_messages_report_idx
-                    ON report_messages(report_id, created_at);
-                CREATE TABLE IF NOT EXISTS report_confirmations (
-                    report_id TEXT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY(report_id, user_id)
-                );
-                CREATE TABLE IF NOT EXISTS notifications (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    kind TEXT NOT NULL,
-                    title TEXT NOT NULL,
-                    message TEXT NOT NULL,
-                    entity_type TEXT,
-                    entity_id TEXT,
-                    read_at TEXT,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, read_at, created_at);
-                CREATE TABLE IF NOT EXISTS news_signals (
-                    id TEXT PRIMARY KEY,
-                    publisher TEXT NOT NULL,
-                    source_url TEXT NOT NULL UNIQUE,
-                    headline TEXT NOT NULL,
-                    summary TEXT NOT NULL,
-                    published_at TEXT NOT NULL,
-                    latitude REAL,
-                    longitude REAL,
-                    location_text TEXT,
-                    category TEXT NOT NULL,
-                    confidence REAL NOT NULL,
-                    content_hash TEXT NOT NULL UNIQUE,
-                    review_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
-                    linked_hazard_id TEXT REFERENCES hazards(id),
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS news_review_idx ON news_signals(review_status, published_at);
-                CREATE TABLE IF NOT EXISTS news_configuration (
-                    singleton_id INTEGER PRIMARY KEY CHECK(singleton_id=1),
-                    refresh_hours INTEGER NOT NULL CHECK(refresh_hours IN (12,24)),
-                    last_ingested_at TEXT,
-                    updated_at TEXT NOT NULL,
-                    updated_by TEXT REFERENCES users(id)
-                );
-                INSERT OR IGNORE INTO news_configuration(singleton_id,refresh_hours,updated_at)
-                    VALUES (1,12,CURRENT_TIMESTAMP);
-                CREATE TABLE IF NOT EXISTS saved_places (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    label TEXT NOT NULL,
-                    address TEXT NOT NULL,
-                    latitude REAL NOT NULL,
-                    longitude REAL NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS saved_places_user_idx ON saved_places(user_id, created_at);
-                CREATE TABLE IF NOT EXISTS emergency_contacts (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    name TEXT NOT NULL,
-                    phone TEXT NOT NULL,
-                    relationship TEXT NOT NULL,
-                    created_at TEXT NOT NULL
-                );
-                CREATE INDEX IF NOT EXISTS emergency_contacts_user_idx ON emergency_contacts(user_id, created_at);
-                CREATE TABLE IF NOT EXISTS journeys (
-                    id TEXT PRIMARY KEY,
-                    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-                    source_label TEXT NOT NULL,
-                    destination_label TEXT NOT NULL,
-                    destination_latitude REAL,
-                    destination_longitude REAL,
-                    travel_mode TEXT NOT NULL,
-                    route_profile TEXT NOT NULL,
-                    route_summary TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    share_token TEXT UNIQUE,
-                    last_latitude REAL,
-                    last_longitude REAL,
-                    started_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    ended_at TEXT
-                );
-                CREATE INDEX IF NOT EXISTS journeys_user_idx ON journeys(user_id, started_at);
-                """
-            )
-            _ensure_column(connection, "reports", "anonymous INTEGER NOT NULL DEFAULT 0")
-            _ensure_column(connection, "reports", "assigned_department TEXT")
-            _ensure_column(connection, "reports", "assigned_to TEXT")
-            _ensure_column(connection, "reports", "requested_info TEXT")
-            _ensure_column(connection, "reports", "due_at TEXT")
-            _ensure_column(connection, "reports", "client_request_id TEXT")
-            _ensure_column(connection, "community_posts", "evidence_id TEXT")
-            connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS reports_client_request_idx ON reports(citizen_id,client_request_id) WHERE client_request_id IS NOT NULL")
-            _ensure_column(connection, "hazards", "geometry_type TEXT NOT NULL DEFAULT 'POINT'")
-            _ensure_column(connection, "hazards", "geometry_json TEXT")
-            _ensure_column(connection, "hazards", "no_go_radius_m REAL")
-            _ensure_column(connection, "journeys", "checkin_interval_minutes INTEGER")
-            _ensure_column(connection, "journeys", "last_checkin_at TEXT")
-            _ensure_column(connection, "journeys", "next_checkin_at TEXT")
-            _ensure_column(connection, "journeys", "checkin_status TEXT NOT NULL DEFAULT 'OFF'")
+            _initialize_product_schema(connection)
         _initialized.add(path)
 
 
+def _initialize_product_schema(connection) -> None:
+    connection.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE COLLATE NOCASE,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('citizen','government','admin')),
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS sessions (
+            token_hash TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS administration_audit (
+            id TEXT PRIMARY KEY, actor_id TEXT NOT NULL REFERENCES users(id),
+            target_id TEXT, action TEXT NOT NULL, reason TEXT NOT NULL,
+            before_json TEXT NOT NULL, after_json TEXT NOT NULL, created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS administration_settings (
+            key TEXT PRIMARY KEY, value TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS reports (
+            id TEXT PRIMARY KEY,
+            citizen_id TEXT NOT NULL REFERENCES users(id),
+            title TEXT NOT NULL,
+            category_key TEXT NOT NULL,
+            description TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            address TEXT NOT NULL,
+            evidence_url TEXT,
+            status TEXT NOT NULL,
+            linked_hazard_id TEXT,
+            client_request_id TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS reports_status_idx ON reports(status, updated_at);
+        CREATE INDEX IF NOT EXISTS reports_citizen_idx ON reports(citizen_id, created_at);
+        CREATE TABLE IF NOT EXISTS hazards (
+            id TEXT PRIMARY KEY,
+            report_id TEXT REFERENCES reports(id),
+            title TEXT NOT NULL,
+            category_key TEXT NOT NULL,
+            description TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            address TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            status TEXT NOT NULL,
+            road_status TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            verified_by TEXT NOT NULL REFERENCES users(id),
+            source TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            resolved_at TEXT,
+            valid_until TEXT,
+            geometry_type TEXT NOT NULL DEFAULT 'POINT',
+            geometry_json TEXT
+        );
+        CREATE INDEX IF NOT EXISTS hazards_map_idx ON hazards(status, latitude, longitude);
+        CREATE TABLE IF NOT EXISTS hazard_history (
+            id TEXT PRIMARY KEY,
+            hazard_id TEXT REFERENCES hazards(id),
+            report_id TEXT REFERENCES reports(id),
+            actor_id TEXT NOT NULL REFERENCES users(id),
+            action TEXT NOT NULL,
+            previous_status TEXT,
+            new_status TEXT,
+            reason TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS history_hazard_idx ON hazard_history(hazard_id, created_at);
+        CREATE TABLE IF NOT EXISTS community_posts (
+            id TEXT PRIMARY KEY,
+            author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            category TEXT NOT NULL,
+            content TEXT NOT NULL,
+            pinned INTEGER NOT NULL DEFAULT 0,
+            removed INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS community_posts_created_idx
+            ON community_posts(removed, pinned, created_at);
+        CREATE TABLE IF NOT EXISTS community_votes (
+            post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(post_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS community_comments (
+            id TEXT PRIMARY KEY,
+            post_id TEXT NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+            author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            content TEXT NOT NULL,
+            removed INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS community_comments_post_idx
+            ON community_comments(post_id, created_at);
+        CREATE TABLE IF NOT EXISTS report_evidence (
+            id TEXT PRIMARY KEY,
+            report_id TEXT REFERENCES reports(id) ON DELETE CASCADE,
+            owner_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            storage_key TEXT NOT NULL,
+            media_type TEXT NOT NULL,
+            original_name TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL,
+            sha256 TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS report_messages (
+            id TEXT PRIMARY KEY,
+            report_id TEXT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+            author_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            content TEXT NOT NULL,
+            evidence_id TEXT REFERENCES report_evidence(id),
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS report_messages_report_idx
+            ON report_messages(report_id, created_at);
+        CREATE TABLE IF NOT EXISTS report_confirmations (
+            report_id TEXT NOT NULL REFERENCES reports(id) ON DELETE CASCADE,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY(report_id, user_id)
+        );
+        CREATE TABLE IF NOT EXISTS notifications (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            message TEXT NOT NULL,
+            entity_type TEXT,
+            entity_id TEXT,
+            read_at TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id, read_at, created_at);
+        CREATE TABLE IF NOT EXISTS news_signals (
+            id TEXT PRIMARY KEY,
+            publisher TEXT NOT NULL,
+            source_url TEXT NOT NULL UNIQUE,
+            headline TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            published_at TEXT NOT NULL,
+            latitude REAL,
+            longitude REAL,
+            location_text TEXT,
+            category TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            content_hash TEXT NOT NULL UNIQUE,
+            review_status TEXT NOT NULL DEFAULT 'UNVERIFIED',
+            linked_hazard_id TEXT REFERENCES hazards(id),
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS news_review_idx ON news_signals(review_status, published_at);
+        CREATE TABLE IF NOT EXISTS news_configuration (
+            singleton_id INTEGER PRIMARY KEY CHECK(singleton_id=1),
+            refresh_hours INTEGER NOT NULL CHECK(refresh_hours IN (12,24)),
+            last_ingested_at TEXT,
+            updated_at TEXT NOT NULL,
+            updated_by TEXT REFERENCES users(id)
+        );
+        INSERT OR IGNORE INTO news_configuration(singleton_id,refresh_hours,updated_at)
+            VALUES (1,12,CURRENT_TIMESTAMP);
+        CREATE TABLE IF NOT EXISTS saved_places (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            label TEXT NOT NULL,
+            address TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS saved_places_user_idx ON saved_places(user_id, created_at);
+        CREATE TABLE IF NOT EXISTS emergency_contacts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name TEXT NOT NULL,
+            phone TEXT NOT NULL,
+            relationship TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS emergency_contacts_user_idx ON emergency_contacts(user_id, created_at);
+        CREATE TABLE IF NOT EXISTS journeys (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            source_label TEXT NOT NULL,
+            destination_label TEXT NOT NULL,
+            destination_latitude REAL,
+            destination_longitude REAL,
+            travel_mode TEXT NOT NULL,
+            route_profile TEXT NOT NULL,
+            route_summary TEXT NOT NULL,
+            status TEXT NOT NULL,
+            share_token TEXT UNIQUE,
+            last_latitude REAL,
+            last_longitude REAL,
+            started_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            ended_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS journeys_user_idx ON journeys(user_id, started_at);
+        """
+    )
+    _ensure_column(connection, "reports", "anonymous INTEGER NOT NULL DEFAULT 0")
+    _ensure_column(connection, "reports", "assigned_department TEXT")
+    _ensure_column(connection, "reports", "assigned_to TEXT")
+    _ensure_column(connection, "reports", "requested_info TEXT")
+    _ensure_column(connection, "reports", "due_at TEXT")
+    _ensure_column(connection, "reports", "client_request_id TEXT")
+    _ensure_column(connection, "community_posts", "evidence_id TEXT")
+    connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS reports_client_request_idx ON reports(citizen_id,client_request_id) WHERE client_request_id IS NOT NULL")
+    _ensure_column(connection, "hazards", "geometry_type TEXT NOT NULL DEFAULT 'POINT'")
+    _ensure_column(connection, "hazards", "geometry_json TEXT")
+    _ensure_column(connection, "hazards", "no_go_radius_m REAL")
+    _ensure_column(connection, "community_comments", "parent_id TEXT REFERENCES community_comments(id)")
+    _ensure_column(connection, "journeys", "checkin_interval_minutes INTEGER")
+    _ensure_column(connection, "journeys", "last_checkin_at TEXT")
+    _ensure_column(connection, "journeys", "next_checkin_at TEXT")
+    _ensure_column(connection, "journeys", "checkin_status TEXT NOT NULL DEFAULT 'OFF'")
+    _ensure_column(connection, "news_configuration", "ingestion_lease_token TEXT")
+    _ensure_column(connection, "news_configuration", "ingestion_lease_until TEXT")
+
+
 def _ensure_column(connection: sqlite3.Connection, table: str, definition: str) -> None:
+    if getattr(connection, "dialect", None) == "postgresql":
+        connection.ensure_column(table, definition)
+        return
     name = definition.split()[0]
     columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
     if name not in columns:
@@ -297,6 +331,72 @@ def _password_matches(password: str, encoded: str) -> bool:
 
 def public_user(row: sqlite3.Row) -> dict[str, Any]:
     return {"id": row["id"], "name": row["name"], "email": row["email"], "role": row["role"]}
+
+
+def admin_accounts(query: str = "") -> list[dict]:
+    with connect_product() as connection:
+        return [dict(row) for row in connection.execute(
+            "SELECT id,name,email,role,active,created_at FROM users WHERE name LIKE ? OR email LIKE ? ORDER BY created_at DESC LIMIT 200",
+            (f"%{query}%", f"%{query}%"))]
+
+
+def _admin_audit(connection, actor_id, target_id, action, reason, before, after):
+    connection.execute("INSERT INTO administration_audit VALUES (?,?,?,?,?,?,?,?)",
+        (f"adm_{uuid.uuid4().hex}", actor_id, target_id, action, reason.strip(), json.dumps(before), json.dumps(after), utc_now()))
+
+
+def admin_account_action(actor_id: str, target_id: str, action: str, reason: str) -> dict | None:
+    with connect_product() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        actor = connection.execute("SELECT role,active FROM users WHERE id=?", (actor_id,)).fetchone()
+        if actor is None or actor["role"] != "admin" or not actor["active"]:
+            raise ValueError("Active administrator required")
+        row = connection.execute("SELECT id,name,email,role,active,created_at FROM users WHERE id=?", (target_id,)).fetchone()
+        if row is None: return None
+        if target_id == actor_id or row["role"] == "admin":
+            raise ValueError("Administrator accounts are protected from these actions")
+        before = dict(row)
+        if action == "suspend": connection.execute("UPDATE users SET active=0 WHERE id=?", (target_id,))
+        elif action == "restore": connection.execute("UPDATE users SET active=1 WHERE id=?", (target_id,))
+        elif action == "promote_official":
+            if not row["active"]: raise ValueError("Restore this account before promoting it")
+            connection.execute("UPDATE users SET role='government' WHERE id=?", (target_id,))
+        elif action == "make_citizen": connection.execute("UPDATE users SET role='citizen' WHERE id=?", (target_id,))
+        elif action != "revoke_sessions": raise ValueError("Unsupported account action")
+        connection.execute("DELETE FROM sessions WHERE user_id=?", (target_id,))
+        after = dict(connection.execute("SELECT id,name,email,role,active,created_at FROM users WHERE id=?", (target_id,)).fetchone())
+        _admin_audit(connection, actor_id, target_id, action, reason, before, after)
+        return after
+
+
+def admin_app_settings() -> dict:
+    with connect_product() as connection:
+        values = dict(connection.execute("SELECT key,value FROM administration_settings"))
+    return {"registration_enabled": values.get("registration_enabled", "true") == "true",
+            "community_posting_enabled": values.get("community_posting_enabled", "true") == "true"}
+
+
+def admin_update_app_settings(actor_id: str, values: dict, reason: str) -> dict:
+    with connect_product() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        actor = connection.execute("SELECT role,active FROM users WHERE id=?", (actor_id,)).fetchone()
+        if actor is None or actor["role"] != "admin" or not actor["active"]: raise ValueError("Active administrator required")
+        old = dict(connection.execute("SELECT key,value FROM administration_settings"))
+        before = {key: old.get(key, "true") == "true" for key in ("registration_enabled", "community_posting_enabled")}
+        after = {**before, **values}
+        for key in before:
+            connection.execute("INSERT INTO administration_settings VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                               (key, "true" if after[key] else "false"))
+        _admin_audit(connection, actor_id, None, "APP_SETTINGS_UPDATED", reason, before, after)
+        return after
+
+
+def admin_audit_history() -> list[dict]:
+    with connect_product() as connection:
+        return [dict(row) for row in connection.execute("""SELECT a.id,a.action,a.reason,a.created_at,
+            u.name AS actor_name,t.email AS target_email FROM administration_audit a
+            JOIN users u ON u.id=a.actor_id LEFT JOIN users t ON t.id=a.target_id
+            ORDER BY a.created_at DESC LIMIT 100""")]
 
 
 def create_user(name: str, email: str, password: str, role: str = "citizen") -> dict[str, Any]:
@@ -670,19 +770,27 @@ def toggle_community_vote(post_id: str, user_id: str) -> dict[str, Any] | None:
         return get_community_post(connection, post_id, user_id)
 
 
-def create_community_comment(post_id: str, author_id: str, content: str) -> dict[str, Any] | None:
+def create_community_comment(post_id: str, author_id: str, content: str, parent_id: str | None = None) -> dict[str, Any] | None:
     comment_id = f"cmt_{uuid.uuid4().hex}"
     now = utc_now()
     with connect_product() as connection:
         if connection.execute("SELECT 1 FROM community_posts WHERE id=? AND removed=0", (post_id,)).fetchone() is None:
             return None
+        if parent_id and connection.execute("SELECT 1 FROM community_comments WHERE id=? AND post_id=? AND removed=0", (parent_id, post_id)).fetchone() is None:
+            raise ValueError("Reply target must be an existing comment on this post")
+        ancestor = parent_id
+        for _ in range(20):
+            if not ancestor: break
+            ancestor_row = connection.execute("SELECT parent_id FROM community_comments WHERE id=?", (ancestor,)).fetchone()
+            ancestor = ancestor_row["parent_id"] if ancestor_row else None
+        if ancestor: raise ValueError("This discussion branch has reached its reply-depth limit; reply to an earlier comment")
         connection.execute(
-            "INSERT INTO community_comments(id,post_id,author_id,content,created_at) VALUES (?,?,?,?,?)",
-            (comment_id, post_id, author_id, content.strip(), now),
+            "INSERT INTO community_comments(id,post_id,author_id,content,created_at,parent_id) VALUES (?,?,?,?,?,?)",
+            (comment_id, post_id, author_id, content.strip(), now, parent_id),
         )
         connection.execute("UPDATE community_posts SET updated_at=? WHERE id=?", (now, post_id))
         row = connection.execute(
-            """SELECT c.id,c.post_id,c.content,c.created_at,u.id AS author_id,u.name AS author_name
+            """SELECT c.id,c.post_id,c.content,c.created_at,c.parent_id,u.id AS author_id,u.name AS author_name
                FROM community_comments c JOIN users u ON u.id=c.author_id WHERE c.id=?""",
             (comment_id,),
         ).fetchone()
@@ -692,7 +800,7 @@ def create_community_comment(post_id: str, author_id: str, content: str) -> dict
 def list_community_comments(post_id: str) -> list[dict[str, Any]]:
     with connect_product() as connection:
         return [row_dict(row) for row in connection.execute(
-            """SELECT c.id,c.post_id,c.content,c.created_at,u.id AS author_id,u.name AS author_name
+            """SELECT c.id,c.post_id,c.content,c.created_at,c.parent_id,u.id AS author_id,u.name AS author_name
                FROM community_comments c JOIN users u ON u.id=c.author_id
                WHERE c.post_id=? AND c.removed=0 ORDER BY c.created_at""",
             (post_id,),
@@ -721,6 +829,8 @@ def list_report_messages(report_id: str, user: dict[str, Any]) -> list[dict[str,
 
 def create_report_message(report_id: str, user: dict[str, Any], content: str,
                           evidence_id: str | None = None) -> dict[str, Any] | None:
+    if user["role"] == "admin":
+        raise ValueError("Administrators have read-only access to case conversations")
     message_id, now = f"msg_{uuid.uuid4().hex}", utc_now()
     with connect_product() as connection:
         report = _can_access_report(connection, report_id, user)
@@ -926,9 +1036,8 @@ def government_metrics() -> dict[str, Any]:
 
 
 def evidence_storage_dir() -> Path:
-    path = Path(os.getenv("SAFE_NAVI_EVIDENCE_DIR", str(product_db_path().parent / "evidence"))).resolve()
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    from .evidence_storage import local_directory
+    return local_directory()
 
 
 def store_evidence(owner_id: str, original_name: str, media_type: str, content: bytes) -> dict[str, Any]:
@@ -938,16 +1047,30 @@ def store_evidence(owner_id: str, original_name: str, media_type: str, content: 
     extension = extensions.get(media_type, "")
     evidence_id = f"evd_{uuid.uuid4().hex}"
     storage_key = f"{evidence_id}{extension}"
-    (evidence_storage_dir() / storage_key).write_bytes(content)
-    with connect_product() as connection:
-        connection.execute(
-            """INSERT INTO report_evidence(id,report_id,owner_id,storage_key,media_type,original_name,size_bytes,sha256,created_at)
-               VALUES (?,NULL,?,?,?,?,?,?,?)""",
-            (evidence_id, owner_id, storage_key, media_type, original_name[:255], len(content), digest, utc_now()),
-        )
-        return row_dict(connection.execute(
-            "SELECT id,media_type,original_name,size_bytes,created_at FROM report_evidence WHERE id=?", (evidence_id,)
-        ).fetchone())
+    from . import evidence_storage
+    evidence_storage.put(storage_key, content, media_type)
+    try:
+        with connect_product() as connection:
+            connection.execute(
+                """INSERT INTO report_evidence(id,report_id,owner_id,storage_key,media_type,original_name,size_bytes,sha256,created_at)
+                   VALUES (?,NULL,?,?,?,?,?,?,?)""",
+                (evidence_id, owner_id, storage_key, media_type, original_name[:255], len(content), digest, utc_now()),
+            )
+            value = row_dict(connection.execute(
+                "SELECT id,media_type,original_name,size_bytes,created_at FROM report_evidence WHERE id=?", (evidence_id,)
+            ).fetchone())
+        return value  # The database transaction must commit before upload acknowledgement.
+    except sqlite3.IntegrityError:
+        try:
+            evidence_storage.delete(storage_key)
+        except Exception:
+            logging.getLogger("safenavi.evidence").warning("Unreferenced upload needs cleanup: %s", evidence_id)
+        raise
+    except Exception:
+        # A lost commit acknowledgement is ambiguous: never delete an object that
+        # a committed row might reference. Reconcile such uploads administratively.
+        logging.getLogger("safenavi.evidence").warning("Upload commit needs verification: %s", evidence_id)
+        raise
 
 
 def evidence_record(evidence_id: str, user: dict[str, Any]) -> dict[str, Any] | None:
@@ -966,7 +1089,9 @@ def evidence_record(evidence_id: str, user: dict[str, Any]) -> dict[str, Any] | 
             if community_visible is None and report_visible is None:
                 return None
         value = row_dict(row)
-        value["path"] = str(evidence_storage_dir() / row["storage_key"])
+        from .evidence_storage import backend_name
+        if backend_name() == "local":
+            value["path"] = str(evidence_storage_dir() / row["storage_key"])
         return value
 
 
@@ -1010,12 +1135,14 @@ def news_configuration() -> dict[str, Any]:
         row = connection.execute("SELECT * FROM news_configuration WHERE singleton_id=1").fetchone()
         assert row is not None
         value = row_dict(row)
+    value.pop("ingestion_lease_token", None)
     last = value.get("last_ingested_at")
     value["next_ingestion_at"] = (
         (datetime.fromisoformat(last) + timedelta(hours=int(value["refresh_hours"]))).isoformat()
         if last else None
     )
     value["scheduler_enabled"] = bool(os.getenv("SAFE_NAVI_NEWS_FEEDS", "").strip())
+    value["scheduler_mode"] = os.getenv("SAFE_NAVI_NEWS_SCHEDULER", "internal")
     return value
 
 
@@ -1035,6 +1162,32 @@ def record_news_ingestion() -> dict[str, Any]:
         connection.execute(
             "UPDATE news_configuration SET last_ingested_at=? WHERE singleton_id=1", (utc_now(),)
         )
+    return news_configuration()
+
+
+def claim_news_ingestion(force: bool = False) -> tuple[str | None, str | None]:
+    """A persistent lease prevents manual, local and external triggers overlapping."""
+    now = datetime.now(timezone.utc)
+    with connect_product() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute("SELECT * FROM news_configuration WHERE singleton_id=1").fetchone()
+        lease = row["ingestion_lease_until"]
+        if lease and datetime.fromisoformat(lease) > now:
+            return None, "already_running"
+        last = row["last_ingested_at"]
+        if not force and last and datetime.fromisoformat(last) + timedelta(hours=int(row["refresh_hours"])) > now:
+            return None, "not_due"
+        token = secrets.token_hex(24)
+        connection.execute("UPDATE news_configuration SET ingestion_lease_token=?,ingestion_lease_until=? WHERE singleton_id=1",
+                           (token, (now + timedelta(minutes=10)).isoformat()))
+        return token, None
+
+
+def finish_news_ingestion(token: str, successful: bool) -> dict[str, Any]:
+    with connect_product() as connection:
+        connection.execute("UPDATE news_configuration SET ingestion_lease_token=NULL,ingestion_lease_until=NULL,"
+                           "last_ingested_at=CASE WHEN ?=1 THEN ? ELSE last_ingested_at END "
+                           "WHERE singleton_id=1 AND ingestion_lease_token=?", (int(successful), utc_now(), token))
     return news_configuration()
 
 

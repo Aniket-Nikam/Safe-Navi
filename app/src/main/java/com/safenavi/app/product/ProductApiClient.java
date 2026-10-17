@@ -25,7 +25,11 @@ import org.json.JSONObject;
 public class ProductApiClient {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private final Context context;
-    private final OkHttpClient client = new OkHttpClient.Builder().build();
+    private final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(90, java.util.concurrent.TimeUnit.SECONDS)
+            .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(120, java.util.concurrent.TimeUnit.SECONDS).build();
     public interface ObjectCallback { void onSuccess(JSONObject value); void onError(String message); }
     public interface ArrayCallback { void onSuccess(JSONArray value); void onError(String message); }
     public interface BytesCallback { void onSuccess(byte[] value, String mediaType); void onError(String message); }
@@ -124,6 +128,9 @@ public class ProductApiClient {
     public static String apiBaseUrl() { return baseUrl(); }
     public static String journeyShareUrl(String token) { return baseUrl() + "/api/v1/journeys/share/" + token + "/view"; }
     public void mapHazards(ObjectCallback callback) { getObject("/api/v1/hazards/map", false, callback); }
+    public void areaCrime(double latitude, double longitude, ObjectCallback callback) {
+        getObject(String.format(Locale.US, "/api/v1/risk/area-crime?latitude=%.7f&longitude=%.7f", latitude, longitude), false, callback);
+    }
     public void triage(String reportId, String reason, ObjectCallback callback) {
         try { post("/api/v1/government/reports/" + reportId + "/triage", new JSONObject().put("reason", reason), true, callback); }
         catch (JSONException error) { callback.onError("Could not prepare triage request."); }
@@ -145,6 +152,18 @@ public class ProductApiClient {
         getArray("/api/v1/government/reports/" + reportId + "/duplicates", true, callback);
     }
     public void governmentMetrics(ObjectCallback callback) { getObject("/api/v1/government/metrics", true, callback); }
+    public void adminAccounts(ArrayCallback callback) { getArray("/api/v1/admin/accounts", true, callback); }
+    public void adminAudit(ArrayCallback callback) { getArray("/api/v1/admin/audit", true, callback); }
+    public void adminAppSettings(ObjectCallback callback) { getObject("/api/v1/admin/app-settings", true, callback); }
+    public void adminAccountAction(String userId, String action, String reason, ObjectCallback callback) {
+        try { post("/api/v1/admin/accounts/" + userId + "/action", new JSONObject().put("action", action).put("reason", reason), true, callback); }
+        catch (JSONException error) { callback.onError("Could not prepare account action."); }
+    }
+    public void updateAdminAppSettings(boolean registration, boolean community, String reason, ObjectCallback callback) {
+        try { request("PATCH", "/api/v1/admin/app-settings", new JSONObject().put("registration_enabled", registration)
+                .put("community_posting_enabled", community).put("reason", reason), true, callback); }
+        catch (JSONException error) { callback.onError("Could not prepare app settings."); }
+    }
     public void newsSignals(ArrayCallback callback) { getArray("/api/v1/government/news-signals", true, callback); }
     public void ingestNews(ObjectCallback callback) { post("/api/v1/government/news/ingest", new JSONObject(), true, callback); }
     public void newsSettings(ObjectCallback callback) { getObject("/api/v1/government/news/settings", true, callback); }
@@ -182,7 +201,14 @@ public class ProductApiClient {
         getArray("/api/v1/community/posts/" + postId + "/comments", true, callback);
     }
     public void createCommunityComment(String postId, String content, ObjectCallback callback) {
-        try { post("/api/v1/community/posts/" + postId + "/comments", new JSONObject().put("content", content), true, callback); }
+        createCommunityComment(postId, content, null, callback);
+    }
+    public void createCommunityComment(String postId, String content, String parentId, ObjectCallback callback) {
+        try {
+            JSONObject payload = new JSONObject().put("content", content);
+            if (parentId != null) payload.put("parent_id", parentId);
+            post("/api/v1/community/posts/" + postId + "/comments", payload, true, callback);
+        }
         catch (JSONException error) { callback.onError("Could not prepare the reply."); }
     }
     public void reportMessages(String reportId, ArrayCallback callback) {
@@ -303,7 +329,7 @@ public class ProductApiClient {
         catch (JSONException ignored) { return "Request failed (HTTP " + code + ")"; }
     }
     private static String baseUrl() {
-        String value = BuildConfig.RISK_API_BASE_URL;
+        String value = ServerConnection.baseUrl();
         while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
         return value;
     }

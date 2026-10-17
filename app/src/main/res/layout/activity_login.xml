@@ -142,6 +142,7 @@
                         app:backgroundTint="@color/primary"
                         app:cornerRadius="16dp"
                         app:elevation="4dp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/loginServerConnectionButton" style="@style/Widget.SafeNavi.DashboardAction" android:layout_marginTop="8dp" android:text="Server connection" />
 
                 </LinearLayout>
 

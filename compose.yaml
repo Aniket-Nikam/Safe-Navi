@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: backend/.env.production
+    volumes:
+      - safenavi-data:/data
+    expose:
+      - "8000"
+    security_opt:
+      - no-new-privileges:true
+  https:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SAFE_NAVI_HOST: ${SAFE_NAVI_HOST:?Set a DNS hostname pointing to your VM in backend/.env.production}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  safenavi-data:
+  caddy-data:
+  caddy-config:

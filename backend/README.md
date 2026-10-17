@@ -1,5 +1,7 @@
 # Safe-Navi dataset API
 
+The service also provides authenticated product workflows. Local mode retains SQLite/filesystem storage; independent Render deployment uses PostgreSQL and private Supabase evidence storage. See [cloud setup and acceptance checks](../docs/RENDER_SUPABASE_SETUP.md). Cloud accounts and live deployment are not provisioned automatically.
+
 This FastAPI service makes the synthetic Mumbai–Navi Mumbai dataset usable by the Android application without embedding the 158 MB Parquet analytics table inside the APK.
 
 The included SQLite database contains the dataset's complete 1 km area-cell aggregation: 6,508 rows across four time periods and all ten factors. It is generated reproducibly from `area_cells.csv.gz`. The full `road_segments.parquet` remains the street-level training and future PostGIS import source.

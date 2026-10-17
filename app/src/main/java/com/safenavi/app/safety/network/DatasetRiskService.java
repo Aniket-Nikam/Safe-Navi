@@ -31,7 +31,10 @@ import org.json.JSONObject;
 /** Client for the Safe-Navi baseline and verified-hazard risk service. */
 public class DatasetRiskService {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
-    private final OkHttpClient client = new OkHttpClient.Builder().build();
+    private final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(90, java.util.concurrent.TimeUnit.SECONDS)
+            .callTimeout(120, java.util.concurrent.TimeUnit.SECONDS).build();
 
     public interface ResultCallback<T> {
         void onSuccess(T value);
@@ -40,29 +43,13 @@ public class DatasetRiskService {
 
     public void evaluateRoutes(List<RouteCandidate> candidates, RouteProfile profile,
                                String timePeriod, ResultCallback<DatasetRouteEvaluation> callback) {
-        HttpUrl url = HttpUrl.parse(trimSlash(BuildConfig.RISK_API_BASE_URL) + "/api/v1/risk/route");
+        HttpUrl url = HttpUrl.parse(trimSlash(com.safenavi.app.product.ServerConnection.baseUrl()) + "/api/v1/risk/route");
         if (url == null) {
             callback.onError("Invalid dataset service URL.");
             return;
         }
         try {
-            JSONObject payload = new JSONObject()
-                    .put("time_period", timePeriod)
-                    .put("profile", profile.name().toLowerCase(Locale.US));
-            JSONArray routes = new JSONArray();
-            for (RouteCandidate candidate : candidates) {
-                JSONObject route = new JSONObject()
-                        .put("route_id", candidate.getProviderRouteId())
-                        .put("travel_minutes", candidate.getTravelMinutes())
-                        .put("distance_meters", candidate.getDistanceMeters());
-                JSONArray coordinates = new JSONArray();
-                for (HazardLocation.GeoPoint point : sample(candidate.getGeometry(), 100)) {
-                    coordinates.put(new JSONObject().put("latitude", point.getLatitude())
-                            .put("longitude", point.getLongitude()));
-                }
-                routes.put(route.put("coordinates", coordinates));
-            }
-            payload.put("routes", routes);
+            JSONObject payload = buildRoutePayload(candidates, profile, timePeriod);
             Request request = new Request.Builder().url(url).header("Accept", "application/json")
                     .post(RequestBody.create(payload.toString(), JSON)).build();
             client.newCall(request).enqueue(new Callback() {
@@ -92,7 +79,7 @@ public class DatasetRiskService {
 
     public void pointRisk(double latitude, double longitude, String timePeriod,
                           ResultCallback<DatasetPointRisk> callback) {
-        HttpUrl base = HttpUrl.parse(trimSlash(BuildConfig.RISK_API_BASE_URL) + "/api/v1/risk/point");
+        HttpUrl base = HttpUrl.parse(trimSlash(com.safenavi.app.product.ServerConnection.baseUrl()) + "/api/v1/risk/point");
         if (base == null) {
             callback.onError("Invalid dataset service URL.");
             return;
@@ -181,14 +168,21 @@ public class DatasetRiskService {
         return joined.toString();
     }
 
-    private static List<HazardLocation.GeoPoint> sample(List<HazardLocation.GeoPoint> points, int maximum) {
-        if (points.size() <= maximum) return points;
-        List<HazardLocation.GeoPoint> output = new ArrayList<>();
-        for (int i = 0; i < maximum; i++) {
-            int index = Math.round(i * (points.size() - 1f) / (maximum - 1f));
-            output.add(points.get(index));
+    public static JSONObject buildRoutePayload(List<RouteCandidate> candidates, RouteProfile profile,
+                                               String timePeriod) throws JSONException {
+        JSONObject payload = new JSONObject().put("time_period", timePeriod)
+                .put("profile", profile.name().toLowerCase(Locale.US));
+        JSONArray routes = new JSONArray();
+        for (RouteCandidate candidate : candidates) {
+            JSONObject route = new JSONObject().put("route_id", candidate.getProviderRouteId())
+                    .put("travel_minutes", candidate.getTravelMinutes()).put("distance_meters", candidate.getDistanceMeters());
+            JSONArray coordinates = new JSONArray();
+            // Full geometry is mandatory for closure checks. Server samples only ML features.
+            for (HazardLocation.GeoPoint point : candidate.getGeometry())
+                coordinates.put(new JSONObject().put("latitude", point.getLatitude()).put("longitude", point.getLongitude()));
+            routes.put(route.put("coordinates", coordinates));
         }
-        return output;
+        return payload.put("routes", routes);
     }
 
     private static String trimSlash(String value) {

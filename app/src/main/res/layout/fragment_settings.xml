@@ -373,6 +373,7 @@
                     app:cornerRadius="14dp" />
 
                 <!-- Change Password -->
+                <com.google.android.material.button.MaterialButton android:id="@+id/profileServerConnectionButton" style="@style/Widget.SafeNavi.DashboardAction" android:layout_marginTop="8dp" android:text="Server connection" />
                 <LinearLayout
                     android:id="@+id/changePasswordLayout"
                     android:layout_width="match_parent"

@@ -4,10 +4,13 @@ import os
 import html
 from datetime import datetime, timezone
 from typing import Annotated, Literal
+from urllib.parse import quote
 
 import httpx
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, UploadFile, WebSocket, WebSocketDisconnect, status
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
+from fastapi.concurrency import run_in_threadpool
+from . import evidence_storage
 from pydantic import BaseModel, Field
 
 from .product_database import (
@@ -62,6 +65,8 @@ from .product_database import (
 )
 from .news_intelligence import ingest_configured_feeds
 from .live_updates import live_updates
+from .product_database import (admin_accounts, admin_account_action, admin_app_settings,
+                               admin_update_app_settings, admin_audit_history)
 
 
 router = APIRouter(prefix="/api/v1", tags=["product"])
@@ -86,6 +91,17 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str
     password: str
+
+
+class AdminAccountAction(BaseModel):
+    action: Literal["suspend", "restore", "revoke_sessions", "promote_official", "make_citizen"]
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class AdminAppSettings(BaseModel):
+    registration_enabled: bool
+    community_posting_enabled: bool
+    reason: str = Field(min_length=3, max_length=500)
 
 
 class PasswordChangeRequest(BaseModel):
@@ -208,6 +224,7 @@ class CommunityPostCreate(BaseModel):
 
 class CommunityCommentCreate(BaseModel):
     content: str = Field(min_length=2, max_length=1000)
+    parent_id: str | None = Field(default=None, max_length=80)
 
 
 class AssistantTurn(BaseModel):
@@ -230,6 +247,12 @@ def current_user(authorization: Annotated[str | None, Header()] = None) -> dict:
 
 
 def government_user(user: Annotated[dict, Depends(current_user)]) -> dict:
+    if user["role"] != "government":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only safety officials may change government records")
+    return user
+
+
+def operations_reader(user: Annotated[dict, Depends(current_user)]) -> dict:
     if user["role"] not in {"government", "admin"}:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Government role required")
     return user
@@ -241,8 +264,39 @@ def admin_user(user: Annotated[dict, Depends(current_user)]) -> dict:
     return user
 
 
+@router.get("/admin/accounts")
+def administrative_accounts(_: Annotated[dict, Depends(admin_user)], q: str = Query(default="", max_length=100)) -> list[dict]:
+    return admin_accounts(q)
+
+
+@router.post("/admin/accounts/{account_id}/action")
+def administrative_account_action(account_id: str, request: AdminAccountAction,
+                                  user: Annotated[dict, Depends(admin_user)]) -> dict:
+    try: result = admin_account_action(user["id"], account_id, request.action, request.reason)
+    except ValueError as error: raise HTTPException(409, str(error)) from error
+    if result is None: raise HTTPException(404, "Account not found")
+    return result
+
+
+@router.get("/admin/app-settings")
+def administrative_settings(_: Annotated[dict, Depends(admin_user)]) -> dict:
+    return admin_app_settings()
+
+
+@router.patch("/admin/app-settings")
+def administrative_update_settings(request: AdminAppSettings, user: Annotated[dict, Depends(admin_user)]) -> dict:
+    return admin_update_app_settings(user["id"], request.model_dump(exclude={"reason"}), request.reason)
+
+
+@router.get("/admin/audit")
+def administrative_audit(_: Annotated[dict, Depends(admin_user)]) -> list[dict]:
+    return admin_audit_history()
+
+
 @router.post("/auth/register", status_code=status.HTTP_201_CREATED)
 def register(request: RegisterRequest) -> dict:
+    if not admin_app_settings()["registration_enabled"]:
+        raise HTTPException(403, "New registrations are currently paused by the administrator")
     if "@" not in request.email or request.email.startswith("@"):
         raise HTTPException(422, "A valid email address is required")
     try:
@@ -308,14 +362,25 @@ async def upload_evidence(
     content = await file.read(15 * 1024 * 1024 + 1)
     if len(content) > 15 * 1024 * 1024: raise HTTPException(413, "Evidence must be 15 MB or smaller")
     if not content: raise HTTPException(422, "Evidence file is empty")
-    return store_evidence(user["id"], file.filename or "evidence", media_type, content)
+    try:
+        return await run_in_threadpool(store_evidence, user["id"], file.filename or "evidence", media_type, content)
+    except evidence_storage.EvidenceStorageError as error:
+        raise HTTPException(503, str(error)) from error
 
 
 @router.get("/evidence/{evidence_id}")
-def download_evidence(evidence_id: str, user: Annotated[dict, Depends(current_user)]) -> FileResponse:
+def download_evidence(evidence_id: str, user: Annotated[dict, Depends(current_user)]) -> Response:
     record = evidence_record(evidence_id, user)
     if record is None: raise HTTPException(404, "Evidence not found")
-    return FileResponse(record["path"], media_type=record["media_type"], filename=record["original_name"])
+    if evidence_storage.backend_name() == "local":
+        if not os.path.isfile(record["path"]): raise HTTPException(404, "Evidence file is unavailable")
+        return FileResponse(record["path"], media_type=record["media_type"], filename=record["original_name"])
+    try:
+        content = evidence_storage.read(record["storage_key"], expected_size=record["size_bytes"], expected_sha256=record["sha256"])
+    except evidence_storage.EvidenceStorageError as error:
+        raise HTTPException(503, str(error)) from error
+    return Response(content, media_type=record["media_type"], headers={
+        "Content-Disposition": "attachment; filename*=UTF-8''" + quote(record["original_name"], safe="")})
 
 
 @router.get("/reports")
@@ -362,6 +427,8 @@ def report_messages(report_id: str, user: Annotated[dict, Depends(current_user)]
 @router.post("/reports/{report_id}/messages", status_code=status.HTTP_201_CREATED)
 def post_report_message(report_id: str, request: ReportMessageCreate,
                         user: Annotated[dict, Depends(current_user)]) -> dict:
+    if user["role"] == "admin":
+        raise HTTPException(403, "Administrators have read-only access to case conversations")
     try:
         value = create_report_message(report_id, user, request.content, request.evidence_id)
     except ValueError as error:
@@ -410,12 +477,12 @@ def request_information(
 
 
 @router.get("/government/reports/{report_id}/duplicates")
-def report_duplicates(report_id: str, _: Annotated[dict, Depends(government_user)]) -> list[dict]:
+def report_duplicates(report_id: str, _: Annotated[dict, Depends(operations_reader)]) -> list[dict]:
     return duplicate_candidates(report_id)
 
 
 @router.get("/government/metrics")
-def metrics(_: Annotated[dict, Depends(government_user)]) -> dict:
+def metrics(_: Annotated[dict, Depends(operations_reader)]) -> dict:
     return government_metrics()
 
 
@@ -438,7 +505,7 @@ def change_news_settings(
 
 @router.get("/government/news-signals")
 def news_signals(
-    _: Annotated[dict, Depends(government_user)],
+    _: Annotated[dict, Depends(operations_reader)],
     review_status: str | None = Query(default=None),
 ) -> list[dict]:
     return list_news_signals(review_status)
@@ -446,7 +513,7 @@ def news_signals(
 
 @router.post("/government/news-signals/{signal_id}/review")
 def review_news(
-    signal_id: str, request: NewsReviewRequest, _: Annotated[dict, Depends(government_user)]
+    signal_id: str, request: NewsReviewRequest, _: Annotated[dict, Depends(operations_reader)]
 ) -> dict:
     value = review_news_signal(signal_id, request.review_status)
     if value is None: raise HTTPException(404, "News signal not found")
@@ -460,7 +527,7 @@ async def review_report(
     user: Annotated[dict, Depends(government_user)],
 ) -> dict:
     try:
-        result = decide_report(report_id, user["id"], request.model_dump(exclude_none=True))
+        result = await run_in_threadpool(decide_report, report_id, user["id"], request.model_dump(exclude_none=True))
     except ValueError as error:
         raise HTTPException(409, str(error)) from error
     if result is None:
@@ -475,7 +542,7 @@ async def change_hazard(
     request: HazardUpdate,
     user: Annotated[dict, Depends(government_user)],
 ) -> dict:
-    result = update_hazard(hazard_id, user["id"], request.model_dump(exclude_none=True))
+    result = await run_in_threadpool(update_hazard, hazard_id, user["id"], request.model_dump(exclude_none=True))
     if result is None:
         raise HTTPException(404, "Hazard not found")
     await live_updates.broadcast("hazards_changed")
@@ -500,7 +567,7 @@ def map_hazards(
 
 
 @router.get("/government/hazards/{hazard_id}/history")
-def history(hazard_id: str, _: Annotated[dict, Depends(government_user)]) -> list[dict]:
+def history(hazard_id: str, _: Annotated[dict, Depends(operations_reader)]) -> list[dict]:
     return hazard_history(hazard_id)
 
 
@@ -628,6 +695,8 @@ def community_posts(
 def publish_community_post(
     request: CommunityPostCreate, user: Annotated[dict, Depends(current_user)]
 ) -> dict:
+    if not admin_app_settings()["community_posting_enabled"]:
+        raise HTTPException(403, "Community posting is currently paused by the administrator")
     try:
         return create_community_post(user["id"], request.category, request.content, request.evidence_id)
     except ValueError as error:
@@ -653,7 +722,10 @@ def publish_community_comment(
     request: CommunityCommentCreate,
     user: Annotated[dict, Depends(current_user)],
 ) -> dict:
-    comment = create_community_comment(post_id, user["id"], request.content)
+    if not admin_app_settings()["community_posting_enabled"]:
+        raise HTTPException(403, "Community posting is currently paused by the administrator")
+    try: comment = create_community_comment(post_id, user["id"], request.content, request.parent_id)
+    except ValueError as error: raise HTTPException(400, str(error)) from error
     if comment is None:
         raise HTTPException(404, "Community post not found")
     return comment
@@ -667,7 +739,7 @@ async def assistant_chat(
     if not api_key:
         raise HTTPException(503, "Safe-Navi AI is not configured. Add GROQ_API_KEY to the backend environment.")
     model = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b").strip()
-    hazard_count = len(active_hazards())
+    hazard_count = len(await run_in_threadpool(active_hazards))
     system_prompt = (
         "You are Navi, the in-app Safe-Navi safety assistant. Give concise, calm, practical guidance about "
         "route planning, civic and crime issue reporting, verified hazards, and personal preparedness. "

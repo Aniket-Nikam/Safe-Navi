@@ -1,0 +1,39 @@
+# Free backend ONLY. Product data/evidence must live in Supabase, never this disk.
+services:
+  - type: web
+    name: safe-navi-api
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: "8000"
+      - key: SAFE_NAVI_CLOUD_MODE
+        value: "true"
+      - key: SAFE_NAVI_DATABASE_URL
+        sync: false
+      - key: SAFE_NAVI_DATABASE_SCHEMA
+        value: safenavi
+      - key: SAFE_NAVI_EVIDENCE_BACKEND
+        value: supabase
+      - key: SAFE_NAVI_SUPABASE_URL
+        sync: false
+      - key: SAFE_NAVI_SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SAFE_NAVI_SUPABASE_BUCKET
+        value: safenavi-evidence
+      - key: SAFE_NAVI_NEWS_SCHEDULER
+        value: external
+      - key: SAFE_NAVI_SCHEDULER_KEY
+        generateValue: true
+      - key: SAFE_NAVI_NEWS_FEEDS
+        value: https://indianexpress.com/section/cities/mumbai/feed/,https://www.hindustantimes.com/feeds/rss/cities/mumbai-news/rssfeed.xml
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-20b
+      - key: SAFE_NAVI_CORS_ORIGINS
+        value: ""

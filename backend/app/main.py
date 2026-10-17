@@ -4,12 +4,17 @@ import asyncio
 from collections import defaultdict
 from contextlib import asynccontextmanager, suppress
 import logging
+import hmac
+import hashlib
 import math
 import os
+import re
+import time
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .database import FACTORS, db_path, lookup_point, metadata
@@ -18,6 +23,9 @@ from .product_database import active_hazards, news_configuration, news_ingestion
 from .model_provider import predict_point, predict_routes, provider_metadata
 from .news_intelligence import configured_feeds, ingest_configured_feeds
 from .security import RateLimitMiddleware
+from .cloud_configuration import scheduler_mode, validate_cloud_configuration
+from .cloud_database import database_url, ProductDatabaseUnavailable
+from .evidence_storage import backend_name
 
 PERIODS = {"morning_peak", "midday", "evening_peak", "night"}
 WEIGHTS = {"fastest": 0.0, "balanced": 0.35, "safest": 1.0}
@@ -27,9 +35,12 @@ logger = logging.getLogger("safenavi.news")
 
 async def scheduled_news_ingestion(stop: asyncio.Event) -> None:
     while not stop.is_set():
-        if await asyncio.to_thread(news_ingestion_due):
-            result = await asyncio.to_thread(ingest_configured_feeds)
-            logger.info("Scheduled news ingestion completed: %s", result)
+        try:
+            if await asyncio.to_thread(news_ingestion_due):
+                result = await asyncio.to_thread(ingest_configured_feeds, False)
+                logger.info("Scheduled news ingestion completed: inserted=%s errors=%s", result.get("inserted"), len(result.get("errors", [])))
+        except Exception as error:
+            logger.warning("News scheduler will retry after %s", type(error).__name__)
         try:
             await asyncio.wait_for(stop.wait(), timeout=60)
         except TimeoutError:
@@ -38,9 +49,10 @@ async def scheduled_news_ingestion(stop: asyncio.Event) -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    await asyncio.to_thread(validate_cloud_configuration)
     stop = asyncio.Event()
     task: asyncio.Task | None = None
-    if configured_feeds():
+    if configured_feeds() and scheduler_mode() == "internal":
         task = asyncio.create_task(scheduled_news_ingestion(stop))
     try:
         yield
@@ -66,6 +78,11 @@ app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_methods=
 app.add_middleware(RateLimitMiddleware)
 app.include_router(product_router)
 
+
+@app.exception_handler(ProductDatabaseUnavailable)
+async def unavailable_product_database(_, error):
+    return JSONResponse(status_code=503, content={"detail": str(error)}, headers={"Retry-After": "30"})
+
 SEVERITY_RISK = {"LOW": 18.0, "MODERATE": 35.0, "HIGH": 60.0, "CRITICAL": 85.0}
 ROAD_RISK = {"SAFE": -10.0, "CAUTION": 4.0, "UNSAFE": 15.0, "WORK_REQUIRED": 9.0, "CLOSED": 25.0}
 
@@ -79,7 +96,7 @@ class RouteInput(BaseModel):
     route_id: str
     travel_minutes: float = Field(gt=0)
     distance_meters: float = Field(gt=0)
-    coordinates: list[Coordinate] = Field(min_length=2)
+    coordinates: list[Coordinate] = Field(min_length=2, max_length=50000)
 
 
 class RouteRiskRequest(BaseModel):
@@ -93,9 +110,25 @@ def health() -> dict:
     provider = provider_metadata()
     news = news_configuration()
     return {"status": "ok", "database": db_path().name, "risk_provider": provider["active_provider"],
-            "news_scheduler": "active" if configured_feeds() else "not_configured",
+            "news_scheduler": ("external" if scheduler_mode() == "external" else "active") if configured_feeds() else "not_configured",
+            "product_store": "postgresql" if database_url() else "sqlite",
+            "evidence_store": backend_name(),
             "news_refresh_hours": news["refresh_hours"], "news_last_ingested_at": news["last_ingested_at"],
             "news_next_ingestion_at": news["next_ingestion_at"]}
+
+
+@app.post("/api/v1/internal/news/tick", tags=["scheduler"])
+def external_news_tick(x_safenavi_scheduler_timestamp: str | None = Header(default=None),
+                       x_safenavi_scheduler_signature: str | None = Header(default=None)) -> dict:
+    expected = os.getenv("SAFE_NAVI_SCHEDULER_KEY", "")
+    if len(expected) < 32:
+        raise HTTPException(503, "External news scheduler is not configured")
+    timestamp = x_safenavi_scheduler_timestamp or ""
+    valid_time = bool(re.fullmatch(r"[0-9]{1,12}", timestamp)) and abs(time.time() - int(timestamp)) <= 300
+    signature = hmac.new(expected.encode(), (timestamp + "\nPOST\n/api/v1/internal/news/tick").encode(), hashlib.sha256).hexdigest()
+    if not valid_time or not hmac.compare_digest((x_safenavi_scheduler_signature or "").encode(), signature.encode()):
+        raise HTTPException(403, "Scheduler authentication required")
+    return ingest_configured_feeds(force=False)
 
 
 @app.get("/api/v1/dataset/stats")
@@ -163,6 +196,44 @@ def haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> floa
     return radius * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
 
 
+CRIME_TERMS = {
+    "Theft / burglary": r"\b(theft|stolen|steal|burglary|pickpocket\w*)\b",
+    "Robbery / snatching": r"\b(robbery|robbed|snatching|mugging)\b",
+    "Assault / violence": r"\b(assault\w*|attack\w*|violence|murder|stabbing)\b",
+    "Harassment": r"\b(harass\w*|stalking|molest\w*)\b",
+    "Fraud / scam": r"\b(fraud\w*|scam\w*|cheating)\b",
+    "Vandalism": r"\b(vandalis\w*|vandaliz\w*)\b",
+}
+
+
+@app.get("/api/v1/risk/area-crime")
+def area_crime(latitude: float = Query(ge=-90, le=90), longitude: float = Query(ge=-180, le=180),
+               radius_m: int = Query(default=3000, ge=100, le=10000)) -> dict:
+    """Only public verified active records; never infer crime types from synthetic factors or news."""
+    counts: dict[str, int] = defaultdict(int)
+    records = []
+    for hazard in active_hazards():
+        if hazard.get("status") not in {"ACTIVE", "MONITORING", "VERIFIED"} or "CRIME" not in hazard.get("category_key", "").upper():
+            continue
+        distance = hazard_distance(latitude, longitude, hazard)
+        if distance > radius_m:
+            continue
+        text = " ".join(str(hazard.get(key) or "") for key in ("title", "description", "reason")).lower()
+        types = [name for name, pattern in CRIME_TERMS.items() if re.search(pattern, text)] or ["Crime type unspecified"]
+        for name in types:
+            counts[name] += 1
+        records.append({"hazard_id": hazard["id"], "title": hazard["title"], "types": types,
+                        "severity": hazard["severity"], "distance_m": round(distance),
+                        "latitude": hazard["latitude"], "longitude": hazard["longitude"]})
+    records.sort(key=lambda item: (item["distance_m"], item["hazard_id"]))
+    return {"radius_m": radius_m, "verified_record_count": len(records),
+            "types": [{"type": name, "count": count} for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))],
+            "records": records, "source": "government_verified_active_hazards",
+            "classification": "keyword_labels_from_verified_text_not_independently_verified_crime_subtypes",
+            "notice": "Active verified reports, not crime prevalence statistics. No records does not mean no crime. "
+                      "One report can have multiple labels. The ML dataset provides a synthetic general crime-risk index, not historical crime types."}
+
+
 def hazard_distance(latitude: float, longitude: float, hazard: dict) -> float:
     coordinates = hazard.get("geometry_coordinates")
     if not coordinates or hazard.get("geometry_type") == "POINT":
@@ -196,6 +267,42 @@ def point_in_polygon(latitude: float, longitude: float, points: list[tuple[float
             if longitude < crossing: inside = not inside
         previous = current
     return inside
+
+
+def segment_distance(a: tuple[float, float], b: tuple[float, float],
+                     c: tuple[float, float], d: tuple[float, float]) -> float:
+    """Distance between complete segments, including crossings and collinear contact."""
+    cosine = math.cos(math.radians((a[0] + b[0] + c[0] + d[0]) / 4))
+    def xy(point): return (point[1] * cosine, point[0])
+    p, q, r, s = map(xy, (a, b, c, d))
+    def cross(x, y, z): return (y[0]-x[0])*(z[1]-x[1]) - (y[1]-x[1])*(z[0]-x[0])
+    def on(x, y, z):
+        return abs(cross(x, y, z)) <= 1e-12 and min(x[0], y[0])-1e-12 <= z[0] <= max(x[0], y[0])+1e-12 and min(x[1], y[1])-1e-12 <= z[1] <= max(x[1], y[1])+1e-12
+    first, second, third, fourth = cross(p,q,r), cross(p,q,s), cross(r,s,p), cross(r,s,q)
+    if ((first * second < 0 and third * fourth < 0) or on(p,q,r) or on(p,q,s) or on(r,s,p) or on(r,s,q)):
+        return 0.0
+    return min(distance_to_segment(*a, *c, *d), distance_to_segment(*b, *c, *d),
+               distance_to_segment(*c, *a, *b), distance_to_segment(*d, *a, *b))
+
+
+def route_geometry_distance(points: list[Coordinate], hazard: dict) -> float:
+    if not points: return math.inf
+    geometry = hazard.get("geometry_coordinates")
+    if not geometry or len(geometry) < 2 or hazard.get("geometry_type") == "POINT":
+        if len(points) == 1: return hazard_distance(points[0].latitude, points[0].longitude, hazard)
+        return min(distance_to_segment(hazard["latitude"], hazard["longitude"],
+                   a.latitude, a.longitude, b.latitude, b.longitude) for a,b in zip(points, points[1:]))
+    boundary = [(float(p["latitude"]), float(p["longitude"])) for p in geometry]
+    polygon = hazard.get("geometry_type") == "POLYGON"
+    if polygon and any(point_in_polygon(p.latitude, p.longitude, boundary) for p in points): return 0.0
+    if len(points) == 1: return hazard_distance(points[0].latitude, points[0].longitude, hazard)
+    edges = list(zip(boundary, boundary[1:] + ([boundary[0]] if polygon else [])))
+    best = math.inf
+    for a,b in zip(points, points[1:]):
+        for c,d in edges:
+            best = min(best, segment_distance((a.latitude,a.longitude), (b.latitude,b.longitude), c,d))
+            if best == 0: return 0.0
+    return best
 
 
 def hazard_contribution(hazard: dict, distance_meters: float) -> float:
@@ -240,7 +347,7 @@ def route_hazard_risk(points: list[Coordinate]) -> tuple[float, list[dict]]:
     exposures = []
     affecting = []
     for hazard in active_hazards():
-        distance = min(hazard_distance(point.latitude, point.longitude, hazard) for point in points)
+        distance = route_geometry_distance(points, hazard)
         contribution = hazard_contribution(hazard, distance)
         if contribution > 0:
             exposures.append(contribution)
@@ -262,7 +369,7 @@ def route_no_go_conflicts(points: list[Coordinate]) -> list[dict]:
             continue
         default_radius = 60.0 if authoritative_closed else 40.0
         radius = float(hazard.get("no_go_radius_m") or default_radius)
-        distance = min(hazard_distance(point.latitude, point.longitude, hazard) for point in points)
+        distance = route_geometry_distance(points, hazard)
         if distance <= radius:
             conflicts.append({
                 "id": hazard["id"], "title": hazard["title"], "severity": hazard["severity"],
@@ -281,8 +388,8 @@ def route_risk(request: RouteRiskRequest) -> dict:
     results = []
     excluded_routes = []
     for route in request.routes:
-        points = sampled(route.coordinates)
-        conflicts = route_no_go_conflicts(points)
+        points = sampled(sampled(route.coordinates, 100))
+        conflicts = route_no_go_conflicts(route.coordinates)
         if conflicts:
             excluded_routes.append({"route_id": route.route_id, "blocked_by": conflicts})
             continue
@@ -305,7 +412,7 @@ def route_risk(request: RouteRiskRequest) -> dict:
                 jurisdiction_counts[cell["jurisdiction"]] += 1
             areas = [name for name, _ in sorted(area_counts.items(), key=lambda item: item[1], reverse=True)[:3]]
         jurisdiction = (max(jurisdiction_counts, key=jurisdiction_counts.get) if matched else None)
-        verified_exposure, affecting_hazards = route_hazard_risk(points)
+        verified_exposure, affecting_hazards = route_hazard_risk(route.coordinates)
         combined_exposure = combine_risk(exposure, verified_exposure)
         score = route.travel_minutes + WEIGHTS[request.profile] * combined_exposure
         results.append(
@@ -331,7 +438,11 @@ def route_risk(request: RouteRiskRequest) -> dict:
             "excluded_routes": excluded_routes,
         })
     model_payload = {"time_period": request.time_period, "profile": request.profile,
-                     "routes": [route.model_dump() for route in request.routes], "baseline_results": results}
+                     # Preserve the established 100-point inference representation while closure
+                     # checks above always use full road geometry. More shape vertices must not
+                     # silently change the trained model's length/location features.
+                     "routes": [{**route.model_dump(), "coordinates": [point.model_dump() for point in sampled(route.coordinates, 100)]}
+                                for route in request.routes], "baseline_results": results}
     predictions, model_error, prediction_provider = predict_routes(model_payload)
     if predictions:
         for result in results:
@@ -345,6 +456,13 @@ def route_risk(request: RouteRiskRequest) -> dict:
             result["risk_exposure"] = combine_risk(prediction["risk_exposure"], result["verified_hazard_exposure"])
             result["ranking_score"] = round(result["travel_minutes"] + WEIGHTS[request.profile] * result["risk_exposure"], 2)
     results.sort(key=lambda result: result["ranking_score"])
+    recommendations = {}
+    for profile, weight in WEIGHTS.items():
+        chosen = min(results, key=lambda item: (item["travel_minutes"] + weight * item["risk_exposure"], item["route_id"]))
+        recommendations[profile] = {"route_id": chosen["route_id"], "travel_minutes": chosen["travel_minutes"],
+                                    "distance_meters": chosen["distance_meters"], "risk_exposure": chosen["risk_exposure"],
+                                    "risk_weight": weight,
+                                    "ranking_score": round(chosen["travel_minutes"] + weight * chosen["risk_exposure"], 2)}
     return {
         "profile": request.profile,
         "time_period": request.time_period,
@@ -355,5 +473,8 @@ def route_risk(request: RouteRiskRequest) -> dict:
         "ml_fallback_reason": model_error,
         "excluded_routes": excluded_routes,
         "closures_enforced": True,
+        "recommendations": recommendations,
+        "distinct_recommended_routes": len({item["route_id"] for item in recommendations.values()}),
+        "ranking_formula": "travel_minutes + risk_weight * risk_exposure (lower is better; score is not ETA)",
         "results": results,
     }

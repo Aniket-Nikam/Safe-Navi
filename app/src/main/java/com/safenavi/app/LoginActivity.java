@@ -40,6 +40,7 @@ public class LoginActivity extends AppCompatActivity {
         secondaryAction.setVisibility(expectedRole.equals("citizen") ? View.VISIBLE : View.GONE);
         secondaryAction.setOnClickListener(v -> startActivity(new Intent(this, SignUpActivity.class)));
         loginButton.setOnClickListener(v -> signIn());
+        findViewById(R.id.loginServerConnectionButton).setOnClickListener(v -> com.safenavi.app.product.ServerConnectionDialog.show(this));
     }
 
     private void signIn() {

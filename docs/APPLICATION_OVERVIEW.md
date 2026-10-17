@@ -88,4 +88,4 @@ For public deployment, the local SQLite product database should be migrated to m
 
 ## 10. Verified build status
 
-The current build is covered by fourteen Android JVM tests, three Android instrumentation tests and seventeen backend integration tests. The verification commands are documented in the repository README. Successful automated checks establish that the tested workflows compile and behave as specified; they do not constitute a claim that any non-trivial application can be proven free of every possible defect, device-specific issue or external-service outage.
+The current build is covered by twenty-one Android JVM tests, six Android instrumentation tests and twenty-nine backend tests. Regressions cover full-segment closure intersections, polygon interiors and cached-closure rerouting, alongside existing workflows. The verification commands are documented in the repository README. Successful automated checks establish that the tested workflows compile and behave as specified; they do not constitute a claim that any non-trivial application can be proven free of every possible defect, device-specific issue or external-service outage.

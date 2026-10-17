@@ -64,6 +64,7 @@ public class SettingsFragment extends Fragment {
             AppCompatDelegate.setDefaultNightMode(checked ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
         });
         view.findViewById(R.id.logoutLayout).setOnClickListener(v -> logout());
+        view.findViewById(R.id.profileServerConnectionButton).setOnClickListener(v -> com.safenavi.app.product.ServerConnectionDialog.show(requireActivity()));
         return view;
     }
 

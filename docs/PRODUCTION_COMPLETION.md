@@ -18,6 +18,6 @@ validation from being incorrectly treated as the same kind of work.
 | Video evidence | Secure upload/download exists | Add a policy-approved in-app player or case-system handoff if required |
 | Messaging | Persistent community and case messaging is complete | Add presence/typing/push delivery only if real-time social chat becomes a requirement |
 | Localisation | English/Hindi/Marathi primary resources exist | Translate and review every dynamic operational/server message with human language QA |
-| Administrator role | Protected admin role shares the government operations console | Build user/role/region administration if required by the deploying authority |
+| Administrator role | Admin account suspension/restoration, official promotion/demotion, session revocation, audited app settings and news configuration; government case/hazard operations are official-only | Region-scoped administration and institutional onboarding remain deployment work |
 | Release hardening | Debug presentation APK is verified | Signed release, minification rules, Play policy review, device matrix and penetration testing |
 | Reliability | Automated backend/JVM/device suites pass | Hosted monitoring, alerting, backups, disaster recovery and load testing |

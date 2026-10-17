@@ -20,6 +20,114 @@ def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_community_reply_threads_stay_on_their_own_post():
+    tokens = []
+    for name in ("first", "second"):
+        user = client.post("/api/v1/auth/register", json={"name": name, "email": f"{name}@threads.test", "password": "community-test-password"}).json()
+        tokens.append(auth(user["access_token"]))
+    posts = [client.post("/api/v1/community/posts", headers=tokens[0], json={"content": "Threaded discussion example", "category": "general"}).json() for _ in range(2)]
+    path = f"/api/v1/community/posts/{posts[0]['id']}/comments"
+    root = client.post(path, headers=tokens[0], json={"content": "Does this road remain blocked?"})
+    assert root.status_code == 201
+    child = client.post(path, headers=tokens[1], json={"content": "The road is open again", "parent_id": root.json()["id"]})
+    assert child.status_code == 201
+    nested = client.post(path, headers=tokens[0], json={"content": "Thank you for confirming", "parent_id": child.json()["id"]})
+    assert nested.status_code == 201
+    comments = client.get(path, headers=tokens[0]).json()
+    assert comments[0]["parent_id"] is None
+    assert comments[1]["parent_id"] == root.json()["id"]
+    assert comments[2]["parent_id"] == child.json()["id"]
+    assert comments[1]["author_name"] == "second"
+    other = f"/api/v1/community/posts/{posts[1]['id']}/comments"
+    assert client.post(other, headers=tokens[1], json={"content": "Wrong post reply", "parent_id": root.json()["id"]}).status_code == 400
+    assert client.get(other, headers=tokens[0]).json() == []
+
+
+def test_account_administration_revokes_sessions_and_protects_admins():
+    sessions = {}
+    users = {}
+    for role in ("admin", "citizen", "government"):
+        users[role] = create_user(role, f"{role}@admin.test", "account-test-password", role)
+        sessions[role] = client.post("/api/v1/auth/login", json={"email": f"{role}@admin.test", "password": "account-test-password"}).json()
+    administrator = auth(sessions["admin"]["access_token"])
+    citizen = auth(sessions["citizen"]["access_token"])
+    official = auth(sessions["government"]["access_token"])
+    assert client.get("/api/v1/admin/accounts", headers=citizen).status_code == 403
+    assert client.get("/api/v1/admin/accounts", headers=official).status_code == 403
+    accounts = client.get("/api/v1/admin/accounts", headers=administrator).json()
+    assert all("password_hash" not in item for item in accounts)
+    path = f"/api/v1/admin/accounts/{users['citizen']['id']}/action"
+    def action(value):
+        return client.post(path, headers=administrator, json={"action": value, "reason": "Administrative test approval"})
+    assert action("suspend").json()["active"] == 0
+    assert client.get("/api/v1/me", headers=citizen).status_code == 401
+    assert client.post("/api/v1/auth/login", json={"email": "citizen@admin.test", "password": "account-test-password"}).status_code == 401
+    assert action("restore").json()["active"] == 1
+    restored = client.post("/api/v1/auth/login", json={"email": "citizen@admin.test", "password": "account-test-password"}).json()
+    assert action("promote_official").json()["role"] == "government"
+    assert client.get("/api/v1/me", headers=auth(restored["access_token"])).status_code == 401
+    promoted = client.post("/api/v1/auth/login", json={"email": "citizen@admin.test", "password": "account-test-password"}).json()
+    assert promoted["user"]["role"] == "government"
+    assert action("revoke_sessions").status_code == 200
+    assert client.get("/api/v1/me", headers=auth(promoted["access_token"])).status_code == 401
+    assert action("make_citizen").json()["role"] == "citizen"
+    assert client.post(f"/api/v1/admin/accounts/{users['admin']['id']}/action", headers=administrator,
+                       json={"action": "suspend", "reason": "Self lockout attempt"}).status_code == 409
+    assert len(client.get("/api/v1/admin/audit", headers=administrator).json()) == 5
+
+
+def test_admin_app_settings_are_enforced_and_audited():
+    create_user("Admin", "settings@admin.test", "account-test-password", "admin")
+    create_user("Citizen", "citizen@settings.test", "account-test-password")
+    admin = client.post("/api/v1/auth/login", json={"email": "settings@admin.test", "password": "account-test-password"}).json()
+    citizen = client.post("/api/v1/auth/login", json={"email": "citizen@settings.test", "password": "account-test-password"}).json()
+    headers = auth(admin["access_token"])
+    payload = {"registration_enabled": False, "community_posting_enabled": False, "reason": "Temporarily pause new content"}
+    assert client.patch("/api/v1/admin/app-settings", headers=auth(citizen["access_token"]), json=payload).status_code == 403
+    assert client.patch("/api/v1/admin/app-settings", headers=headers, json=payload).status_code == 200
+    assert client.post("/api/v1/auth/register", json={"name": "Paused registration", "email": "paused@test.example", "password": "account-test-password"}).status_code == 403
+    assert client.post("/api/v1/community/posts", headers=auth(citizen["access_token"]),
+                       json={"content": "This should be blocked while posting is paused", "category": "general"}).status_code == 403
+    assert client.get("/api/v1/community/posts", headers=auth(citizen["access_token"])).status_code == 200
+    assert client.get("/api/v1/admin/audit", headers=headers).json()[0]["action"] == "APP_SETTINGS_UPDATED"
+    payload.update(registration_enabled=True, community_posting_enabled=True)
+    assert client.patch("/api/v1/admin/app-settings", headers=headers, json=payload).status_code == 200
+    assert client.post("/api/v1/auth/register", json={"name": "Resumed registration", "email": "resumed@test.example", "password": "account-test-password"}).status_code == 201
+
+
+def test_admin_cannot_change_official_records():
+    headers = {}
+    for role in ("citizen", "government", "admin"):
+        create_user(role, f"{role}@roles.test", "test-role-password", role)
+        session = client.post("/api/v1/auth/login", json={"email": f"{role}@roles.test", "password": "test-role-password"}).json()
+        headers[role] = auth(session["access_token"])
+    report = client.post("/api/v1/reports", headers=headers["citizen"], json={
+        "title": "Role separation test", "category_key": "ROAD_DAMAGE", "description": "A damaged section requiring official review",
+        "latitude": 19.0657, "longitude": 72.9986, "address": "Vashi, Navi Mumbai",
+    }).json()
+    base = f"/api/v1/government/reports/{report['id']}"
+    for path, body in (
+        (base + "/triage", {"reason": "Attempt review"}),
+        (base + "/assign", {"department": "Roads", "due_hours": 24}),
+        (base + "/request-information", {"message": "Please provide a photograph"}),
+        (base + "/decision", {"decision": "reject", "reason": "Attempt rejection"}),
+        (base + "/decision", {"decision": "verify", "severity": "HIGH", "road_status": "UNSAFE", "reason": "Attempt publication"}),
+        (f"/api/v1/reports/{report['id']}/messages", {"content": "Attempt official message"}),
+    ):
+        assert client.post(path, headers=headers["admin"], json=body).status_code == 403, path
+    assert client.get(f"/api/v1/reports/{report['id']}", headers=headers["admin"]).json()["status"] == "REPORTED"
+    published = client.post(base + "/decision", headers=headers["government"], json={
+        "decision": "verify", "severity": "HIGH", "road_status": "UNSAFE", "reason": "Official field verification",
+    })
+    assert published.status_code == 200
+    hazard = published.json()["hazard"]
+    assert client.patch(f"/api/v1/government/hazards/{hazard['id']}", headers=headers["admin"],
+                        json={"status": "RESOLVED", "reason": "Attempt lifecycle change"}).status_code == 403
+    assert client.get("/api/v1/government/metrics", headers=headers["admin"]).status_code == 200
+    assert client.get("/api/v1/government/news/settings", headers=headers["admin"]).status_code == 200
+    assert client.get("/api/v1/government/news/settings", headers=headers["government"]).status_code == 403
+
+
 def test_report_review_map_and_route_risk_workflow():
     citizen_response = client.post(
         "/api/v1/auth/register",

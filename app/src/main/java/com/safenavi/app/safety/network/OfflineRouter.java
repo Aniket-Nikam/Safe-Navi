@@ -13,15 +13,14 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public final class OfflineRouter {
     private static final String ASSET = "offline/navi_mumbai_graph.sqlite";
+    private static volatile OfflineRoadGraph cachedGraph;
     private final Context context;
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     public interface Callback<T> { void onSuccess(T value); void onError(String message); }
@@ -30,15 +29,9 @@ public final class OfflineRouter {
         Result(RouteCandidate route, double riskExposure) { this.route = route; this.riskExposure = riskExposure; }
     }
     private static final class State implements Comparable<State> {
-        final long node; final double priority;
-        State(long node, double priority) { this.node = node; this.priority = priority; }
+        final int node; final double priority, cost;
+        State(int node, double priority, double cost) { this.node = node; this.priority = priority; this.cost=cost; }
         @Override public int compareTo(State other) { return Double.compare(priority, other.priority); }
-    }
-    private static final class Step {
-        final long from; final double lat, lon, distance, seconds, risk;
-        Step(long from, double lat, double lon, double distance, double seconds, double risk) {
-            this.from = from; this.lat = lat; this.lon = lon; this.distance = distance; this.seconds = seconds; this.risk = risk;
-        }
     }
 
     public OfflineRouter(Context context) { this.context = context.getApplicationContext(); }
@@ -56,62 +49,69 @@ public final class OfflineRouter {
     public void route(double fromLat, double fromLon, double toLat, double toLon, TravelMode mode,
                       RouteProfile profile, Callback<Result> callback) {
         executor.execute(() -> { try (SQLiteDatabase db = database()) {
-            long start = nearest(db, fromLat, fromLon), goal = nearest(db, toLat, toLon);
+            OfflineRoadGraph graph=graph(db);
+            int modeIndex=mode==TravelMode.WALKING?1:mode==TravelMode.CYCLING?2:0;
+            int start=graph.nearest(fromLat,fromLon,modeIndex), goal=graph.nearest(toLat,toLon,modeIndex);
             if (start < 0 || goal < 0) { callback.onError("The selected points are outside the downloaded Navi Mumbai routing graph."); return; }
-            Result value = aStar(db, start, goal, fromLat, fromLon, toLat, toLon, mode, profile);
+            Result value = aStar(graph, start, goal, fromLat, fromLon, toLat, toLon, modeIndex, profile);
             if (value == null) callback.onError("No traversable offline route was found. A cached official closure may block the available roads.");
             else callback.onSuccess(value);
         } catch (Exception error) { callback.onError("Offline routing failed: " + error.getMessage()); }});
     }
 
-    private Result aStar(SQLiteDatabase db, long start, long goal, double startLat, double startLon,
-                         double goalLat, double goalLon, TravelMode mode, RouteProfile profile) {
-        String timeColumn = mode == TravelMode.WALKING ? "walk_seconds" : mode == TravelMode.CYCLING ? "cycle_seconds" : "drive_seconds";
+    private static OfflineRoadGraph graph(SQLiteDatabase db) {
+        if(cachedGraph == null) synchronized(OfflineRouter.class) { if(cachedGraph == null) cachedGraph=OfflineRoadGraph.load(db); }
+        return cachedGraph;
+    }
+
+    private Result aStar(OfflineRoadGraph graph, int start, int goal, double startLat, double startLon,
+                         double goalLat, double goalLon, int mode, RouteProfile profile) {
         double riskWeight = profile == RouteProfile.SAFEST ? 1.0 : profile == RouteProfile.BALANCED ? 0.35 : 0.0;
-        double maxMetersPerSecond = mode == TravelMode.WALKING ? 1.35 : mode == TravelMode.CYCLING ? 5.0 : 22.2;
-        PriorityQueue<State> open = new PriorityQueue<>(); Map<Long, Double> cost = new HashMap<>(); Map<Long, Step> previous = new HashMap<>();
-        cost.put(start, 0.0); open.add(new State(start, 0)); long deadline = System.currentTimeMillis() + 12_000L; int expanded = 0;
-        while (!open.isEmpty() && expanded++ < 175_000 && System.currentTimeMillis() < deadline) {
-            State state = open.poll(); double known = cost.getOrDefault(state.node, Double.MAX_VALUE);
-            if (state.node == goal) break;
-            try (Cursor cursor = db.rawQuery("SELECT to_node,to_lat,to_lon,distance_m,risk," + timeColumn + " FROM edges WHERE from_node=? AND " + timeColumn + " IS NOT NULL", new String[]{Long.toString(state.node)})) {
-                while (cursor.moveToNext()) {
-                    long next = cursor.getLong(0); double lat = cursor.getDouble(1), lon = cursor.getDouble(2);
-                    if (OfflineHazardCache.isNoGo(context, lat, lon)) continue;
-                    double distance = cursor.getDouble(3), risk = cursor.getDouble(4), seconds = cursor.getDouble(5);
-                    double nextCost = known + seconds * (1.0 + riskWeight * risk / 100.0);
-                    if (nextCost >= cost.getOrDefault(next, Double.MAX_VALUE)) continue;
-                    cost.put(next, nextCost); previous.put(next, new Step(state.node, lat, lon, distance, seconds, risk));
-                    open.add(new State(next, nextCost + haversine(lat, lon, goalLat, goalLon) / maxMetersPerSecond));
-                }
+        OfflineHazardCache.Snapshot restrictions=OfflineHazardCache.snapshot(context);
+        if(restrictions.blocksEdge(startLat,startLon,graph.lat[start],graph.lon[start])
+                || restrictions.blocksEdge(graph.lat[goal],graph.lon[goal],goalLat,goalLon)) return null;
+        PriorityQueue<State> open=new PriorityQueue<>(); double[] cost=new double[graph.lat.length];
+        java.util.Arrays.fill(cost,Double.POSITIVE_INFINITY);
+        int[] previous=new int[graph.lat.length], previousEdge=new int[graph.lat.length]; java.util.Arrays.fill(previous,-1);
+        cost[start]=0; open.add(new State(start,0,0));
+        float[] times=graph.times(mode); long deadline=android.os.SystemClock.elapsedRealtime()+20_000;
+        boolean reached=false;
+        while(!open.isEmpty()) {
+            if(android.os.SystemClock.elapsedRealtime()>deadline) throw new IllegalStateException("Offline route calculation exceeded its time budget. Try closer endpoints.");
+            State state=open.poll(); if(state.cost>cost[state.node]) continue;
+            if(state.node==goal){reached=true;break;}
+            for(int edge=graph.head[state.node];edge>=0;edge=graph.next[edge]) {
+                double seconds=times[edge]; if(!Double.isFinite(seconds) || seconds<=0) continue;
+                int next=graph.to[edge];
+                if(restrictions.blocksEdge(graph.lat[state.node],graph.lon[state.node],graph.lat[next],graph.lon[next])) continue;
+                double nextCost=state.cost+seconds*(1+riskWeight*graph.risk[edge]/100.0);
+                if(nextCost>=cost[next]) continue;
+                cost[next]=nextCost;previous[next]=state.node;previousEdge[next]=edge;
+                open.add(new State(next,nextCost+haversine(graph.lat[next],graph.lon[next],graph.lat[goal],graph.lon[goal])/graph.maxSpeed[mode],nextCost));
             }
         }
-        if (!previous.containsKey(goal)) return null;
-        List<HazardLocation.GeoPoint> points = new ArrayList<>(); double distance = 0, seconds = 0, weightedRisk = 0; long node = goal;
+        if(!reached) return null;
+        List<HazardLocation.GeoPoint> points = new ArrayList<>(); double distance = 0, seconds = 0, weightedRisk = 0; int node = goal;
         points.add(new HazardLocation.GeoPoint(goalLat, goalLon));
-        while (node != start) { Step step = previous.get(node); if (step == null) return null;
-            points.add(new HazardLocation.GeoPoint(step.lat, step.lon)); distance += step.distance; seconds += step.seconds; weightedRisk += step.risk * step.distance; node = step.from;
+        points.add(new HazardLocation.GeoPoint(graph.lat[goal],graph.lon[goal]));
+        while(node != start) {
+            int edge=previousEdge[node]; if(previous[node]<0) return null;
+            distance+=graph.distance[edge];seconds+=times[edge];weightedRisk+=graph.risk[edge]*graph.distance[edge];node=previous[node];
+            points.add(new HazardLocation.GeoPoint(graph.lat[node],graph.lon[node]));
         }
         points.add(new HazardLocation.GeoPoint(startLat, startLon)); Collections.reverse(points);
         RouteCandidate candidate = new RouteCandidate("offline-graph-route", seconds / 60.0, distance, points);
         return new Result(candidate, distance <= 0 ? 0 : weightedRisk / distance);
     }
 
-    private long nearest(SQLiteDatabase db, double lat, double lon) {
-        double[] radii = {0.005, 0.02, 0.08};
-        for (double radius : radii) try (Cursor cursor = db.rawQuery("SELECT n.node_id FROM nodes n WHERE n.latitude BETWEEN ? AND ? AND n.longitude BETWEEN ? AND ? ORDER BY ((n.latitude-?)*(n.latitude-?)+(n.longitude-?)*(n.longitude-?)) LIMIT 1",
-                new String[]{Double.toString(lat-radius),Double.toString(lat+radius),Double.toString(lon-radius),Double.toString(lon+radius),Double.toString(lat),Double.toString(lat),Double.toString(lon),Double.toString(lon)})) {
-            if (cursor.moveToFirst()) return cursor.getLong(0);
-        }
-        return -1;
-    }
-
     private SQLiteDatabase database() throws Exception {
+        synchronized (OfflineRouter.class) {
         File file = new File(context.getNoBackupFilesDir(), "navi_mumbai_graph_v2.sqlite");
         if (!file.isFile() || file.length() < 1_000_000) try (InputStream input = context.getAssets().open(ASSET); FileOutputStream output = new FileOutputStream(file)) {
             byte[] buffer = new byte[64 * 1024]; int count; while ((count = input.read(buffer)) != -1) output.write(buffer, 0, count);
         }
         return SQLiteDatabase.openDatabase(file.getAbsolutePath(), null, SQLiteDatabase.OPEN_READONLY);
+        }
     }
 
     private static double haversine(double aLat, double aLon, double bLat, double bLon) {

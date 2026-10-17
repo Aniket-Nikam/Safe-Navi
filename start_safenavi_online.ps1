@@ -1,4 +1,42 @@
+param([switch]$FirewallSetupOnly)
+
 $ErrorActionPreference = "Stop"
+
+function Test-SafeNaviFirewall {
+    $rule = Get-NetFirewallRule -Name "SafeNaviDemoApi" -ErrorAction SilentlyContinue
+    if ($null -eq $rule) { return $false }
+    $port = $rule | Get-NetFirewallPortFilter
+    $address = $rule | Get-NetFirewallAddressFilter
+    return ($rule.Enabled -eq "True" -and $rule.Direction -eq "Inbound" -and
+        $rule.Action -eq "Allow" -and $rule.Profile -eq "Private" -and
+        $port.Protocol -eq "TCP" -and $port.LocalPort -eq "8000" -and
+        @($address.RemoteAddress).Count -eq 1 -and $address.RemoteAddress -eq "LocalSubnet")
+}
+
+if ($FirewallSetupOnly) {
+    try {
+        $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+        $principal = New-Object Security.Principal.WindowsPrincipal($identity)
+        if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+            throw "Firewall setup requires administrator access."
+        }
+        $rule = Get-NetFirewallRule -Name "SafeNaviDemoApi" -ErrorAction SilentlyContinue
+        if ($null -eq $rule) {
+            New-NetFirewallRule -Name "SafeNaviDemoApi" -DisplayName "Safe-Navi Demo API" `
+                -Direction Inbound -Action Allow -Enabled True -Protocol TCP -LocalPort 8000 `
+                -Profile Private -RemoteAddress LocalSubnet | Out-Null
+        } else {
+            $rule | Set-NetFirewallRule -Direction Inbound -Action Allow -Enabled True -Profile Private
+            $rule | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort 8000
+            $rule | Get-NetFirewallAddressFilter | Set-NetFirewallAddressFilter -RemoteAddress LocalSubnet
+        }
+        if (-not (Test-SafeNaviFirewall)) { throw "Firewall rule verification failed." }
+        exit 0
+    } catch {
+        Write-Error $_
+        exit 1
+    }
+}
 
 $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backendRoot = Join-Path $projectRoot "backend"
@@ -18,6 +56,26 @@ foreach ($required in @($pythonPath, $databasePath, $apkPath)) {
     if (-not (Test-Path -LiteralPath $required)) {
         throw "Required Safe-Navi file is missing: $required"
     }
+}
+
+if (-not (Test-SafeNaviFirewall)) {
+    Write-Host "  Setting up private-network phone access. Accept the Windows administrator prompt." -ForegroundColor Yellow
+    try {
+        $helper = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
+            -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" -FirewallSetupOnly" `
+            -Verb RunAs -WindowStyle Hidden -Wait -PassThru
+    } catch {
+        throw "Firewall setup was cancelled or failed. Restart this launcher and accept the Windows administrator prompt. $($_.Exception.Message)"
+    }
+    if ($helper.ExitCode -ne 0 -or -not (Test-SafeNaviFirewall)) {
+        throw "Private-network firewall setup failed. Safe-Navi cannot confirm phone access on TCP port 8000."
+    }
+}
+Write-Host "  Phone firewall        READY (Private network, local subnet, TCP 8000)" -ForegroundColor Green
+
+$profiles = Get-NetConnectionProfile -ErrorAction SilentlyContinue
+if (-not ($profiles | Where-Object { $_.NetworkCategory -eq "Private" })) {
+    Write-Warning "Set your trusted demo Wi-Fi/hotspot to Private in Windows Network settings so the phone-access rule applies."
 }
 
 $health = $null
@@ -62,7 +120,7 @@ if (Test-Path -LiteralPath $localPropertiesPath) {
     $configuredUrl = Select-String -LiteralPath $localPropertiesPath -Pattern '^RISK_API_BASE_URL=(.+)$' |
         Select-Object -First 1 | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() }
     if ($configuredUrl -and $configuredUrl -notlike "*://${lanIp}:8000") {
-        Write-Warning "This APK is configured for $configuredUrl, but the PC currently appears to be $lanIp. Update local.properties and rebuild before using physical phones."
+        Write-Warning "The APK default is $configuredUrl, but this PC is now $lanIp. In the app, open Server connection and enter http://${lanIp}:8000, then Test and save."
     }
 }
 

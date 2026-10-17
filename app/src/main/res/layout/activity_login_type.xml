@@ -55,6 +55,7 @@
                     <ImageView android:layout_width="22dp" android:layout_height="22dp" android:src="@drawable/ic_arrow_forward" app:tint="@color/signal_coral" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
+            <com.google.android.material.button.MaterialButton android:id="@+id/serverConnectionButton" style="@style/Widget.SafeNavi.DashboardAction" android:text="Server connection" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

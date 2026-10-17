@@ -3,6 +3,7 @@ presentation-build/node_modules/
 presentation-build/rendered/
 presentation-build/temp/
 deliverables/*.apk
+deliverables/*.log
 deliverables/*.pptx
 deliverables/*.zip
 deliverables/*.ndjson
@@ -19,6 +20,13 @@ backend/.venv/
 backend/.pytest_cache/
 backend/**/__pycache__/
 backend/.env.local
+backend/.env.production
+backend/.env.render
+backend/data/evidence/
+backend/data/*.log
+backend/data/*product.sqlite-*
+backend/data/*product.sqlite.*
+backend/data/backups/
 backend/data/safe_navi_product.sqlite
 *.pyc
 .gradle

@@ -64,9 +64,67 @@ public class OpenMapService {
                 .addQueryParameter("format", "jsonv2")
                 .addQueryParameter("limit", "5")
                 .addQueryParameter("countrycodes", "in")
+                .addQueryParameter("viewbox", "72.65,19.55,73.35,18.85")
+                .addQueryParameter("bounded", "1")
                 .addQueryParameter("accept-language", "en")
                 .build();
-        execute(url, body -> parsePlaces(body), callback);
+        execute(url, OpenMapService::parsePlaces, new ResultCallback<List<PlaceSearchResult>>() {
+            @Override public void onSuccess(List<PlaceSearchResult> values) {
+                List<PlaceSearchResult> matching = filterSearchResults(query, values);
+                if (matching.isEmpty()) searchFuzzy(query, callback); else callback.onSuccess(matching);
+            }
+            @Override public void onError(String message) { searchFuzzy(query, callback); }
+        });
+    }
+
+    private void searchFuzzy(String query, ResultCallback<List<PlaceSearchResult>> callback) {
+        HttpUrl url = HttpUrl.parse("https://photon.komoot.io/api/").newBuilder()
+                .addQueryParameter("q", query.replace(',', ' ')).addQueryParameter("limit", "8")
+                .addQueryParameter("bbox", "72.65,18.85,73.35,19.55")
+                .addQueryParameter("lat", "19.043").addQueryParameter("lon", "73.023")
+                .build();
+        execute(url, OpenMapService::parsePhotonPlaces, new ResultCallback<List<PlaceSearchResult>>() {
+            @Override public void onSuccess(List<PlaceSearchResult> values) {
+                callback.onSuccess(filterSearchResults(query, values));
+            }
+            @Override public void onError(String message) { callback.onError(message); }
+        });
+    }
+
+    public static List<PlaceSearchResult> filterSearchResults(String query, List<PlaceSearchResult> values) {
+        List<PlaceSearchResult> results = new ArrayList<>();
+        String[] components = query.toLowerCase(java.util.Locale.ROOT).split(",");
+        for (PlaceSearchResult place : values) {
+            if (place.getLatitude() < 18.85 || place.getLatitude() > 19.55
+                    || place.getLongitude() < 72.65 || place.getLongitude() > 73.35) continue;
+            String address = place.getDisplayName().toLowerCase(java.util.Locale.ROOT);
+            boolean matches = true;
+            for (int i = 1; i < components.length; i++) {
+                String locality = components[i].trim();
+                if (!locality.isEmpty() && !address.contains(locality)) { matches = false; break; }
+            }
+            if (matches) results.add(place);
+        }
+        return results;
+    }
+
+    public static List<PlaceSearchResult> parsePhotonPlaces(String body) throws JSONException {
+        JSONArray features = new JSONObject(body).getJSONArray("features");
+        List<PlaceSearchResult> results = new ArrayList<>();
+        for (int i = 0; i < features.length(); i++) {
+            JSONObject feature = features.getJSONObject(i);
+            JSONArray coordinates = feature.getJSONObject("geometry").getJSONArray("coordinates");
+            JSONObject properties = feature.getJSONObject("properties");
+            double lon = coordinates.getDouble(0), lat = coordinates.getDouble(1);
+            if (!Double.isFinite(lat) || !Double.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) continue;
+            List<String> parts = new ArrayList<>();
+            for (String key : new String[]{"name", "street", "district", "city", "state", "country"}) {
+                String value = properties.optString(key, "").trim();
+                if (!value.isEmpty() && !parts.contains(value)) parts.add(value);
+            }
+            results.add(new PlaceSearchResult(parts.isEmpty() ? "Unnamed place" : String.join(", ", parts), lat, lon));
+        }
+        return results;
     }
 
     public synchronized void reverse(double latitude, double longitude, ResultCallback<String> callback) {

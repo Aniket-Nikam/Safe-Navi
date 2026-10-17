@@ -17,6 +17,7 @@ public class LoginTypeActivity extends AppCompatActivity {
 
         initializeViews();
         setupClickListeners();
+        findViewById(R.id.serverConnectionButton).setOnClickListener(v -> com.safenavi.app.product.ServerConnectionDialog.show(this));
     }
 
     private void initializeViews() {

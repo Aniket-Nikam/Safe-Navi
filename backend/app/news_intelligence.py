@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 
-from .product_database import record_news_ingestion, store_news_signal
+from .product_database import claim_news_ingestion, finish_news_ingestion, news_configuration, store_news_signal
 
 
 CATEGORY_TERMS = {
@@ -64,8 +64,13 @@ def parse_feed(content: bytes, publisher: str) -> list[dict]:
     return values
 
 
-def ingest_configured_feeds() -> dict:
+def ingest_configured_feeds(force: bool = True) -> dict:
     feeds = configured_feeds()
+    lease, skipped_reason = claim_news_ingestion(force) if feeds else (None, "no_feeds")
+    if not lease:
+        schedule = news_configuration()
+        return {"feeds": len(feeds), "inserted": 0, "deduplicated": 0, "errors": [], "skipped": skipped_reason,
+                "last_ingested_at": schedule.get("last_ingested_at"), "next_ingestion_at": schedule.get("next_ingestion_at")}
     inserted = 0; skipped = 0; errors: list[str] = []
     for url in feeds:
         parsed = urlparse(url)
@@ -82,7 +87,7 @@ def ingest_configured_feeds() -> dict:
                 else: skipped += 1
         except Exception as error:
             errors.append(f"{parsed.hostname}: {type(error).__name__}")
-    schedule = record_news_ingestion() if feeds and len(errors) < len(feeds) else None
+    schedule = finish_news_ingestion(lease, len(errors) < len(feeds))
     return {"feeds": len(feeds), "inserted": inserted, "deduplicated": skipped, "errors": errors,
             "last_ingested_at": schedule.get("last_ingested_at") if schedule else None,
             "next_ingestion_at": schedule.get("next_ingestion_at") if schedule else None,

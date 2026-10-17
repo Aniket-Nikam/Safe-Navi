@@ -1,0 +1,11 @@
+**
+!backend/
+!backend/requirements.txt
+!backend/app/
+!backend/app/**
+!backend/models/
+!backend/models/safety_score_linear_v1.json
+!backend/data/
+!backend/data/safe_navi_runtime.sqlite
+backend/app/**/__pycache__/
+backend/app/**/*.pyc
