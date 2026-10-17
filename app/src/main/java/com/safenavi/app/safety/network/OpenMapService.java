@@ -30,6 +30,7 @@ public class OpenMapService {
     private final OkHttpClient client;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private long lastSearchAt;
+    private final java.util.LinkedHashMap<String, List<PlaceSearchResult>> suggestionCache = new java.util.LinkedHashMap<>();
 
     public OpenMapService() {
         client = new OkHttpClient.Builder()
@@ -89,6 +90,47 @@ public class OpenMapService {
             }
             @Override public void onError(String message) { callback.onError(message); }
         });
+    }
+
+    /** Photon supports search-as-you-type; public Nominatim MUST remain explicit-submit only. */
+    public Call suggest(String query, double latitude, double longitude, ResultCallback<List<PlaceSearchResult>> callback) {
+        String cacheKey = query.trim().toLowerCase(java.util.Locale.ROOT);
+        synchronized (suggestionCache) {
+            if (suggestionCache.containsKey(cacheKey)) {
+                callback.onSuccess(new ArrayList<>(suggestionCache.get(cacheKey))); return null;
+            }
+        }
+        HttpUrl url = HttpUrl.parse("https://photon.komoot.io/api/").newBuilder()
+                .addQueryParameter("q", query.replace(',', ' ')).addQueryParameter("limit", "8")
+                .addQueryParameter("bbox", "72.65,18.85,73.35,19.55")
+                .addQueryParameter("lat", Double.toString(Math.max(18.85, Math.min(19.55, latitude))))
+                .addQueryParameter("lon", Double.toString(Math.max(72.65, Math.min(73.35, longitude))))
+                .addQueryParameter("lang", "en").build();
+        return execute(url, OpenMapService::parsePhotonPlaces, new ResultCallback<List<PlaceSearchResult>>() {
+            @Override public void onSuccess(List<PlaceSearchResult> values) {
+                List<PlaceSearchResult> matches = uniquePlaces(filterSearchResults(query, values));
+                synchronized (suggestionCache) {
+                    if (suggestionCache.size() >= 32) suggestionCache.remove(suggestionCache.keySet().iterator().next());
+                    suggestionCache.put(cacheKey, new ArrayList<>(matches));
+                }
+                callback.onSuccess(matches);
+            }
+            @Override public void onError(String message) { callback.onError(message); }
+        });
+    }
+
+    public static List<PlaceSearchResult> uniquePlaces(List<PlaceSearchResult> values) {
+        List<PlaceSearchResult> output = new ArrayList<>();
+        for (PlaceSearchResult value : values) {
+            boolean duplicate = false;
+            for (PlaceSearchResult existing : output) {
+                if (existing.getPrimaryText().equalsIgnoreCase(value.getPrimaryText())
+                        && Math.abs(existing.getLatitude() - value.getLatitude()) < .002
+                        && Math.abs(existing.getLongitude() - value.getLongitude()) < .002) { duplicate = true; break; }
+            }
+            if (!duplicate) output.add(value);
+        }
+        return output;
     }
 
     public static List<PlaceSearchResult> filterSearchResults(String query, List<PlaceSearchResult> values) {
@@ -169,12 +211,13 @@ public class OpenMapService {
 
     private interface Parser<T> { T parse(String body) throws JSONException; }
 
-    private <T> void execute(HttpUrl url, Parser<T> parser, ResultCallback<T> callback) {
+    private <T> Call execute(HttpUrl url, Parser<T> parser, ResultCallback<T> callback) {
         Request request = new Request.Builder().url(url)
                 .header("User-Agent", USER_AGENT)
                 .header("Accept", "application/json")
                 .build();
-        client.newCall(request).enqueue(new Callback() {
+        Call call = client.newCall(request);
+        call.enqueue(new Callback() {
             @Override public void onFailure(Call call, IOException error) {
                 callback.onError("Network request failed. Check your connection or provider configuration.");
             }
@@ -191,6 +234,7 @@ public class OpenMapService {
                 }
             }
         });
+        return call;
     }
 
     private <T> void executePost(HttpUrl url, String json, Parser<T> parser,

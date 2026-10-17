@@ -34,6 +34,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import com.safenavi.app.product.ProductApiClient;
 import com.safenavi.app.product.ProductSession;
+import com.safenavi.app.product.PlaceSearchSheet;
+import com.safenavi.app.product.ServerConnection;
+import com.safenavi.app.product.ServerConnectionDialog;
 import com.safenavi.app.product.SafetyCheckInWorker;
 import com.safenavi.app.product.JourneyTrackingService;
 import com.safenavi.app.product.JourneyEndWorker;
@@ -48,6 +51,7 @@ import com.safenavi.app.safety.model.PlaceSearchResult;
 import com.safenavi.app.safety.model.RouteCandidate;
 import com.safenavi.app.safety.model.RouteProfile;
 import com.safenavi.app.safety.model.RouteSafetyResult;
+import com.safenavi.app.safety.model.RouteRiskPoint;
 import com.safenavi.app.safety.model.TravelMode;
 import com.safenavi.app.safety.network.OpenMapService;
 import com.safenavi.app.safety.network.DatasetRiskService;
@@ -103,9 +107,11 @@ public class MapsActivity extends AppCompatActivity {
     private static final String ROUTES_LAYER = "safe-navi-route-options";
     private static final String SELECTED_ROUTE_SOURCE = "safe-navi-selected-route";
     private static final String SELECTED_ROUTE_LAYER = "safe-navi-selected-route-line";
+    private static final String RISK_POINTS_SOURCE = "selected-route-risk-points";
+    private static final String RISK_POINTS_LAYER = "selected-route-risk-markers";
     private static final List<String> HAZARD_LAYER_IDS = Arrays.asList(
             "hazard-low-point", "hazard-moderate-point", "hazard-high-point", "hazard-critical-point",
-            "hazard-geometry-line", "hazard-geometry-fill", "pending-report-point");
+            "hazard-geometry-line", "hazard-geometry-fill", "pending-report-point", RISK_POINTS_LAYER);
 
     private MapView mapView;
     private MapLibreMap map;
@@ -148,6 +154,8 @@ public class MapsActivity extends AppCompatActivity {
     private int routePinTarget;
     private String lastRouteSummary = "";
     private String currentHazardId;
+    private final Map<String, RouteRiskPoint> selectedRiskPoints = new LinkedHashMap<>();
+    private boolean locatingSource = true;
     private String activeJourneyId;
     private String activeJourneyToken;
     private TravelMode travelMode = TravelMode.DRIVING;
@@ -176,7 +184,7 @@ public class MapsActivity extends AppCompatActivity {
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(mapLibreMap -> {
             map = mapLibreMap;
-            map.getUiSettings().setCompassEnabled(true);
+            map.getUiSettings().setCompassEnabled(false);
             map.setStyle(new Style.Builder().fromUri(MAP_STYLE), style -> {
                 mapStyle = style;
                 loadHazards();
@@ -197,6 +205,8 @@ public class MapsActivity extends AppCompatActivity {
         mapView = findViewById(R.id.mapView);
         sourceInput = findViewById(R.id.sourceInput);
         destinationInput = findViewById(R.id.destinationInput);
+        sourceInput.setOnClickListener(v -> openPlaceSearch(true));
+        destinationInput.setOnClickListener(v -> openPlaceSearch(false));
         routeProgress = findViewById(R.id.routeProgress);
         findRouteButton = findViewById(R.id.findRouteButton);
         journeyButton = findViewById(R.id.startJourneyButton);
@@ -218,6 +228,11 @@ public class MapsActivity extends AppCompatActivity {
             String source = textOf(sourceInput);
             sourceInput.setText(textOf(destinationInput));
             destinationInput.setText(source);
+            PlaceSearchResult oldSource = selectedSourcePlace;
+            selectedSourcePlace = selectedDestinationPlace; selectedDestinationPlace = oldSource;
+            selectedSourceText = textOf(sourceInput); selectedDestinationText = textOf(destinationInput);
+            invalidateRouteForEndpoints();
+            if (!textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) findRoutes();
         });
         if (getIntent().hasExtra("destinationLatitude") && getIntent().hasExtra("destinationLongitude")) {
             destinationInput.setText(String.format(Locale.US, "%.6f, %.6f",
@@ -225,7 +240,8 @@ public class MapsActivity extends AppCompatActivity {
                     getIntent().getDoubleExtra("destinationLongitude", 0)));
         }
         findViewById(R.id.backButton).setOnClickListener(v -> finish());
-        findViewById(R.id.locationButton).setOnClickListener(v -> enableLocationWithContext());
+        findViewById(R.id.locationButton).setOnClickListener(v -> { locatingSource = true; enableLocationWithContext(); });
+        findViewById(R.id.mapConnectionButton).setOnClickListener(v -> showConnectionOptions());
         findViewById(R.id.mapToolsButton).setOnClickListener(v -> showMapTools());
         travelModeButton.setOnClickListener(v -> showTravelModePicker());
         routeProfileButton.setOnClickListener(v -> showRouteProfilePicker());
@@ -236,18 +252,118 @@ public class MapsActivity extends AppCompatActivity {
             if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) { findRoutes(); return true; }
             return false;
         });
-        findViewById(R.id.routeDetailsToggle).setOnClickListener(v -> {
-            View details = findViewById(R.id.routeDetailsPanel);
-            boolean expanded = details.getVisibility() != View.VISIBLE;
-            details.setVisibility(expanded ? View.VISIBLE : View.GONE);
-            ((MaterialButton) v).setText(expanded ? "Hide route details ▴" : "Route details and actions ▾");
-        });
+        findViewById(R.id.routeDetailsToggle).setOnClickListener(v -> showRouteDetailsSheet());
         findViewById(R.id.shareRouteButton).setOnClickListener(v -> shareRoute());
         findViewById(R.id.openNavigationButton).setOnClickListener(v -> openNavigation());
         findViewById(R.id.saveDestinationButton).setOnClickListener(v -> saveDestination());
         journeyButton.setOnClickListener(v -> { if (activeJourneyId == null) startSharedJourney(); else endSharedJourney(); });
         findViewById(R.id.closeDetailButton).setOnClickListener(v -> detailCard.setVisibility(View.GONE));
         detailCard.setOnLongClickListener(v -> { if (isGovernmentUser() && currentHazardId != null) { showHazardLifecycleDialog(); return true; } return false; });
+        detailReason.setOnClickListener(v -> new MaterialAlertDialogBuilder(this).setTitle(detailTitle.getText())
+                .setMessage(detailReason.getText()).setPositiveButton("Close", null).show());
+        RouteProfile[] initialProfiles = {RouteProfile.FASTEST, RouteProfile.BALANCED, RouteProfile.SAFEST};
+        int[] initialIds = {R.id.fastestRecommendation, R.id.balancedRecommendation, R.id.safestRecommendation};
+        for (int i = 0; i < initialIds.length; i++) {
+            RouteProfile preference = initialProfiles[i]; TextView option = findViewById(initialIds[i]);
+            styleRouteOption(option, preference, preference == routeProfile);
+            option.setOnClickListener(v -> {
+                routeProfile = preference; routeProfileButton.setText(profileName(preference));
+                for (int j = 0; j < initialIds.length; j++) styleRouteOption(findViewById(initialIds[j]), initialProfiles[j], initialProfiles[j] == preference);
+            });
+        }
+    }
+
+    private void showConnectionOptions() {
+        if (ServerConnection.baseUrl().startsWith("http://")) {
+            ServerConnectionDialog.show(this, ServerConnection.CLOUD_ORIGIN); return;
+        }
+        new MaterialAlertDialogBuilder(this).setTitle("Safety connection")
+                .setMessage("Server: " + ServerConnection.baseUrl() + "\n\nA free cloud server can take about a minute to wake. Offline maps do not connect the live safety service.")
+                .setPositiveButton("Retry", (d,w) -> {
+                    loadHazards(); LatLng center = map == null ? null : map.getCameraPosition().target;
+                    if (center != null) renderScore(center.getLatitude(), center.getLongitude());
+                }).setNeutralButton("Server settings", (d,w) -> ServerConnectionDialog.show(this))
+                .setNegativeButton("Close", null).show();
+    }
+
+    private void openPlaceSearch(boolean source) {
+        LatLng center = map == null ? null : map.getCameraPosition().target;
+        new PlaceSearchSheet(this, openMapService, offlineRouter, source ? "Choose starting point" : "Search destination",
+                textOf(source ? sourceInput : destinationInput), center == null ? 19.043 : center.getLatitude(),
+                center == null ? 73.023 : center.getLongitude(), new PlaceSearchSheet.Listener() {
+            @Override public void onPlace(PlaceSearchResult place) {
+                setSelectedPlace(source, place); invalidateRouteForEndpoints();
+                if (map != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(place.getLatitude(), place.getLongitude()), 14.5));
+                if (!textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) findRoutes();
+            }
+            @Override public void onMapPin() {
+                routePinTarget = source ? 1 : 2;
+                ((TextView)findViewById(R.id.routeStatusText)).setText("Tap the exact " + (source ? "starting point" : "destination") + " on the map");
+            }
+            @Override public void onDeviceLocation() { locatingSource = source; enableLocationWithContext(); }
+        }).show();
+    }
+
+    private void setSelectedPlace(boolean source, PlaceSearchResult place) {
+        TextInputEditText input = source ? sourceInput : destinationInput;
+        input.setText(place.getPrimaryText()); input.setContentDescription((source ? "Start: " : "Destination: ") + place.getDisplayName());
+        if (source) { selectedSourcePlace = place; selectedSourceText = textOf(input); }
+        else { selectedDestinationPlace = place; selectedDestinationText = textOf(input); }
+        if (mapStyle != null) renderEndpoint(source ? "start" : "finish", source ? "A" : "B", place, source ? "#08735C" : "#BF3F38");
+    }
+
+    private void invalidateRouteForEndpoints() {
+        activeRouteRequest++; setRouteBusy(false); routeResultCard.setVisibility(View.GONE);
+        detailCard.setVisibility(View.GONE); selectedRiskPoints.clear(); lastRouteSummary = ""; lastDestination = null;
+        ((TextView)findViewById(R.id.routeStatusText)).setText("Ready to compare all three preferences");
+        int[] ids = {R.id.fastestRecommendation, R.id.balancedRecommendation, R.id.safestRecommendation};
+        RouteProfile[] profiles = {RouteProfile.FASTEST, RouteProfile.BALANCED, RouteProfile.SAFEST};
+        for (int i = 0; i < ids.length; i++) {
+            TextView option = findViewById(ids[i]); option.setText(profileName(profiles[i]) + "\n—\nRisk —");
+            styleRouteOption(option, profiles[i], profiles[i] == routeProfile);
+            RouteProfile preference = profiles[i];
+            option.setOnClickListener(v -> { routeProfile = preference; invalidateRouteForEndpoints(); });
+        }
+        if (mapStyle != null) {
+            removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE); removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
+            removeLayerAndSource(RISK_POINTS_LAYER, RISK_POINTS_SOURCE);
+        }
+    }
+
+    private int routeColor(RouteProfile profile) {
+        return Color.parseColor(profile == RouteProfile.FASTEST ? "#286BC3" : profile == RouteProfile.SAFEST ? "#C76B12" : "#08735C");
+    }
+
+    private void styleRouteOption(TextView option, RouteProfile profile, boolean selected) {
+        android.graphics.drawable.GradientDrawable background = new android.graphics.drawable.GradientDrawable();
+        background.setCornerRadius(12 * getResources().getDisplayMetrics().density);
+        int color = routeColor(profile);
+        background.setColor(selected ? Color.argb(35, Color.red(color), Color.green(color), Color.blue(color))
+                : androidx.core.content.ContextCompat.getColor(this, R.color.surface));
+        background.setStroke(Math.round(getResources().getDisplayMetrics().density * (selected ? 2 : 1)),
+                selected ? color : androidx.core.content.ContextCompat.getColor(this, R.color.divider));
+        option.setBackground(background); option.setSelected(selected);
+        option.setTypeface(android.graphics.Typeface.DEFAULT, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+    }
+
+    private void showRouteDetailsSheet() {
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        android.widget.LinearLayout content = new android.widget.LinearLayout(this); content.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad = Math.round(18 * getResources().getDisplayMetrics().density); content.setPadding(pad,pad,pad,pad);
+        TextView title = new TextView(this); title.setText(routeResultTitle.getText()); title.setTextSize(20);
+        title.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.text_primary)); content.addView(title);
+        TextView explanation = new TextView(this); explanation.setText(routeResultRisk.getText()); explanation.setTextSize(14);
+        explanation.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.text_secondary)); explanation.setPadding(0,pad,0,pad);
+        content.addView(explanation);
+        String[] actions = {"Share route", "Navigate", "Save destination", activeJourneyId == null ? "Share journey" : "End shared journey", "Close"};
+        for (int i=0;i<actions.length;i++) {
+            final int action=i; MaterialButton button=new MaterialButton(this); button.setText(actions[i]); button.setAllCaps(false);
+            button.setOnClickListener(v -> { sheet.dismiss();
+                if(action==0) shareRoute(); else if(action==1) openNavigation(); else if(action==2) saveDestination();
+                else if(action==3) { if(activeJourneyId==null) startSharedJourney(); else endSharedJourney(); }
+            }); content.addView(button);
+        }
+        android.widget.ScrollView scroll=new android.widget.ScrollView(this); scroll.addView(content); sheet.setContentView(scroll); sheet.show();
     }
 
     private void showMapTools() {
@@ -336,10 +452,11 @@ public class MapsActivity extends AppCompatActivity {
 
     private boolean onMapClick(@NonNull LatLng point) {
         if (routePinTarget != 0) {
-            String coordinates = String.format(Locale.US, "%.6f, %.6f", point.getLatitude(), point.getLongitude());
-            if (routePinTarget == 1) sourceInput.setText(coordinates); else destinationInput.setText(coordinates);
+            boolean source = routePinTarget == 1;
+            setSelectedPlace(source, new PlaceSearchResult("Pinned " + (source ? "start" : "destination"), point.getLatitude(), point.getLongitude()));
             routePinTarget = 0;
-            Toast.makeText(this, "Exact location selected. Tap Compare to calculate the route.", Toast.LENGTH_LONG).show();
+            invalidateRouteForEndpoints();
+            if (!textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) findRoutes();
             return true;
         }
         detailCard.setVisibility(View.GONE);
@@ -347,6 +464,9 @@ public class MapsActivity extends AppCompatActivity {
         if (map == null || mapStyle == null) return false;
         List<Feature> features = map.queryRenderedFeatures(
                 map.getProjection().toScreenLocation(point), HAZARD_LAYER_IDS.toArray(new String[0]));
+        if (!features.isEmpty() && features.get(0).hasProperty("riskPointId")) {
+            showRouteRiskPoint(features.get(0).getStringProperty("riskPointId")); return true;
+        }
         if (!features.isEmpty() && features.get(0).hasProperty("hazardId")) {
             showHazard(features.get(0).getStringProperty("hazardId"));
             return true;
@@ -636,7 +756,7 @@ public class MapsActivity extends AppCompatActivity {
         View focused = getCurrentFocus();
         if (keyboard != null && focused != null) keyboard.hideSoftInputFromWindow(focused.getWindowToken(), 0);
         setRouteBusy(true);
-        resolvePlace(sourceText, requestId, source -> resolvePlace(destinationText, requestId,
+        resolvePlace(sourceText, requestId, true, source -> resolvePlace(destinationText, requestId, false,
                 destination -> requestRoutes(source, destination, requestId)));
     }
 
@@ -740,9 +860,9 @@ public class MapsActivity extends AppCompatActivity {
             RouteSafetyResult recommendation = RouteRecommendations.rank(evaluated, option).get(0);
             distinct.add(recommendation.getRoute().getProviderRouteId());
             TextView row = findViewById(rowIds[i]);
-            row.setText(String.format(Locale.US, "%s%s\n%.1f min\nRisk %.1f/100\nScore %.2f",
-                    option == profile ? "✓ " : "", profileName(option), recommendation.getRoute().getTravelMinutes(),
-                    recommendation.getRiskExposure(), recommendation.getScore()));
+            row.setText(String.format(Locale.US, "%s\n%.1f min\nRisk %.0f/100",
+                    profileName(option), recommendation.getRoute().getTravelMinutes(), recommendation.getRiskExposure()));
+            styleRouteOption(row, option, option == profile);
             row.setContentDescription(row.getText() + ". Tap to highlight this recommendation.");
             row.setOnClickListener(v -> {
                 routeProfile = option; routeProfileButton.setText(profileName(option));
@@ -773,11 +893,26 @@ public class MapsActivity extends AppCompatActivity {
         comparison.append(objectives).append("Scores express different preferences, not different safety predictions. Same road = same time and exposure.\n")
                 .append("Line colours: blue Fastest, green Balanced, orange Safest; shared roads overlap. A = start, B = destination.");
         routeResultRisk.setText(comparison.toString());
-        ((TextView) findViewById(R.id.routeRiskSummary)).setText(distinct.size() == 1
-                ? "Same road wins all 3 · time and risk are unchanged"
-                : distinct.size() + " different recommended roads · tap a preference");
+        renderSelectedRiskPoints(best);
+        if (mapStyle != null) {
+            renderEndpoint("start", "A", source, "#08735C");
+            renderEndpoint("finish", "B", destination, "#BF3F38");
+        }
+        long verified = selectedRiskPoints.values().stream().filter(RouteRiskPoint::isVerified).count();
+        long estimates = selectedRiskPoints.size() - verified;
+        ((TextView) findViewById(R.id.routeRiskSummary)).setText((distinct.size() == 1
+                ? "Same road wins all 3. " : distinct.size() + " recommended roads. ")
+                + verified + " official hazard(s) · " + estimates + " estimated risk zone(s). Tap a pin for why.");
+        ((TextView)findViewById(R.id.routeStatusText)).setText(sourceLabel.startsWith("Offline")
+                ? "Offline graph · last verified snapshot" : "All 3 preferences · tap to highlight a route");
+        comparison.append("\n\nSelected-route explanations:\n");
+        for (RouteRiskPoint point : selectedRiskPoints.values()) comparison.append(point.isVerified() ? "Official: " : "Estimate: ")
+                .append(point.getTitle()).append("\n").append(point.getReason()).append("\n\n");
+        if (selectedRiskPoints.isEmpty()) comparison.append("No elevated risk markers available. This is not a guarantee of safety.\n");
+        comparison.append("Estimated zones use synthetic area-cell data, not precise crime observations. Red pins are verified reports; amber pins are estimates.");
+        routeResultRisk.setText(comparison.toString());
         findViewById(R.id.routeDetailsPanel).setVisibility(View.GONE);
-        ((MaterialButton) findViewById(R.id.routeDetailsToggle)).setText("Route details and actions ▾");
+        ((MaterialButton) findViewById(R.id.routeDetailsToggle)).setText("Why this route? · Details & actions");
         lastDestination = destination;
         lastRouteSummary = routeResultTitle.getText() + "\n" + routeResultMeta.getText() + "\n" + comparison;
         routeResultCard.setVisibility(View.VISIBLE);
@@ -1068,6 +1203,70 @@ public class MapsActivity extends AppCompatActivity {
         }
     }
 
+    private void renderSelectedRiskPoints(RouteSafetyResult result) {
+        selectedRiskPoints.clear();
+        for (RouteRiskPoint point : result.getRiskPoints()) selectedRiskPoints.put(point.getId(), point);
+        // Older servers/offline routes can still explain genuine cached verified hazards.
+        for (JSONObject record : liveHazardRecords.values()) {
+            String id = record.optString("id");
+            if (selectedRiskPoints.containsKey(id)) continue;
+            JSONArray coordinates = record.optJSONArray("geometry_coordinates");
+            List<double[]> shape = new ArrayList<>();
+            boolean polygon = "POLYGON".equals(record.optString("geometry_type"));
+            if (coordinates != null && !"POINT".equals(record.optString("geometry_type")))
+                for (int i=0;i<coordinates.length();i++) {
+                    JSONObject point=coordinates.optJSONObject(i);
+                    if(point!=null) shape.add(new double[]{point.optDouble("latitude"),point.optDouble("longitude")});
+                }
+            if(shape.size()<2) { shape.clear(); shape.add(new double[]{record.optDouble("latitude"),record.optDouble("longitude")}); polygon=false; }
+            double[][] geometry=shape.toArray(new double[0][]); double distance=Double.POSITIVE_INFINITY;
+            List<HazardLocation.GeoPoint> road=result.getRoute().getGeometry();
+            for(int i=0;i<road.size()-1;i++) {
+                HazardLocation.GeoPoint a=road.get(i),b=road.get(i+1);
+                distance=Math.min(distance,com.safenavi.app.safety.network.NoGoGeometry.distance(
+                        a.getLatitude(),a.getLongitude(),b.getLatitude(),b.getLongitude(),geometry,polygon));
+            }
+            if(distance<=750) selectedRiskPoints.put(id,new RouteRiskPoint(id,record.optDouble("latitude"),record.optDouble("longitude"),
+                    record.optString("title"),record.optString("reason")+"\n"+record.optString("road_status")+" · within "+Math.round(distance)+" m of route",
+                    0,true,"government_verified_hazard"));
+        }
+        if(mapStyle==null) return;
+        removeLayerAndSource(RISK_POINTS_LAYER,RISK_POINTS_SOURCE);
+        List<Feature> features=new ArrayList<>();
+        for(RouteRiskPoint point:selectedRiskPoints.values()) {
+            Feature feature=Feature.fromGeometry(Point.fromLngLat(point.getLongitude(),point.getLatitude()));
+            feature.addStringProperty("riskPointId",point.getId());
+            feature.addStringProperty("icon",point.isVerified()?"route-risk-official":"route-risk-estimate"); features.add(feature);
+        }
+        mapStyle.addImage("route-risk-official",riskPinBitmap(Color.parseColor("#B93D36"),"!"));
+        mapStyle.addImage("route-risk-estimate",riskPinBitmap(Color.parseColor("#9A6500"),"E"));
+        mapStyle.addSource(new GeoJsonSource(RISK_POINTS_SOURCE,FeatureCollection.fromFeatures(features)));
+        mapStyle.addLayer(new SymbolLayer(RISK_POINTS_LAYER,RISK_POINTS_SOURCE).withProperties(
+                org.maplibre.android.style.layers.PropertyFactory.iconImage(org.maplibre.android.style.expressions.Expression.get("icon")),
+                org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap(true),
+                org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement(true)));
+    }
+
+    private Bitmap riskPinBitmap(int color,String label) {
+        float density=getResources().getDisplayMetrics().density; int size=Math.round(30*density);
+        Bitmap bitmap=Bitmap.createBitmap(size,size,Bitmap.Config.ARGB_8888); Canvas canvas=new Canvas(bitmap);
+        Paint paint=new Paint(Paint.ANTI_ALIAS_FLAG); paint.setColor(Color.WHITE); canvas.drawCircle(size/2f,size/2f,size/2f,paint);
+        paint.setColor(color); canvas.drawCircle(size/2f,size/2f,size/2f-2*density,paint);
+        paint.setColor(Color.WHITE); paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD); paint.setTextSize(16*density); paint.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(label,size/2f,size/2f-(paint.ascent()+paint.descent())/2,paint); return bitmap;
+    }
+
+    private void showRouteRiskPoint(String id) {
+        RouteRiskPoint point=selectedRiskPoints.get(id); if(point==null) return;
+        currentHazardId=point.isVerified()?id:null;
+        detailTitle.setText(point.getTitle());
+        detailMeta.setText(point.isVerified()?"Government-verified · selected route"
+                :String.format(Locale.US,"Estimated exposure %.0f/100 · approximate area-cell location",point.getRisk()));
+        detailReason.setText(point.getReason()+"\nTap this text for the full explanation.");
+        detailCard.setVisibility(View.VISIBLE);
+        if(map!=null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(point.getLatitude(),point.getLongitude()),14.8));
+    }
+
     private void renderEndpoint(String key, String label, PlaceSearchResult place, String color) {
         String sourceId = "endpoint-" + key, layerId = sourceId + "-marker";
         removeLayerAndSource(layerId, sourceId);
@@ -1103,11 +1302,11 @@ public class MapsActivity extends AppCompatActivity {
 
     private interface PlaceCallback { void accept(PlaceSearchResult place); }
 
-    private void resolvePlace(String text, int requestId, PlaceCallback callback) {
-        if (selectedSourcePlace != null && text.equals(selectedSourceText)) {
+    private void resolvePlace(String text, int requestId, boolean source, PlaceCallback callback) {
+        if (source && selectedSourcePlace != null && text.equals(selectedSourceText)) {
             callback.accept(selectedSourcePlace); return;
         }
-        if (selectedDestinationPlace != null && text.equals(selectedDestinationText)) {
+        if (!source && selectedDestinationPlace != null && text.equals(selectedDestinationText)) {
             callback.accept(selectedDestinationPlace); return;
         }
         PlaceSearchResult coordinates = parseCoordinates(text);
@@ -1120,14 +1319,14 @@ public class MapsActivity extends AppCompatActivity {
                 runOnUiThread(() -> {
                     if (!isRouteRequestActive(requestId)) return;
                     if (results.isEmpty()) showMissingPlace(text, requestId);
-                    else choosePlace(text, results, requestId, callback);
+                    else choosePlace(text, results, requestId, source, callback);
                 });
             }
 
             @Override public void onError(String message) {
                 offlineRouter.search(text, new OfflineRouter.Callback<List<PlaceSearchResult>>() {
                     @Override public void onSuccess(List<PlaceSearchResult> results) { runOnUiThread(() -> {
-                        if (isRouteRequestActive(requestId)) choosePlace(text, results, requestId, callback);
+                        if (isRouteRequestActive(requestId)) choosePlace(text, results, requestId, source, callback);
                     }); }
                     @Override public void onError(String offlineMessage) { runOnUiThread(() -> {
                         if (isRouteRequestActive(requestId)) showRouteError(requestId, message + "\n\n" + offlineMessage);
@@ -1137,16 +1336,17 @@ public class MapsActivity extends AppCompatActivity {
         });
     }
 
-    private void choosePlace(String query, List<PlaceSearchResult> results, int requestId, PlaceCallback callback) {
+    private void choosePlace(String query, List<PlaceSearchResult> results, int requestId, boolean source, PlaceCallback callback) {
         if (results.isEmpty()) { showRouteError(requestId, "No match. Try the full place name and locality, or latitude, longitude."); return; }
-        String[] labels = new String[results.size()];
-        for (int i = 0; i < results.size(); i++) labels[i] = results.get(i).getDisplayName();
-        new MaterialAlertDialogBuilder(this).setTitle("Choose location: " + query)
-                .setItems(labels, (dialog, which) -> {
-                    if (isRouteRequestActive(requestId)) callback.accept(results.get(which));
-                }).setNegativeButton("Cancel", (dialog, which) -> {
-                    if (isRouteRequestActive(requestId)) setRouteBusy(false);
-                }).setOnCancelListener(dialog -> { if (isRouteRequestActive(requestId)) setRouteBusy(false); }).show();
+        setRouteBusy(false);
+        new PlaceSearchSheet(this, openMapService, offlineRouter, source ? "Choose starting point" : "Search destination",
+                query, 19.043, 73.023, new PlaceSearchSheet.Listener() {
+            @Override public void onPlace(PlaceSearchResult place) {
+                if (isRouteRequestActive(requestId)) { setSelectedPlace(source, place); setRouteBusy(true); callback.accept(place); }
+            }
+            @Override public void onMapPin() { routePinTarget = source ? 1 : 2; }
+            @Override public void onDeviceLocation() { locatingSource = source; enableLocationWithContext(); }
+        }).showResults(results);
     }
 
     private void showMissingPlace(String query, int requestId) {
@@ -1175,7 +1375,7 @@ public class MapsActivity extends AppCompatActivity {
         try {
             double latitude = Double.parseDouble(parts[0].trim());
             double longitude = Double.parseDouble(parts[1].trim());
-            if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+            if (!Double.isFinite(latitude) || !Double.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
             return new PlaceSearchResult(value, latitude, longitude);
         } catch (NumberFormatException ignored) {
             return null;
@@ -1201,6 +1401,7 @@ public class MapsActivity extends AppCompatActivity {
                             if (requestId != activeScoreRequest || isFinishing() || isDestroyed()) return;
                             scoreText.setText(String.format(Locale.US, "%.0f", risk.getSafetyScore()));
                             scoreLabel.setText(readable(risk.getRiskLabel()) + " risk · " + risk.getAreaName());
+                            ((MaterialButton)findViewById(R.id.mapConnectionButton)).setText("Safety connected");
                         });
                     }
 
@@ -1208,7 +1409,9 @@ public class MapsActivity extends AppCompatActivity {
                         runOnUiThread(() -> {
                             if (requestId == activeScoreRequest && !isFinishing() && !isDestroyed()) {
                                 scoreText.setText("—");
-                                scoreLabel.setText("Safety service unavailable");
+                                boolean coverage = "OUTSIDE_COVERAGE".equals(message);
+                                scoreLabel.setText(coverage ? "Outside dataset coverage" : "Connect safety service");
+                                ((MaterialButton)findViewById(R.id.mapConnectionButton)).setText(coverage ? "Safety connected" : "Connect safety");
                             }
                         });
                     }
@@ -1246,12 +1449,12 @@ public class MapsActivity extends AppCompatActivity {
                 Toast.makeText(this, "No recent device location is available.", Toast.LENGTH_SHORT).show();
                 return;
             }
-            String coordinates = String.format(Locale.US, "%.6f, %.6f",
-                    location.getLatitude(), location.getLongitude());
-            sourceInput.setText(coordinates);
+            setSelectedPlace(locatingSource, new PlaceSearchResult("My location", location.getLatitude(), location.getLongitude()));
+            invalidateRouteForEndpoints();
             renderScore(location.getLatitude(), location.getLongitude());
             if (map != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(location.getLatitude(), location.getLongitude()), 14.0));
+            if (!textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) findRoutes();
         });
     }
 
@@ -1266,12 +1469,29 @@ public class MapsActivity extends AppCompatActivity {
         findRouteButton.setEnabled(!busy);
         findRouteButton.setText(busy ? "Comparing..." : getString(R.string.compare_short));
         routeProgress.setVisibility(busy ? View.VISIBLE : View.GONE);
-        if (busy) routeResultCard.setVisibility(View.GONE);
+        for (int id : new int[]{R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation}) findViewById(id).setEnabled(!busy);
+        if (busy) {
+            routeResultCard.setVisibility(View.GONE); detailCard.setVisibility(View.GONE);
+            selectedRiskPoints.clear();
+            if (mapStyle != null) {
+                removeLayerAndSource(RISK_POINTS_LAYER, RISK_POINTS_SOURCE);
+                removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE);
+                removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
+            }
+            for (int id : new int[]{R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation}) {
+                TextView option = findViewById(id);
+                RouteProfile profile = id == R.id.fastestRecommendation ? RouteProfile.FASTEST :
+                        id == R.id.safestRecommendation ? RouteProfile.SAFEST : RouteProfile.BALANCED;
+                option.setText((profile == RouteProfile.FASTEST ? "Fastest" : profile == RouteProfile.SAFEST ? "Safest" : "Balanced") + "\n…");
+            }
+            ((TextView)findViewById(R.id.routeStatusText)).setText("Comparing Fastest, Balanced and Safest…");
+        }
     }
 
     private void showRouteError(int requestId, String message) {
         if (!isRouteRequestActive(requestId)) return;
         setRouteBusy(false);
+        ((TextView)findViewById(R.id.routeStatusText)).setText("Route unavailable · check connection or endpoints");
         new MaterialAlertDialogBuilder(this)
                 .setTitle("Route unavailable")
                 .setMessage(message + "\n\nCheck your connection and try again. Safe-Navi will never invent a route when routing intelligence is unavailable.")

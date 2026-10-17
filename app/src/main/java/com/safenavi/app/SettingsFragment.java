@@ -82,10 +82,14 @@ public class SettingsFragment extends Fragment {
     }
 
     private void openOfflineMaps() {
+        final View screen = getView();
+        if (screen == null) return;
         OfflineMapManager.status(requireContext(), new OfflineMapManager.Callback() {
             @Override public void onStatus(String status, boolean downloaded) {
                 if (!isAdded()) return;
-                requireActivity().runOnUiThread(() -> new AlertDialog.Builder(requireContext())
+                screen.post(() -> {
+                    if (!isAdded() || getView() != screen) return;
+                    new AlertDialog.Builder(requireContext())
                         .setTitle(getString(R.string.offline_maps))
                         .setMessage(status + "\n\nDownloaded tiles keep the base map visible without a connection. Live routes, search and new safety updates still require internet. Use Wi-Fi; the area can use significant storage.")
                         .setNegativeButton("Close", null)
@@ -95,19 +99,25 @@ public class SettingsFragment extends Fragment {
                         .setPositiveButton(downloaded ? "Update" : "Download", (d,w) -> {
                             Snackbar.make(requireView(), "Offline map download started. You may keep using Safe-Navi.", Snackbar.LENGTH_LONG).show();
                             OfflineMapManager.download(requireContext(), mapStatusCallback());
-                        }).show());
+                        }).show();
+                });
             }
         });
     }
 
     private OfflineMapManager.Callback mapStatusCallback() {
+        final View screen = getView();
         return new OfflineMapManager.Callback() {
             private int lastPercent = -10;
-            @Override public void onStatus(String message, boolean downloaded) { if (isAdded()) requireActivity().runOnUiThread(() -> Snackbar.make(requireView(), message, Snackbar.LENGTH_LONG).show()); }
+            private void notifyScreen(String message, int duration) {
+                if (screen == null) return;
+                screen.post(() -> { if (isAdded() && getView() == screen) Snackbar.make(screen, message, duration).show(); });
+            }
+            @Override public void onStatus(String message, boolean downloaded) { notifyScreen(message, Snackbar.LENGTH_LONG); }
             @Override public void onProgress(long completed, long required, long bytes) {
                 if (!isAdded() || required <= 0) return;
                 int percent = (int) (completed * 100 / required);
-                if (percent >= lastPercent + 10) { lastPercent = percent; requireActivity().runOnUiThread(() -> Snackbar.make(requireView(), "Offline map " + percent + "% downloaded", Snackbar.LENGTH_SHORT).show()); }
+                if (percent >= lastPercent + 10) { lastPercent = percent; notifyScreen("Offline map " + percent + "% downloaded", Snackbar.LENGTH_SHORT); }
             }
         };
     }

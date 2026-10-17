@@ -7,6 +7,7 @@ import com.safenavi.app.safety.model.HazardLocation;
 import com.safenavi.app.safety.model.RouteCandidate;
 import com.safenavi.app.safety.model.RouteProfile;
 import com.safenavi.app.safety.model.RouteSafetyResult;
+import com.safenavi.app.safety.model.RouteRiskPoint;
 import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -96,7 +97,7 @@ public class DatasetRiskService {
                     @Override public void onResponse(Call call, Response response) {
                         try (Response closeable = response) {
                             if (!response.isSuccessful() || response.body() == null) {
-                                callback.onError("No dataset cell was found for this point.");
+                                callback.onError(response.code() == 404 ? "OUTSIDE_COVERAGE" : "Safety API returned HTTP " + response.code());
                                 return;
                             }
                             callback.onSuccess(parsePointRisk(response.body().string()));
@@ -131,8 +132,18 @@ public class DatasetRiskService {
             JSONObject item = results.getJSONObject(i);
             RouteCandidate route = byId.get(item.getString("route_id"));
             if (route == null) continue;
+            List<RouteRiskPoint> riskPoints = new ArrayList<>();
+            JSONArray zones = item.optJSONArray("risk_points");
+            if (zones != null) for (int j = 0; j < zones.length(); j++) {
+                JSONObject zone = zones.optJSONObject(j);
+                if (zone == null) continue;
+                double lat = zone.optDouble("latitude", Double.NaN), lon = zone.optDouble("longitude", Double.NaN);
+                if (!Double.isFinite(lat) || !Double.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) continue;
+                riskPoints.add(new RouteRiskPoint(zone.optString("id"), lat, lon, zone.optString("title"),
+                        zone.optString("reason"), zone.optDouble("risk_exposure", 0), zone.optBoolean("verified", false), zone.optString("source")));
+            }
             ranked.add(new RouteSafetyResult(route, profile, item.getDouble("risk_exposure"),
-                    item.getDouble("ranking_score")));
+                    item.getDouble("ranking_score"), riskPoints));
             if (i == 0) {
                 coverage = item.optDouble("coverage_ratio", 0);
                 if (provider.endsWith("_ml")) {

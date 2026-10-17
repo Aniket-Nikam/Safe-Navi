@@ -7,6 +7,7 @@ import java.net.URISyntaxException;
 import java.util.Locale;
 
 public final class ServerConnection {
+    public static final String CLOUD_ORIGIN = "https://safe-navi-api.onrender.com";
     private static volatile String address=BuildConfig.RISK_API_BASE_URL;
     private ServerConnection() { }
     public static void initialize(Context context) {

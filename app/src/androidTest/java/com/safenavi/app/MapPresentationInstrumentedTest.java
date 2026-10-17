@@ -49,7 +49,9 @@ public class MapPresentationInstrumentedTest {
                                 Arrays.asList(new HazardLocation.GeoPoint(19.0657, 72.9986),
                                         new HazardLocation.GeoPoint(19.05 + i * .001, 73.01),
                                         new HazardLocation.GeoPoint(19.042644, 73.023428)));
-                        roads.add(route); evaluated.add(new RouteSafetyResult(route, RouteProfile.BALANCED, risks[i], 0));
+                        roads.add(route); evaluated.add(new RouteSafetyResult(route, RouteProfile.BALANCED, risks[i], 0,
+                                Collections.singletonList(new RouteRiskPoint("test-risk", 19.05, 73.01,
+                                        "Test estimate", "Synthetic test explanation", 70, false, "test"))));
                     }
                     Method method = MapsActivity.class.getDeclaredMethod("renderRankedRoutes", List.class, List.class,
                             RouteProfile.class, PlaceSearchResult.class, PlaceSearchResult.class, String.class, String.class);
@@ -66,6 +68,7 @@ public class MapPresentationInstrumentedTest {
                     assertTrue(((TextView) activity.findViewById(R.id.routeResultTitle)).getText().toString().contains("Safest"));
                     assertNotNull(mapRef.get().getStyle().getLayer("endpoint-start-marker"));
                     assertNotNull(mapRef.get().getStyle().getLayer("endpoint-finish-marker"));
+                    assertNotNull(mapRef.get().getStyle().getLayer("selected-route-risk-markers"));
                 } catch (Exception error) { throw new AssertionError(error); }
             });
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();
@@ -78,6 +81,52 @@ public class MapPresentationInstrumentedTest {
                     assertTrue(row.isShown()); assertTrue("Preference text clipped", row.getLayout().getHeight() <= row.getHeight() - row.getPaddingTop() - row.getPaddingBottom());
                 }
             });
+            screenshot("map-redesign.png");
         }
+    }
+
+    @Test public void placeSearchUsesDedicatedSheetWithLocalityRows() throws Exception {
+        Intent intent = new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(), MapsActivity.class);
+        try (ActivityScenario<MapsActivity> scenario = ActivityScenario.launch(intent)) {
+            AtomicReference<com.safenavi.app.product.PlaceSearchSheet> sheetRef = new AtomicReference<>();
+            scenario.onActivity(activity -> {
+                com.safenavi.app.product.PlaceSearchSheet sheet = new com.safenavi.app.product.PlaceSearchSheet(
+                        activity, new com.safenavi.app.safety.network.OpenMapService(),
+                        new com.safenavi.app.safety.network.OfflineRouter(activity), "Destination", "", 19, 73,
+                        new com.safenavi.app.product.PlaceSearchSheet.Listener() {
+                            public void onPlace(PlaceSearchResult place) { }
+                            public void onMapPin() { }
+                            public void onDeviceLocation() { }
+                        });
+                sheet.showResults(Collections.singletonList(new PlaceSearchResult("SIES GST, Nerul, Navi Mumbai", 19.04, 73.02)));
+                sheetRef.set(sheet);
+            });
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            scenario.onActivity(activity -> {
+                try {
+                    Field field = sheetRef.get().getClass().getDeclaredField("dialog"); field.setAccessible(true);
+                    android.app.Dialog dialog = (android.app.Dialog) field.get(sheetRef.get());
+                    assertTrue(dialog.isShowing());
+                    android.view.View root = dialog.getWindow().getDecorView();
+                    assertTrue(hasVisibleText(root, "SIES GST"));
+                    assertTrue(hasVisibleText(root, "Nerul, Navi Mumbai"));
+                } catch (Exception error) { throw new AssertionError(error); }
+            });
+            screenshot("map-search-redesign.png");
+        }
+    }
+    private static boolean hasVisibleText(android.view.View view, String text) {
+        if (view instanceof TextView && text.contentEquals(((TextView)view).getText()) && view.isShown()) return true;
+        if (view instanceof android.view.ViewGroup) {
+            android.view.ViewGroup group=(android.view.ViewGroup)view;
+            for(int i=0;i<group.getChildCount();i++) if(hasVisibleText(group.getChildAt(i),text)) return true;
+        }
+        return false;
+    }
+    private static void screenshot(String name) throws Exception {
+        android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+        java.io.File output=new java.io.File(InstrumentationRegistry.getInstrumentation().getTargetContext().getExternalFilesDir(null),name);
+        try(java.io.FileOutputStream stream=new java.io.FileOutputStream(output)) { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream); }
+        bitmap.recycle();
     }
 }

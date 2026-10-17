@@ -48,3 +48,34 @@ def test_empty_crime_information_is_unknown_not_safe(monkeypatch):
     value = main.area_crime(19, 73, 3000)
     assert value["types"] == []
     assert "does not mean no crime" in value["notice"]
+
+
+def test_route_explanations_distinguish_verified_records_and_bounded_estimates(monkeypatch):
+    monkeypatch.setattr(main, "predict_point", lambda **kwargs: (
+        dict(risk_exposure=70, factor_contributions={"crime_risk_index": 12}), None, "trained_ml"))
+    points = [main.Coordinate(latitude=19 + i * .01, longitude=73) for i in range(8)]
+    cells = [dict(area_cell_id=str(i), area_name="Test area", jurisdiction="Test",
+                  risk_score=70, factors={}) for i in range(8)]
+    hazard = dict(id="verified", latitude=19, longitude=73, title="Road damage",
+                  reason="Official inspection", severity="HIGH", road_status="UNSAFE", distance_meters=10)
+    values = main.route_risk_points(points, cells, "midday", [hazard])
+    assert len(values) == 4
+    assert values[0]["verified"] is True
+    assert values[0]["reason"] == "Official inspection"
+    for item in values[1:]:
+        assert item["verified"] is False
+        assert item["source"] == "trained_ml_area_estimate"
+        assert "not a verified incident" in item["reason"]
+
+
+def test_low_risk_cells_do_not_generate_danger_markers(monkeypatch):
+    monkeypatch.setattr(main, "predict_point", lambda **kwargs: (None, "unavailable", "baseline"))
+    cell = dict(area_cell_id="one", area_name="Test", jurisdiction="Test", risk_score=20, factors={})
+    assert main.route_risk_points([main.Coordinate(latitude=19, longitude=73)], [cell], "midday", []) == []
+
+
+def test_nearby_model_estimates_are_not_stacked(monkeypatch):
+    monkeypatch.setattr(main, "predict_point", lambda **kwargs: (None, "unavailable", "baseline"))
+    points = [main.Coordinate(latitude=19, longitude=73 + i * .0001) for i in range(6)]
+    cells = [dict(area_cell_id=str(i), area_name="Test", jurisdiction="Test", risk_score=80, factors={}) for i in range(6)]
+    assert len(main.route_risk_points(points, cells, "midday", [])) == 1

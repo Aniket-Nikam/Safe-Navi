@@ -14,4 +14,12 @@ public class PlaceSearchResult {
     public String getDisplayName() { return displayName; }
     public double getLatitude() { return latitude; }
     public double getLongitude() { return longitude; }
+    public String getPrimaryText() {
+        int comma = displayName.indexOf(',');
+        return comma > 0 ? displayName.substring(0, comma).trim() : displayName;
+    }
+    public String getSecondaryText() {
+        int comma = displayName.indexOf(',');
+        return comma >= 0 ? displayName.substring(comma + 1).trim() : "Mumbai metropolitan region";
+    }
 }

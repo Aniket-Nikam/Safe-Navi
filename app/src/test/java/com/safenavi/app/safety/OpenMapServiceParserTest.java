@@ -9,6 +9,14 @@ import java.util.List;
 import org.junit.Test;
 
 public class OpenMapServiceParserTest {
+    @Test public void searchRowsKeepShortNameAndSeparateLocalityAndRemoveNearbyDuplicates() {
+        PlaceSearchResult place = new PlaceSearchResult("Nahur, Mumbai, India", 19.15, 72.94);
+        assertEquals("Nahur", place.getPrimaryText());
+        assertEquals("Mumbai, India", place.getSecondaryText());
+        assertEquals(2, OpenMapService.uniquePlaces(java.util.Arrays.asList(place,
+                new PlaceSearchResult("Nahur, S Ward, Mumbai", 19.1501, 72.9401),
+                new PlaceSearchResult("Nahur Station, Mumbai", 19.15, 72.94))).size());
+    }
     @Test public void rejectsForeignAndWrongLocalityMatches() {
         List<PlaceSearchResult> values = java.util.Arrays.asList(
                 new PlaceSearchResult("Shubh Aangan, Italy", 41.9, 12.5),

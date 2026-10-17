@@ -14,6 +14,18 @@ import java.util.Collections;
 import org.junit.Test;
 
 public class DatasetRiskServiceParserTest {
+    @Test public void locatedExplanationsSurvivePreferenceChangesAndInvalidCoordinatesAreIgnored() throws Exception {
+        String body = "{\"time_period\":\"midday\",\"results\":[{\"route_id\":\"r\",\"risk_exposure\":60,\"ranking_score\":30,"
+                + "\"risk_points\":[{\"id\":\"official\",\"latitude\":19,\"longitude\":73,\"verified\":true,\"reason\":\"Road damage\"},"
+                + "{\"id\":\"invalid\",\"latitude\":190,\"longitude\":73}]}]}";
+        DatasetRouteEvaluation result = DatasetRiskService.parseRouteEvaluation(body,
+                Collections.singletonList(route("r", 20)), RouteProfile.BALANCED);
+        com.safenavi.app.safety.model.RouteSafetyResult value =
+                com.safenavi.app.safety.service.RouteRecommendations.rank(result.getRankedResults(), RouteProfile.SAFEST).get(0);
+        assertEquals(1, value.getRiskPoints().size());
+        assertTrue(value.getRiskPoints().get(0).isVerified());
+        assertEquals("Road damage", value.getRiskPoints().get(0).getReason());
+    }
     @Test public void parsesPointRisk() throws Exception {
         DatasetPointRisk risk = DatasetRiskService.parsePointRisk(
                 "{\"risk_score\":48.5,\"safety_score\":51.5,\"risk_label\":\"high\","

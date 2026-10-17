@@ -16,13 +16,21 @@ import org.json.JSONObject;
 public final class ServerConnectionDialog {
     private ServerConnectionDialog() { }
     public static void show(Activity activity) {
-        EditText input=new EditText(activity); input.setText(ServerConnection.baseUrl()); input.setTextSize(14);
+        show(activity, ServerConnection.baseUrl());
+    }
+    public static void show(Activity activity, String initialAddress) {
+        EditText input=new EditText(activity); input.setText(initialAddress); input.setTextSize(14);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI);
         input.setPadding(40,20,40,20);
         AlertDialog dialog=new MaterialAlertDialogBuilder(activity).setTitle("Server connection")
                 .setMessage("Enter your hosted HTTPS address, or the laptop address shown by Start Safe-Navi. Only laptop hosting requires the same network. A sleeping free cloud server may take about a minute to wake. Changing the address signs you out.")
-                .setView(input).setNegativeButton("Cancel",null).setPositiveButton("Test and save",null).create();
-        dialog.setOnShowListener(shown -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
+                .setView(input).setNeutralButton("Use cloud", null).setNegativeButton("Cancel",null).setPositiveButton("Test and save",null).create();
+        dialog.setOnShowListener(shown -> {
+            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
+                input.setText(ServerConnection.CLOUD_ORIGIN);
+                input.setError(null);
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             final String address;
             try { address=ServerConnection.normalize(input.getText().toString()); }
             catch(IllegalArgumentException error){input.setError(error.getMessage());return;}
@@ -61,7 +69,7 @@ public final class ServerConnectionDialog {
                     if(changed) activity.startActivity(new Intent(activity,LoginTypeActivity.class).setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
                 });
             },"safenavi-connection-check").start();
-        }));
+        }); });
         dialog.show();
     }
 }

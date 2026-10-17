@@ -18,15 +18,16 @@ android {
         applicationId "com.safenavi.app"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 12
+        versionName "1.2-map"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         
         // Inject keys into BuildConfig
         buildConfigField "String", "NOMINATIM_BASE_URL", "\"${localProperties.getProperty('NOMINATIM_BASE_URL', 'https://nominatim.openstreetmap.org')}\""
         buildConfigField "String", "VALHALLA_BASE_URL", "\"${localProperties.getProperty('VALHALLA_BASE_URL', 'https://valhalla1.openstreetmap.de')}\""
-        buildConfigField "String", "RISK_API_BASE_URL", "\"${localProperties.getProperty('RISK_API_BASE_URL', 'http://10.0.2.2:8000')}\""
+        // Cloud is the install default. LAN builds must opt in explicitly with -PriskApiBaseUrl=...
+        buildConfigField "String", "RISK_API_BASE_URL", "\"${project.findProperty('riskApiBaseUrl') ?: 'https://safe-navi-api.onrender.com'}\""
         manifestPlaceholders = [usesCleartextTraffic: "false"]
         
     }
