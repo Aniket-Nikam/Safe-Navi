@@ -42,8 +42,7 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backendRoot = Join-Path $projectRoot "backend"
 $pythonPath = Join-Path $backendRoot "venv\Scripts\python.exe"
 $databasePath = Join-Path $backendRoot "data\safe_navi_runtime.sqlite"
-$apkPath = Join-Path $projectRoot "deliverables\Safe-Navi-Demo-v1.1.apk"
-$localPropertiesPath = Join-Path $projectRoot "local.properties"
+$apkPath = Join-Path $projectRoot "deliverables\Safe-Navi-Map-1.2.apk"
 $adbPath = Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"
 $healthUrl = "http://127.0.0.1:8000/health"
 
@@ -116,13 +115,8 @@ Write-Host "  PC API docs           http://127.0.0.1:8000/docs"
 Write-Host "  Phone health check    $phoneHealth" -ForegroundColor Cyan
 Write-Host ""
 
-if (Test-Path -LiteralPath $localPropertiesPath) {
-    $configuredUrl = Select-String -LiteralPath $localPropertiesPath -Pattern '^RISK_API_BASE_URL=(.+)$' |
-        Select-Object -First 1 | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() }
-    if ($configuredUrl -and $configuredUrl -notlike "*://${lanIp}:8000") {
-        Write-Warning "The APK default is $configuredUrl, but this PC is now $lanIp. In the app, open Server connection and enter http://${lanIp}:8000, then Test and save."
-    }
-}
+Write-Host "  APK                   Map 1.2 (cloud default; existing server choice preserved)"
+Write-Host "  To use THIS laptop's accounts/data: in the app open Server connection, enter http://${lanIp}:8000, then Test and save." -ForegroundColor Cyan
 
 if (Test-Path -LiteralPath $adbPath) {
     $device = & $adbPath devices | Select-String "`tdevice$" | Select-Object -First 1

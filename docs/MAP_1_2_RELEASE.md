@@ -9,3 +9,14 @@
 - Offline tile-download callbacks no longer target a destroyed settings view. Downloaded tiles are not a replacement for online search, live ML evaluation, or new safety updates.
 
 Free cloud hosting can sleep. Test and save allows time to wake it; retry the map after a successful health check. Public search/routing providers also have availability and usage limits. This update does not provision cloud officials/admins, migrate local product data, or configure the external news scheduler.
+
+## Verification on 17 October 2026
+
+- Android build and 36 JVM unit tests passed.
+- Two API-36.1 emulator layout tests passed: all three cards, A/B layers and selected-route risk marker layer, visible map space, and short-name/locality search rows.
+- Opt-in read-only Android live smoke test passed: Photon returned SIES College in Nerul, Valhalla returned actual road candidates, and the deployed cloud backend evaluated them with `trained_ml`; the real map rendered A/B endpoints and comparison cards. For this tested morning route, the same physical road won all three preferences. That is not evidence of three different recommendations.
+- Backend suite: 58 passed, 3 skipped (PostgreSQL-specific checks require an isolated PostgreSQL test URL). Existing closure-geometry tests passed alongside new risk-marker tests.
+- Render deployed application commit `d2358d4` successfully. `/health` reports PostgreSQL, Supabase evidence and trained ML.
+- APK: `deliverables/Safe-Navi-Map-1.2.apk`, version code 12. SHA-256: `51C54F326937B57309C46B373447789B4BD29A04553A5869B10B9BBE20E4CE25`.
+
+These checks do not establish bug-free operation or full two-phone role/evidence acceptance on the cloud deployment. The first Espresso-based search assertion hit an old test-library/API-36 incompatibility; the final tests use direct view assertions and pass.
