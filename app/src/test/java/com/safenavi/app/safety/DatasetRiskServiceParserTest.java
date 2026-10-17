@@ -14,6 +14,12 @@ import java.util.Collections;
 import org.junit.Test;
 
 public class DatasetRiskServiceParserTest {
+    @Test public void unknownSectionRemainsUnknownWhenReranking() throws Exception {
+        String body="{\"time_period\":\"midday\",\"results\":[{\"route_id\":\"r\",\"risk_exposure\":50,\"ranking_score\":30,\"risk_sections\":[{\"id\":\"s\",\"band\":\"unknown\",\"risk_exposure\":null,\"coordinates\":[{\"latitude\":19,\"longitude\":73},{\"latitude\":19.1,\"longitude\":73}]}]}]}";
+        DatasetRouteEvaluation value=DatasetRiskService.parseRouteEvaluation(body,Collections.singletonList(route("r",20)),RouteProfile.BALANCED);
+        com.safenavi.app.safety.model.RouteRiskSection section=com.safenavi.app.safety.service.RouteRecommendations.rank(value.getRankedResults(),RouteProfile.FASTEST).get(0).getRiskSections().get(0);
+        assertTrue(Double.isNaN(section.risk)); assertEquals("unknown",section.band); assertEquals(2,section.geometry.size());
+    }
     @Test public void locatedExplanationsSurvivePreferenceChangesAndInvalidCoordinatesAreIgnored() throws Exception {
         String body = "{\"time_period\":\"midday\",\"results\":[{\"route_id\":\"r\",\"risk_exposure\":60,\"ranking_score\":30,"
                 + "\"risk_points\":[{\"id\":\"official\",\"latitude\":19,\"longitude\":73,\"verified\":true,\"reason\":\"Road damage\"},"

@@ -78,10 +78,23 @@ public class MapPresentationInstrumentedTest {
                 assertTrue("Map needs visible space between search and results", panel.getTop() - search.getBottom() > 60);
                 for (int id : new int[]{R.id.fastestRecommendation, R.id.balancedRecommendation, R.id.safestRecommendation}) {
                     TextView row = activity.findViewById(id);
-                    assertTrue(row.isShown()); assertTrue("Preference text clipped", row.getLayout().getHeight() <= row.getHeight() - row.getPaddingTop() - row.getPaddingBottom());
+                    assertFalse("Comparisons must not cover the map until requested",row.isShown());
                 }
+                assertFalse(activity.findViewById(R.id.endpointEditor).isShown());
+                assertFalse(activity.findViewById(R.id.safetyScoreCard).isShown());
+                assertEquals("none",mapRef.get().getStyle().getLayer("selected-route-risk-markers").getVisibility().getValue());
             });
             screenshot("map-redesign.png");
+            scenario.onActivity(activity -> activity.findViewById(R.id.findRouteButton).performClick());
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            scenario.onActivity(activity -> {
+                try {
+                    Field field=MapsActivity.class.getDeclaredField("activeMapSheet"); field.setAccessible(true);
+                    android.app.Dialog sheet=(android.app.Dialog)field.get(activity);
+                    assertNotNull(sheet); assertTrue(hasVisibleText(sheet.getWindow().getDecorView(),"Choose your route"));
+                } catch(Exception e) { throw new AssertionError(e); }
+            });
+            screenshot("map-comparison-1.3.png");
         }
     }
 
@@ -92,7 +105,7 @@ public class MapPresentationInstrumentedTest {
             scenario.onActivity(activity -> {
                 com.safenavi.app.product.PlaceSearchSheet sheet = new com.safenavi.app.product.PlaceSearchSheet(
                         activity, new com.safenavi.app.safety.network.OpenMapService(),
-                        new com.safenavi.app.safety.network.OfflineRouter(activity), "Destination", "", 19, 73,
+                        new com.safenavi.app.safety.network.OfflineRouter(activity), "Destination", "SIES", 19, 73,
                         new com.safenavi.app.product.PlaceSearchSheet.Listener() {
                             public void onPlace(PlaceSearchResult place) { }
                             public void onMapPin() { }

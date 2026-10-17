@@ -8,6 +8,7 @@ import com.safenavi.app.safety.model.RouteCandidate;
 import com.safenavi.app.safety.model.RouteProfile;
 import com.safenavi.app.safety.model.RouteSafetyResult;
 import com.safenavi.app.safety.model.RouteRiskPoint;
+import com.safenavi.app.safety.model.RouteRiskSection;
 import java.io.IOException;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -142,8 +143,22 @@ public class DatasetRiskService {
                 riskPoints.add(new RouteRiskPoint(zone.optString("id"), lat, lon, zone.optString("title"),
                         zone.optString("reason"), zone.optDouble("risk_exposure", 0), zone.optBoolean("verified", false), zone.optString("source")));
             }
+            List<RouteRiskSection> sections=new ArrayList<>(); JSONArray sectionArray=item.optJSONArray("risk_sections");
+            if(sectionArray!=null) for(int j=0;j<sectionArray.length();j++) {
+                JSONObject section=sectionArray.optJSONObject(j); if(section==null) continue;
+                JSONArray points=section.optJSONArray("coordinates"); List<HazardLocation.GeoPoint> shape=new ArrayList<>();
+                if(points!=null) for(int k=0;k<points.length();k++) {
+                    JSONObject point=points.optJSONObject(k); if(point==null) continue;
+                    double lat=point.optDouble("latitude",Double.NaN), lon=point.optDouble("longitude",Double.NaN);
+                    if(Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180) shape.add(new HazardLocation.GeoPoint(lat,lon));
+                }
+                if(shape.size()<2) continue;
+                sections.add(new RouteRiskSection(section.optString("id"),section.optString("band","unknown"),
+                        section.optString("area_name"),section.optString("reason"),section.optString("source"),section.optDouble("risk_exposure",Double.NaN),
+                        section.optDouble("latitude"),section.optDouble("longitude"),section.optDouble("distance_from_start_m"),section.optDouble("length_m"),shape));
+            }
             ranked.add(new RouteSafetyResult(route, profile, item.getDouble("risk_exposure"),
-                    item.getDouble("ranking_score"), riskPoints));
+                    item.getDouble("ranking_score"), riskPoints, sections));
             if (i == 0) {
                 coverage = item.optDouble("coverage_ratio", 0);
                 if (provider.endsWith("_ml")) {

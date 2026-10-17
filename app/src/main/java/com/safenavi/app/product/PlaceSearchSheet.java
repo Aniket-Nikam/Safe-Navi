@@ -24,6 +24,7 @@ import com.safenavi.app.R;
 import com.safenavi.app.safety.model.PlaceSearchResult;
 import com.safenavi.app.safety.network.OpenMapService;
 import com.safenavi.app.safety.network.OfflineRouter;
+import com.safenavi.app.safety.service.PlaceRelevance;
 import java.util.ArrayList;
 import java.util.List;
 import okhttp3.Call;
@@ -70,10 +71,10 @@ public final class PlaceSearchSheet {
         input.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
         field.addView(input, new LinearLayout.LayoutParams(-1, dp(60))); root.addView(field);
         LinearLayout actions = new LinearLayout(activity);
-        MaterialButton locate = button("My location"), pin = button("Choose on map"), search = button("Search");
+        MaterialButton locate = button("My location"), pin = button("Choose on map"), search = button("Go");
         locate.setOnClickListener(v -> { dialog.dismiss(); listener.onDeviceLocation(); });
         pin.setOnClickListener(v -> { dialog.dismiss(); listener.onMapPin(); });
-        search.setOnClickListener(v -> search(true));
+        search.setOnClickListener(v -> submitBest());
         for (MaterialButton action : new MaterialButton[]{locate, pin, search})
             actions.addView(action, new LinearLayout.LayoutParams(0, dp(48), 1));
         root.addView(actions);
@@ -99,7 +100,7 @@ public final class PlaceSearchSheet {
             @Override public void afterTextChanged(Editable s) { }
         });
         input.setOnEditorActionListener((v, action, event) -> {
-            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) { search(true); return true; }
+            if (action == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) { submitBest(); return true; }
             return false;
         });
         dialog.setOnDismissListener(d -> {
@@ -112,13 +113,13 @@ public final class PlaceSearchSheet {
             dialog.getBehavior().setSkipCollapsed(true);
             input.requestFocus();
         });
-        input.setText(initial);
+        input.setText("My location".equalsIgnoreCase(initial.trim()) ? "" : initial);
     }
 
     public void show() { dialog.show(); }
     public void showResults(List<PlaceSearchResult> places) {
-        invalidate(); adapter.set(OpenMapService.uniquePlaces(places));
-        status.setText("Select a place · confirm its locality below"); dialog.show();
+        invalidate(); adapter.set(ranked(places));
+        status.setText("Go uses the best match. Or tap another place below."); dialog.show();
     }
     private void invalidate() {
         generation++;
@@ -135,15 +136,17 @@ public final class PlaceSearchSheet {
         OpenMapService.ResultCallback<List<PlaceSearchResult>> callback = new OpenMapService.ResultCallback<List<PlaceSearchResult>>() {
             @Override public void onSuccess(List<PlaceSearchResult> places) { activity.runOnUiThread(() -> {
                 if (!active(request)) return;
-                adapter.set(OpenMapService.uniquePlaces(places));
+                List<PlaceSearchResult> matches=ranked(places); adapter.set(matches);
+                if(explicit && !matches.isEmpty()) { choose(matches.get(0)); return; }
                 status.setText(places.isEmpty() ? "No match. Try the full name and locality, tap Search, or choose on map."
-                        : "Select a place · confirm its locality below");
+                        : "Go uses the best match. Or tap another place below.");
             }); }
             @Override public void onError(String message) {
                 if (!active(request)) return;
                 offline.search(query, new OfflineRouter.Callback<List<PlaceSearchResult>>() {
                     @Override public void onSuccess(List<PlaceSearchResult> places) { activity.runOnUiThread(() -> {
-                        if (!active(request)) return; adapter.set(OpenMapService.uniquePlaces(places));
+                        if (!active(request)) return; List<PlaceSearchResult> matches=ranked(places); adapter.set(matches);
+                        if(explicit && !matches.isEmpty()) { choose(matches.get(0)); return; }
                         status.setText("Offline graph matches · limited Navi Mumbai coverage");
                     }); }
                     @Override public void onError(String ignored) { activity.runOnUiThread(() -> {
@@ -154,6 +157,18 @@ public final class PlaceSearchSheet {
         };
         if (explicit) provider.search(query, callback);
         else suggestion = provider.suggest(query, latitude, longitude, callback);
+    }
+    private List<PlaceSearchResult> ranked(List<PlaceSearchResult> places) {
+        return PlaceRelevance.rank(input.getText()==null?"":input.getText().toString(),OpenMapService.uniquePlaces(places),latitude,longitude);
+    }
+    private void choose(PlaceSearchResult place) { dialog.dismiss(); listener.onPlace(place); }
+    private void submitBest() {
+        String query=input.getText()==null?"":input.getText().toString().trim();
+        if("my location".equalsIgnoreCase(query) || "current location".equalsIgnoreCase(query)) {
+            dialog.dismiss(); listener.onDeviceLocation(); return;
+        }
+        if(!adapter.places.isEmpty()) { choose(adapter.places.get(0)); return; }
+        search(true);
     }
     private boolean active(int request) { return request == generation && dialog.isShowing() && !activity.isFinishing() && !activity.isDestroyed(); }
     private int dp(int value) { return Math.round(value * activity.getResources().getDisplayMetrics().density); }

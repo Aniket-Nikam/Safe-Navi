@@ -26,6 +26,7 @@ from .security import RateLimitMiddleware
 from .cloud_configuration import scheduler_mode, validate_cloud_configuration
 from .cloud_database import database_url, ProductDatabaseUnavailable
 from .evidence_storage import backend_name
+from .route_explanations import explain as explain_route, markers as explanation_markers
 
 PERIODS = {"morning_peak", "midday", "evening_peak", "night"}
 WEIGHTS = {"fastest": 0.0, "balanced": 0.35, "safest": 1.0}
@@ -386,48 +387,6 @@ def combine_risk(dataset_risk: float, verified_risk: float) -> float:
     return combined_contributions([dataset_risk, verified_risk])
 
 
-def route_risk_points(points: list[Coordinate], cells: list[dict | None], time_period: str,
-                     affecting_hazards: list[dict]) -> list[dict]:
-    """Located explanations, never disguise synthetic model estimates as verified incidents.
-
-    At most six distinct area cells are evaluated for explanation markers. This does
-    not alter route inference, its established sampling representation or rankings.
-    """
-    output = [{"id": hazard["id"], "latitude": hazard["latitude"], "longitude": hazard["longitude"],
-               "title": hazard["title"], "reason": hazard["reason"], "verified": True,
-               "source": "government_verified_hazard", "risk_exposure": SEVERITY_RISK.get(hazard["severity"], 0),
-               "severity": hazard["severity"], "road_status": hazard["road_status"],
-               "distance_meters": hazard["distance_meters"]} for hazard in affecting_hazards]
-    unique = {}
-    for point, cell in zip(points, cells):
-        if cell:
-            unique.setdefault(cell.get("area_cell_id") or (point.latitude, point.longitude), (point, cell))
-    candidates = sorted(unique.values(), key=lambda pair: pair[1]["risk_score"], reverse=True)[:6]
-    estimates = []
-    for point, cell in candidates:
-        prediction, _, provider = predict_point(factors=cell["factors"], time_period=time_period,
-                jurisdiction=cell["jurisdiction"], latitude=point.latitude, longitude=point.longitude)
-        risk = prediction["risk_exposure"] if prediction else cell["risk_score"]
-        if risk < 50:
-            continue
-        factors = prediction.get("factor_contributions", {}) if prediction else cell["factors"]
-        leading = sorted(((name, value) for name, value in factors.items() if value > 0),
-                         key=lambda item: item[1], reverse=True)[:3]
-        reasons = ", ".join(f"{name.replace('_index', '').replace('_', ' ')} {value:+.1f}"
-                            for name, value in leading) or "Elevated area-cell baseline"
-        estimates.append({"id": f"estimate_{cell.get('area_cell_id', len(estimates))}",
-                          "latitude": point.latitude, "longitude": point.longitude,
-                          "title": f"Elevated estimated risk · {cell['area_name']}",
-                          "reason": f"Synthetic baseline estimate, not a verified incident. Leading factors: {reasons}.",
-                          "risk_exposure": round(risk, 2), "verified": False,
-                          "source": "trained_ml_area_estimate" if prediction else "synthetic_baseline_estimate"})
-    selected = []
-    for point in sorted(estimates, key=lambda item: item["risk_exposure"], reverse=True):
-        if all(haversine_meters(point["latitude"], point["longitude"], other["latitude"], other["longitude"]) >= 500 for other in selected):
-            selected.append(point)
-        if len(selected) == 3:
-            break
-    return output + selected
 
 
 @app.post("/api/v1/risk/route")
@@ -461,6 +420,11 @@ def route_risk(request: RouteRiskRequest) -> dict:
         jurisdiction = (max(jurisdiction_counts, key=jurisdiction_counts.get) if matched else None)
         verified_exposure, affecting_hazards = route_hazard_risk(route.coordinates)
         combined_exposure = combine_risk(exposure, verified_exposure)
+        sections = explain_route(route.coordinates, request.time_period, lookup_point, predict_point)
+        official_points = [{"id": h["id"], "latitude": h["latitude"], "longitude": h["longitude"],
+                           "title": h["title"], "reason": h["reason"], "verified": True,
+                           "source": "government_verified_hazard", "risk_exposure": SEVERITY_RISK.get(h["severity"], 0)}
+                          for h in affecting_hazards]
         score = route.travel_minutes + WEIGHTS[request.profile] * combined_exposure
         results.append(
             {
@@ -476,7 +440,9 @@ def route_risk(request: RouteRiskRequest) -> dict:
                 "factor_averages": factors,
                 "areas": areas,
                 "jurisdiction": jurisdiction,
-                "risk_points": route_risk_points(points, cells, request.time_period, affecting_hazards),
+                "risk_points": explanation_markers(sections, official_points),
+                "risk_sections": sections,
+                "explanation_notice": "Distance-sampled area estimates across the full route. Grey sections are unassessed, not safe. Official hazards are separate verified records.",
             }
         )
     if not results:

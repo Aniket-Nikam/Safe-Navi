@@ -15,7 +15,7 @@ public final class RouteRecommendations {
     public static List<RouteSafetyResult> rank(List<RouteSafetyResult> evaluated, RouteProfile profile) {
         List<RouteSafetyResult> output = new ArrayList<>();
         for (RouteSafetyResult value : evaluated) output.add(new RouteSafetyResult(value.getRoute(), profile,
-                value.getRiskExposure(), value.getRoute().getTravelMinutes() + weight(profile) * value.getRiskExposure(), value.getRiskPoints()));
+                value.getRiskExposure(), value.getRoute().getTravelMinutes() + weight(profile) * value.getRiskExposure(), value.getRiskPoints(), value.getRiskSections()));
         output.sort(Comparator.comparingDouble(RouteSafetyResult::getScore)
                 .thenComparing(value -> value.getRoute().getProviderRouteId()));
         return output;

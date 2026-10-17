@@ -94,7 +94,7 @@ public class OpenMapService {
 
     /** Photon supports search-as-you-type; public Nominatim MUST remain explicit-submit only. */
     public Call suggest(String query, double latitude, double longitude, ResultCallback<List<PlaceSearchResult>> callback) {
-        String cacheKey = query.trim().toLowerCase(java.util.Locale.ROOT);
+        String cacheKey = query.trim().toLowerCase(java.util.Locale.ROOT) + ":" + Math.round(latitude*100) + ":" + Math.round(longitude*100);
         synchronized (suggestionCache) {
             if (suggestionCache.containsKey(cacheKey)) {
                 callback.onSuccess(new ArrayList<>(suggestionCache.get(cacheKey))); return null;

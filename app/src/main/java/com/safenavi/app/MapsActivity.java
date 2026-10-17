@@ -52,6 +52,7 @@ import com.safenavi.app.safety.model.RouteCandidate;
 import com.safenavi.app.safety.model.RouteProfile;
 import com.safenavi.app.safety.model.RouteSafetyResult;
 import com.safenavi.app.safety.model.RouteRiskPoint;
+import com.safenavi.app.safety.model.RouteRiskSection;
 import com.safenavi.app.safety.model.TravelMode;
 import com.safenavi.app.safety.network.OpenMapService;
 import com.safenavi.app.safety.network.DatasetRiskService;
@@ -109,9 +110,14 @@ public class MapsActivity extends AppCompatActivity {
     private static final String SELECTED_ROUTE_LAYER = "safe-navi-selected-route-line";
     private static final String RISK_POINTS_SOURCE = "selected-route-risk-points";
     private static final String RISK_POINTS_LAYER = "selected-route-risk-markers";
+    private static final String RISK_SECTIONS_LAYER = "selected-route-exposure";
+    private static final String RISK_SECTIONS_SOURCE = "selected-route-exposure-source";
     private static final List<String> HAZARD_LAYER_IDS = Arrays.asList(
             "hazard-low-point", "hazard-moderate-point", "hazard-high-point", "hazard-critical-point",
-            "hazard-geometry-line", "hazard-geometry-fill", "pending-report-point", RISK_POINTS_LAYER);
+            "hazard-geometry-line", "hazard-geometry-fill", "pending-report-point", RISK_POINTS_LAYER, RISK_SECTIONS_LAYER);
+    private boolean risksVisible;
+    private RouteSafetyResult displayedRoute;
+    private com.google.android.material.bottomsheet.BottomSheetDialog activeMapSheet;
 
     private MapView mapView;
     private MapLibreMap map;
@@ -247,7 +253,17 @@ public class MapsActivity extends AppCompatActivity {
         routeProfileButton.setOnClickListener(v -> showRouteProfilePicker());
         findViewById(R.id.emergencyButton).setOnClickListener(v -> showEmergencyTools());
         findViewById(R.id.areaCrimeButton).setOnClickListener(v -> showAreaCrime());
-        findRouteButton.setOnClickListener(v -> findRoutes());
+        findRouteButton.setOnClickListener(v -> { if(displayedRoute==null) findRoutes(); else showRouteComparisonSheet(); });
+        findViewById(R.id.mapSearchSummary).setOnClickListener(v -> openPlaceSearch(false));
+        findViewById(R.id.editEndpointsButton).setOnClickListener(v -> {
+            View editor=findViewById(R.id.endpointEditor);
+            editor.setVisibility(editor.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);
+        });
+        findViewById(R.id.riskLayerButton).setOnClickListener(v -> {
+            if(displayedRoute==null) { Toast.makeText(this,"Plan a route first to inspect its coverage.",Toast.LENGTH_SHORT).show(); return; }
+            risksVisible=!risksVisible; applyRiskVisibility();
+            if(risksVisible) showRiskLegend();
+        });
         destinationInput.setOnEditorActionListener((view, action, event) -> {
             if (action == android.view.inputmethod.EditorInfo.IME_ACTION_DONE) { findRoutes(); return true; }
             return false;
@@ -293,8 +309,10 @@ public class MapsActivity extends AppCompatActivity {
                 center == null ? 73.023 : center.getLongitude(), new PlaceSearchSheet.Listener() {
             @Override public void onPlace(PlaceSearchResult place) {
                 setSelectedPlace(source, place); invalidateRouteForEndpoints();
+                findViewById(R.id.endpointEditor).setVisibility(View.GONE);
                 if (map != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(place.getLatitude(), place.getLongitude()), 14.5));
                 if (!textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) findRoutes();
+                else if(!source && textOf(sourceInput).isEmpty()) { locatingSource=true; enableLocationWithContext(); }
             }
             @Override public void onMapPin() {
                 routePinTarget = source ? 1 : 2;
@@ -309,12 +327,16 @@ public class MapsActivity extends AppCompatActivity {
         input.setText(place.getPrimaryText()); input.setContentDescription((source ? "Start: " : "Destination: ") + place.getDisplayName());
         if (source) { selectedSourcePlace = place; selectedSourceText = textOf(input); }
         else { selectedDestinationPlace = place; selectedDestinationText = textOf(input); }
+        ((TextView)findViewById(R.id.mapSearchSummary)).setText(selectedDestinationPlace==null?"Where to?":selectedDestinationPlace.getPrimaryText());
         if (mapStyle != null) renderEndpoint(source ? "start" : "finish", source ? "A" : "B", place, source ? "#08735C" : "#BF3F38");
     }
 
     private void invalidateRouteForEndpoints() {
         activeRouteRequest++; setRouteBusy(false); routeResultCard.setVisibility(View.GONE);
         detailCard.setVisibility(View.GONE); selectedRiskPoints.clear(); lastRouteSummary = ""; lastDestination = null;
+        displayedRoute=null;
+        ((TextView)findViewById(R.id.mapSearchSummary)).setText(textOf(destinationInput).isEmpty()?"Where to?":textOf(destinationInput));
+        findRouteButton.setText("Plan route");
         ((TextView)findViewById(R.id.routeStatusText)).setText("Ready to compare all three preferences");
         int[] ids = {R.id.fastestRecommendation, R.id.balancedRecommendation, R.id.safestRecommendation};
         RouteProfile[] profiles = {RouteProfile.FASTEST, RouteProfile.BALANCED, RouteProfile.SAFEST};
@@ -327,6 +349,7 @@ public class MapsActivity extends AppCompatActivity {
         if (mapStyle != null) {
             removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE); removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
             removeLayerAndSource(RISK_POINTS_LAYER, RISK_POINTS_SOURCE);
+            removeLayerAndSource(RISK_SECTIONS_LAYER, RISK_SECTIONS_SOURCE);
         }
     }
 
@@ -344,6 +367,118 @@ public class MapsActivity extends AppCompatActivity {
                 selected ? color : androidx.core.content.ContextCompat.getColor(this, R.color.divider));
         option.setBackground(background); option.setSelected(selected);
         option.setTypeface(android.graphics.Typeface.DEFAULT, selected ? android.graphics.Typeface.BOLD : android.graphics.Typeface.NORMAL);
+    }
+
+    private android.widget.LinearLayout sheetContent() {
+        android.widget.LinearLayout content=new android.widget.LinearLayout(this); content.setOrientation(android.widget.LinearLayout.VERTICAL);
+        int pad=Math.round(20*getResources().getDisplayMetrics().density); content.setPadding(pad,pad,pad,pad);
+        content.setBackgroundColor(androidx.core.content.ContextCompat.getColor(this,R.color.surface)); return content;
+    }
+    private TextView sheetText(String text,int size) {
+        TextView label=new TextView(this); label.setText(text); label.setTextSize(size);
+        label.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.text_primary));
+        int pad=Math.round(8*getResources().getDisplayMetrics().density); label.setPadding(0,pad,0,pad); return label;
+    }
+    private MaterialButton sheetButton(String text) {
+        MaterialButton button=new MaterialButton(this,null,com.google.android.material.R.attr.borderlessButtonStyle);
+        button.setText(text); button.setAllCaps(false); button.setLetterSpacing(0); button.setTextSize(14); button.setMinHeight(Math.round(48*getResources().getDisplayMetrics().density)); return button;
+    }
+    private com.google.android.material.bottomsheet.BottomSheetDialog presentSheet(android.widget.LinearLayout content) {
+        if(activeMapSheet!=null) activeMapSheet.dismiss();
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet=new com.google.android.material.bottomsheet.BottomSheetDialog(this);
+        activeMapSheet=sheet; sheet.setOnDismissListener(d -> { if(activeMapSheet==sheet) activeMapSheet=null; });
+        android.widget.ScrollView scroll=new android.widget.ScrollView(this); scroll.setFillViewport(false); scroll.addView(content);
+        sheet.setContentView(scroll); sheet.show(); sheet.getBehavior().setState(com.google.android.material.bottomsheet.BottomSheetBehavior.STATE_EXPANDED); return sheet;
+    }
+    private void showRouteComparisonSheet() {
+        if(displayedRoute==null) return;
+        android.widget.LinearLayout content=sheetContent(); content.addView(sheetText("Choose your route",20));
+        content.addView(sheetText(routeRiskSummaryText(),13));
+        android.widget.LinearLayout options=new android.widget.LinearLayout(this);
+        final com.google.android.material.bottomsheet.BottomSheetDialog[] dialog=new com.google.android.material.bottomsheet.BottomSheetDialog[1];
+        int[] ids={R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation};
+        RouteProfile[] profiles={RouteProfile.FASTEST,RouteProfile.BALANCED,RouteProfile.SAFEST};
+        for(int i=0;i<ids.length;i++) {
+            final int id=ids[i]; TextView state=findViewById(id); MaterialButton choice=sheetButton(state.getText().toString());
+            choice.setTextSize(12); choice.setPadding(4,12,4,12); choice.setMinWidth(0); choice.setMinimumWidth(0);
+            choice.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.text_primary));
+            choice.setStrokeColor(android.content.res.ColorStateList.valueOf(routeColor(profiles[i])));
+            choice.setStrokeWidth(profiles[i]==routeProfile?Math.round(2*getResources().getDisplayMetrics().density):0);
+            choice.setCornerRadius(Math.round(14*getResources().getDisplayMetrics().density));
+            choice.setContentDescription(state.getText()+". Select route");
+            choice.setOnClickListener(v -> { dialog[0].dismiss(); state.performClick(); });
+            options.addView(choice,new android.widget.LinearLayout.LayoutParams(0,-2,1));
+        }
+        content.addView(options);
+        content.addView(sheetText("All three use the same evaluated roads. If one road wins every preference, its time and risk stay the same.",12));
+        MaterialButton details=sheetButton("Details, share & navigation"), compare=sheetButton("Refresh route comparison"), close=sheetButton("Back to map");
+        content.addView(details); content.addView(compare); content.addView(close);
+        details.setOnClickListener(v -> { dialog[0].dismiss(); showRouteDetailsSheet(); });
+        compare.setOnClickListener(v -> { dialog[0].dismiss(); findRoutes(); });
+        close.setOnClickListener(v -> dialog[0].dismiss()); dialog[0]=presentSheet(content);
+    }
+    private String routeRiskSummaryText() { return ((TextView)findViewById(R.id.routeRiskSummary)).getText().toString(); }
+    private void openHazardDetailSheet() {
+        detailCard.setVisibility(View.GONE);
+        android.widget.LinearLayout content=sheetContent(); content.addView(sheetText(detailTitle.getText().toString(),20));
+        content.addView(sheetText(detailMeta.getText().toString(),12)); content.addView(sheetText(detailReason.getText().toString(),14));
+        final String hazardId=currentHazardId;
+        if(isGovernmentUser() && hazardId!=null) {
+            MaterialButton update=sheetButton("Update official hazard lifecycle"); content.addView(update);
+            update.setOnClickListener(v -> { currentHazardId=hazardId; showHazardLifecycleDialog(); });
+        }
+        MaterialButton close=sheetButton("Back to map"); content.addView(close);
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet=presentSheet(content); close.setOnClickListener(v -> sheet.dismiss());
+    }
+    private void showRiskLegend() {
+        android.widget.LinearLayout content=sheetContent(); content.addView(sheetText("Understand route coverage",20));
+        content.addView(sheetText("Blue: lower estimated exposure\nAmber: moderate estimate\nOrange / red: elevated estimate\nGrey: no assessment\nRed ! pins: government-verified hazards",14));
+        content.addView(sheetText("No colour or missing pin is proof that a road is safe. Estimates use synthetic area-cell factors, not precise crime observations. Road curves are preserved; the display samples approximately every 500 m (up to 128 sections).",13));
+        if(displayedRoute!=null) {
+            double total=0, assessed=0; for(RouteRiskSection section:displayedRoute.getRiskSections()) { total+=section.length; if(Double.isFinite(section.risk)) assessed+=section.length; }
+            content.addView(sheetText(total>0?String.format(Locale.US,"%.0f%% of route length has an area estimate. %.1f km is unassessed.",100*assessed/total,(total-assessed)/1000):"Section coverage is unavailable from this server / offline route. Do not infer safety from missing markers.",13));
+        }
+        MaterialButton list=sheetButton("View every route section"), close=sheetButton("Inspect on map"); content.addView(list); content.addView(close);
+        com.google.android.material.bottomsheet.BottomSheetDialog sheet=presentSheet(content);
+        close.setOnClickListener(v -> sheet.dismiss()); list.setOnClickListener(v -> { sheet.dismiss(); showRiskSectionList(); });
+    }
+    private void showRiskSectionList() {
+        if(displayedRoute==null) return;
+        android.widget.LinearLayout content=sheetContent(); content.addView(sheetText("Full journey assessment",20));
+        content.addView(sheetText("Area estimates, not guarantees of safety. Tap any section to locate it.",13));
+        final com.google.android.material.bottomsheet.BottomSheetDialog[] dialog=new com.google.android.material.bottomsheet.BottomSheetDialog[1];
+        for(RouteRiskSection section:displayedRoute.getRiskSections()) {
+            String value=Double.isFinite(section.risk)?String.format(Locale.US,"%.0f/100 estimate",section.risk):"Unassessed";
+            MaterialButton row=sheetButton(String.format(Locale.US,"%.1f–%.1f km: %s\n%s",section.offset/1000,(section.offset+section.length)/1000,value,section.area));
+            row.setOnClickListener(v -> { dialog[0].dismiss(); currentHazardId=null; detailTitle.setText(section.area); detailMeta.setText(value); detailReason.setText(section.reason);
+                if(map!=null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(section.latitude,section.longitude),14)); openHazardDetailSheet(); }); content.addView(row);
+        }
+        if(displayedRoute.getRiskSections().isEmpty()) content.addView(sheetText("No section assessment available. Connect to the updated server and compare again.",14));
+        dialog[0]=presentSheet(content);
+    }
+    private void applyRiskVisibility() {
+        if(mapStyle!=null) for(String id:new String[]{RISK_POINTS_LAYER,RISK_SECTIONS_LAYER}) {
+            org.maplibre.android.style.layers.Layer layer=mapStyle.getLayer(id);
+            if(layer!=null) layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(risksVisible?"visible":"none"));
+        }
+        ((MaterialButton)findViewById(R.id.riskLayerButton)).setText(risksVisible?"Hide route risks":"Route risks");
+        if(risksVisible && displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText("Estimates only. Grey = unassessed, not safe.");
+        else if(displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText(profileName(routeProfile)+" · "+String.format(Locale.US,"%.1f km",displayedRoute.getRoute().getDistanceMeters()/1000));
+    }
+    private void renderRiskSections(RouteSafetyResult result) {
+        if(mapStyle==null) return;
+        removeLayerAndSource(RISK_SECTIONS_LAYER,RISK_SECTIONS_SOURCE); List<Feature> features=new ArrayList<>();
+        for(RouteRiskSection section:result.getRiskSections()) {
+            List<Point> shape=new ArrayList<>(); for(HazardLocation.GeoPoint point:section.geometry) shape.add(Point.fromLngLat(point.getLongitude(),point.getLatitude()));
+            if(shape.size()<2) continue;
+            Feature feature=Feature.fromGeometry(LineString.fromLngLats(shape)); feature.addStringProperty("sectionId",section.id);
+            feature.addStringProperty("color","high".equals(section.band)?"#B52F42":"elevated".equals(section.band)?"#C65B29":"moderate".equals(section.band)?"#B38426":"lower".equals(section.band)?"#2F779D":"#7D8490"); features.add(feature);
+        }
+        // Older servers and offline paths explicitly remain unassessed rather than looking safe.
+        if(features.isEmpty()) { Feature feature=Feature.fromGeometry(lineString(result.getRoute())); feature.addStringProperty("color","#7D8490"); features.add(feature); }
+        mapStyle.addSource(new GeoJsonSource(RISK_SECTIONS_SOURCE,FeatureCollection.fromFeatures(features)));
+        mapStyle.addLayerBelow(new LineLayer(RISK_SECTIONS_LAYER,RISK_SECTIONS_SOURCE).withProperties(
+                lineColor(org.maplibre.android.style.expressions.Expression.get("color")),lineWidth(8f),lineOpacity(.95f)),RISK_POINTS_LAYER);
     }
 
     private void showRouteDetailsSheet() {
@@ -367,10 +502,15 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void showMapTools() {
-        String[] tools = {"Saved places", "Visible safety layers", "Pin exact source on map", "Pin exact destination on map"};
+        String[] tools = {"Saved places", "Visible safety layers", "Pin exact source on map", "Pin exact destination on map", "Safety connection", "Area safety details", "Area crime reports", "My location", "Route risk legend"};
         new MaterialAlertDialogBuilder(this).setTitle("Map tools").setItems(tools, (dialog, which) -> {
             if (which == 0) showSavedPlaces();
             else if (which == 1) showHazardFilters();
+            else if(which==4) showConnectionOptions();
+            else if(which==5) new MaterialAlertDialogBuilder(this).setTitle("Area safety estimate").setMessage(scoreText.getText()+"\n"+scoreLabel.getText()+"\n\nAn area estimate is not a guarantee of safety.").setPositiveButton("Close",null).show();
+            else if(which==6) showAreaCrime();
+            else if(which==7) { locatingSource=true; enableLocationWithContext(); }
+            else if(which==8) showRiskLegend();
             else {
                 routePinTarget = which == 2 ? 1 : 2;
                 Toast.makeText(this, "Zoom in, then tap the exact " + (routePinTarget == 1 ? "source" : "destination") + ".", Toast.LENGTH_LONG).show();
@@ -467,6 +607,14 @@ public class MapsActivity extends AppCompatActivity {
         if (!features.isEmpty() && features.get(0).hasProperty("riskPointId")) {
             showRouteRiskPoint(features.get(0).getStringProperty("riskPointId")); return true;
         }
+        if (!features.isEmpty() && features.get(0).hasProperty("sectionId") && displayedRoute!=null) {
+            String id=features.get(0).getStringProperty("sectionId");
+            for(RouteRiskSection section:displayedRoute.getRiskSections()) if(section.id.equals(id)) {
+                currentHazardId=null; detailTitle.setText(section.area);
+                detailMeta.setText(Double.isFinite(section.risk)?String.format(Locale.US,"Estimated exposure %.0f/100 · %.1f km from start",section.risk,section.offset/1000):"Unassessed section");
+                detailReason.setText(section.reason); openHazardDetailSheet(); return true;
+            }
+        }
         if (!features.isEmpty() && features.get(0).hasProperty("hazardId")) {
             showHazard(features.get(0).getStringProperty("hazardId"));
             return true;
@@ -519,7 +667,7 @@ public class MapsActivity extends AppCompatActivity {
         detailTitle.setText(report.optString("title", "Your pending report"));
         detailMeta.setText(report.optString("status").replace('_', ' ') + " · Visible only to you and reviewers");
         detailReason.setText(report.optString("description") + "\n" + report.optString("address"));
-        detailCard.setVisibility(View.VISIBLE);
+        openHazardDetailSheet();
     }
 
     private boolean onMapLongClick(@NonNull LatLng point) {
@@ -709,11 +857,10 @@ public class MapsActivity extends AppCompatActivity {
         detailMeta.setText(hazard.getSeverity().name() + " · " + hazard.getStatus().name()
                 + " · Government verified");
         detailReason.setText(hazard.getReason() + "\n" + hazard.getLocation().getDisplayName());
-        detailCard.setVisibility(View.VISIBLE);
+        openHazardDetailSheet();
         renderScore(hazard.getLocation().getLatitude(), hazard.getLocation().getLongitude());
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(
                 hazard.getLocation().getLatitude(), hazard.getLocation().getLongitude()), 14.2));
-        if (isGovernmentUser()) detailReason.append("\n\nLong-press this card to update the official lifecycle.");
     }
 
     private boolean isGovernmentUser() {
@@ -746,6 +893,7 @@ public class MapsActivity extends AppCompatActivity {
         String sourceText = textOf(sourceInput);
         String destinationText = textOf(destinationInput);
         if (sourceText.isEmpty() || destinationText.isEmpty()) {
+            findViewById(R.id.endpointEditor).setVisibility(View.VISIBLE);
             Toast.makeText(this, "Enter both source and destination.", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -844,6 +992,8 @@ public class MapsActivity extends AppCompatActivity {
         routeProfile = profile; routeProfileButton.setText(profileName(profile));
         ranked = RouteRecommendations.rank(ranked, profile);
         RouteSafetyResult best = ranked.get(0);
+        displayedRoute=best;
+        findViewById(R.id.endpointEditor).setVisibility(View.GONE);
         RouteSafetyResult fastest = best;
         for (RouteSafetyResult result : ranked) if (result.getRoute().getTravelMinutes() < fastest.getRoute().getTravelMinutes()) fastest = result;
         // Only evaluated, non-excluded roads may be displayed as route alternatives.
@@ -894,6 +1044,8 @@ public class MapsActivity extends AppCompatActivity {
                 .append("Line colours: blue Fastest, green Balanced, orange Safest; shared roads overlap. A = start, B = destination.");
         routeResultRisk.setText(comparison.toString());
         renderSelectedRiskPoints(best);
+        renderRiskSections(best);
+        applyRiskVisibility();
         if (mapStyle != null) {
             renderEndpoint("start", "A", source, "#08735C");
             renderEndpoint("finish", "B", destination, "#BF3F38");
@@ -903,8 +1055,8 @@ public class MapsActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.routeRiskSummary)).setText((distinct.size() == 1
                 ? "Same road wins all 3. " : distinct.size() + " recommended roads. ")
                 + verified + " official hazard(s) · " + estimates + " estimated risk zone(s). Tap a pin for why.");
-        ((TextView)findViewById(R.id.routeStatusText)).setText(sourceLabel.startsWith("Offline")
-                ? "Offline graph · last verified snapshot" : "All 3 preferences · tap to highlight a route");
+        ((TextView)findViewById(R.id.routeStatusText)).setText(profileName(profile)+" · "+String.format(Locale.US,"%.1f km",best.getRoute().getDistanceMeters()/1000));
+        findRouteButton.setText(String.format(Locale.US,"Routes · %.0f min",best.getRoute().getTravelMinutes()));
         comparison.append("\n\nSelected-route explanations:\n");
         for (RouteRiskPoint point : selectedRiskPoints.values()) comparison.append(point.isVerified() ? "Official: " : "Estimate: ")
                 .append(point.getTitle()).append("\n").append(point.getReason()).append("\n\n");
@@ -918,6 +1070,7 @@ public class MapsActivity extends AppCompatActivity {
         routeResultCard.setVisibility(View.VISIBLE);
         sourceInput.setText(shortName(source.getDisplayName()));
         destinationInput.setText(shortName(destination.getDisplayName()));
+        ((TextView)findViewById(R.id.mapSearchSummary)).setText(destination.getPrimaryText());
         selectedSourcePlace = source; selectedSourceText = textOf(sourceInput);
         selectedDestinationPlace = destination; selectedDestinationText = textOf(destinationInput);
     }
@@ -1243,8 +1396,8 @@ public class MapsActivity extends AppCompatActivity {
         mapStyle.addSource(new GeoJsonSource(RISK_POINTS_SOURCE,FeatureCollection.fromFeatures(features)));
         mapStyle.addLayer(new SymbolLayer(RISK_POINTS_LAYER,RISK_POINTS_SOURCE).withProperties(
                 org.maplibre.android.style.layers.PropertyFactory.iconImage(org.maplibre.android.style.expressions.Expression.get("icon")),
-                org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap(true),
-                org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement(true)));
+                org.maplibre.android.style.layers.PropertyFactory.iconAllowOverlap(false),
+                org.maplibre.android.style.layers.PropertyFactory.iconIgnorePlacement(false)));
     }
 
     private Bitmap riskPinBitmap(int color,String label) {
@@ -1263,7 +1416,7 @@ public class MapsActivity extends AppCompatActivity {
         detailMeta.setText(point.isVerified()?"Government-verified · selected route"
                 :String.format(Locale.US,"Estimated exposure %.0f/100 · approximate area-cell location",point.getRisk()));
         detailReason.setText(point.getReason()+"\nTap this text for the full explanation.");
-        detailCard.setVisibility(View.VISIBLE);
+        openHazardDetailSheet();
         if(map!=null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(point.getLatitude(),point.getLongitude()),14.8));
     }
 
@@ -1471,10 +1624,12 @@ public class MapsActivity extends AppCompatActivity {
         routeProgress.setVisibility(busy ? View.VISIBLE : View.GONE);
         for (int id : new int[]{R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation}) findViewById(id).setEnabled(!busy);
         if (busy) {
+            displayedRoute=null;
             routeResultCard.setVisibility(View.GONE); detailCard.setVisibility(View.GONE);
             selectedRiskPoints.clear();
             if (mapStyle != null) {
                 removeLayerAndSource(RISK_POINTS_LAYER, RISK_POINTS_SOURCE);
+                removeLayerAndSource(RISK_SECTIONS_LAYER, RISK_SECTIONS_SOURCE);
                 removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE);
                 removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
             }
@@ -1551,6 +1706,7 @@ public class MapsActivity extends AppCompatActivity {
     @Override protected void onStop() { mapView.onStop(); super.onStop(); }
     @Override public void onLowMemory() { super.onLowMemory(); mapView.onLowMemory(); }
     @Override protected void onDestroy() {
+        if(activeMapSheet!=null) activeMapSheet.dismiss();
         activeRouteRequest++;
         activeScoreRequest++;
         mapView.onDestroy();
