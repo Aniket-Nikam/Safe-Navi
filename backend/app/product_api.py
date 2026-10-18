@@ -64,6 +64,7 @@ from .product_database import (
     update_news_configuration,
 )
 from .news_intelligence import ingest_configured_feeds
+from .news_publication import publish_news
 from .live_updates import live_updates
 from .product_database import (admin_accounts, admin_account_action, admin_app_settings,
                                admin_update_app_settings, admin_audit_history)
@@ -143,6 +144,19 @@ class InformationRequest(BaseModel):
 class ReportMessageCreate(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
     evidence_id: str | None = Field(default=None, max_length=80)
+    client_request_id: str | None = Field(default=None,min_length=8,max_length=100)
+
+
+class NewsPublishRequest(BaseModel):
+    latitude: float = Field(ge=-90,le=90)
+    longitude: float = Field(ge=-180,le=180)
+    address: str = Field(min_length=5,max_length=500)
+    severity: Literal["LOW","MODERATE","HIGH","CRITICAL"]
+    road_status: Literal["CAUTION","UNSAFE","WORK_REQUIRED","CLOSED"]
+    verification_note: str = Field(min_length=10,max_length=1500)
+    confirmed_current: Literal[True]
+    valid_hours: int = Field(default=12,ge=1,le=72)
+    no_go_radius_m: float | None = Field(default=None,ge=10,le=500)
 
 
 class NewsReviewRequest(BaseModel):
@@ -355,7 +369,7 @@ def submit_report(request: ReportCreate, user: Annotated[dict, Depends(current_u
 async def upload_evidence(
     user: Annotated[dict, Depends(current_user)], file: UploadFile = File(...)
 ) -> dict:
-    if user["role"] != "citizen": raise HTTPException(403, "Citizen role required")
+    if user["role"] not in {"citizen","government"}: raise HTTPException(403, "Citizen or official role required")
     media_type = (file.content_type or "").lower()
     allowed = {"image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm"}
     if media_type not in allowed: raise HTTPException(415, "Use JPEG, PNG, WebP, MP4, or WebM evidence")
@@ -417,8 +431,11 @@ def get_report(report_id: str, user: Annotated[dict, Depends(current_user)]) -> 
 
 
 @router.get("/reports/{report_id}/messages")
-def report_messages(report_id: str, user: Annotated[dict, Depends(current_user)]) -> list[dict]:
-    values = list_report_messages(report_id, user)
+def report_messages(report_id: str, user: Annotated[dict, Depends(current_user)],
+                    limit: int = Query(default=50,ge=1,le=100), before_id: str | None = Query(default=None,max_length=80),
+                    after_id: str | None = Query(default=None,max_length=80)) -> list[dict]:
+    try: values = list_report_messages(report_id, user, limit, before_id, after_id)
+    except ValueError as error: raise HTTPException(400,str(error)) from error
     if values is None:
         raise HTTPException(404, "Report not found")
     return values
@@ -430,7 +447,7 @@ def post_report_message(report_id: str, request: ReportMessageCreate,
     if user["role"] == "admin":
         raise HTTPException(403, "Administrators have read-only access to case conversations")
     try:
-        value = create_report_message(report_id, user, request.content, request.evidence_id)
+        value = create_report_message(report_id, user, request.content, request.evidence_id,request.client_request_id)
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
     if value is None:
@@ -515,8 +532,19 @@ def news_signals(
 def review_news(
     signal_id: str, request: NewsReviewRequest, _: Annotated[dict, Depends(operations_reader)]
 ) -> dict:
-    value = review_news_signal(signal_id, request.review_status)
+    try: value = review_news_signal(signal_id, request.review_status)
+    except ValueError as error: raise HTTPException(409,str(error)) from error
     if value is None: raise HTTPException(404, "News signal not found")
+    return value
+
+
+@router.post("/government/news-signals/{signal_id}/publish")
+async def publish_news_hazard(signal_id: str, request: NewsPublishRequest,
+                              user: Annotated[dict,Depends(government_user)]) -> dict:
+    try: value=await run_in_threadpool(publish_news,signal_id,user,request.model_dump())
+    except ValueError as error: raise HTTPException(409,str(error)) from error
+    if value is None: raise HTTPException(404,"News signal not found")
+    await live_updates.broadcast("hazards_changed")
     return value
 
 

@@ -231,6 +231,13 @@ def _initialize_product_schema(connection) -> None:
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS news_review_idx ON news_signals(review_status, published_at);
+        CREATE TABLE IF NOT EXISTS news_hazard_links (
+            signal_id TEXT PRIMARY KEY REFERENCES news_signals(id),
+            hazard_id TEXT NOT NULL UNIQUE REFERENCES hazards(id),
+            verified_by TEXT NOT NULL REFERENCES users(id),
+            verified_at TEXT NOT NULL,
+            verification_note TEXT NOT NULL
+        );
         CREATE TABLE IF NOT EXISTS news_configuration (
             singleton_id INTEGER PRIMARY KEY CHECK(singleton_id=1),
             refresh_hours INTEGER NOT NULL CHECK(refresh_hours IN (12,24)),
@@ -673,13 +680,15 @@ def update_hazard(hazard_id: str, actor_id: str, payload: dict[str, Any]) -> dic
 
 
 def active_hazards(bounds: tuple[float, float, float, float] | None = None) -> list[dict[str, Any]]:
-    query = "SELECT * FROM hazards WHERE status IN ('ACTIVE','MONITORING','VERIFIED') AND (valid_until IS NULL OR valid_until>?)"
+    query = """SELECT h.*,n.source_url AS news_source_url,n.publisher AS news_publisher,n.published_at AS news_published_at
+        FROM hazards h LEFT JOIN news_hazard_links l ON l.hazard_id=h.id LEFT JOIN news_signals n ON n.id=l.signal_id
+        WHERE h.status IN ('ACTIVE','MONITORING','VERIFIED') AND (h.valid_until IS NULL OR h.valid_until>?)"""
     params: list[Any] = [utc_now()]
     if bounds:
         min_lat, min_lng, max_lat, max_lng = bounds
-        query += " AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ?"
+        query += " AND h.latitude BETWEEN ? AND ? AND h.longitude BETWEEN ? AND ?"
         params.extend([min_lat, max_lat, min_lng, max_lng])
-    query += " ORDER BY updated_at DESC"
+    query += " ORDER BY h.updated_at DESC"
     with connect_product() as connection:
         values = [row_dict(row) for row in connection.execute(query, params)]
         for value in values:
@@ -815,27 +824,50 @@ def _can_access_report(connection: sqlite3.Connection, report_id: str,
     return report
 
 
-def list_report_messages(report_id: str, user: dict[str, Any]) -> list[dict[str, Any]] | None:
+def list_report_messages(report_id: str, user: dict[str, Any], limit: int = 50,
+                         before_id: str | None = None, after_id: str | None = None) -> list[dict[str, Any]] | None:
     with connect_product() as connection:
         if _can_access_report(connection, report_id, user) is None:
             return None
-        return [row_dict(row) for row in connection.execute(
+        limit=max(1,min(100,limit)); params=[report_id]; condition=""
+        cursor_id=before_id or after_id
+        if before_id and after_id: raise ValueError("Use one message cursor at a time")
+        if cursor_id:
+            cursor=connection.execute("SELECT id,created_at FROM report_messages WHERE id=? AND report_id=?",(cursor_id,report_id)).fetchone()
+            if cursor is None: raise ValueError("Message cursor not found in this conversation")
+            op="<" if before_id else ">"
+            condition=f" AND (m.created_at {op} ? OR (m.created_at=? AND m.id {op} ?))"
+            params.extend([cursor["created_at"],cursor["created_at"],cursor["id"]])
+        direction="ASC" if after_id else "DESC"
+        params.append(limit)
+        values=[row_dict(row) for row in connection.execute(
             """SELECT m.id,m.report_id,m.content,m.evidence_id,m.created_at,
-                      u.id AS author_id,u.name AS author_name,u.role AS author_role
+                      u.id AS author_id,u.name AS author_name,u.role AS author_role,
+                      e.original_name AS attachment_name,e.media_type AS attachment_type
                FROM report_messages m JOIN users u ON u.id=m.author_id
-               WHERE m.report_id=? ORDER BY m.created_at""", (report_id,),
-        )]
+               LEFT JOIN report_evidence e ON e.id=m.evidence_id
+               WHERE m.report_id=?"""+condition+f" ORDER BY m.created_at {direction},m.id {direction} LIMIT ?",params)]
+        return values if after_id else list(reversed(values))
 
 
 def create_report_message(report_id: str, user: dict[str, Any], content: str,
-                          evidence_id: str | None = None) -> dict[str, Any] | None:
+                          evidence_id: str | None = None, client_request_id: str | None = None) -> dict[str, Any] | None:
     if user["role"] == "admin":
         raise ValueError("Administrators have read-only access to case conversations")
     message_id, now = f"msg_{uuid.uuid4().hex}", utc_now()
+    if not content.strip(): raise ValueError("Write a message before sending")
+    if client_request_id:
+        message_id="msg_"+hashlib.sha256(f"{user['id']}|{report_id}|{client_request_id}".encode()).hexdigest()[:40]
     with connect_product() as connection:
+        connection.execute("BEGIN IMMEDIATE")
         report = _can_access_report(connection, report_id, user)
         if report is None:
             return None
+        existing=connection.execute("SELECT * FROM report_messages WHERE id=?",(message_id,)).fetchone()
+        if existing:
+            if existing["content"]!=content.strip() or existing["evidence_id"]!=evidence_id:
+                raise ValueError("Retry ID already belongs to a different message")
+            return row_dict(existing)
         if evidence_id:
             evidence = connection.execute(
                 "SELECT owner_id,media_type,report_id FROM report_evidence WHERE id=?", (evidence_id,)
@@ -845,10 +877,14 @@ def create_report_message(report_id: str, user: dict[str, Any], content: str,
             if evidence["report_id"] not in (None, report_id):
                 raise ValueError("Evidence is already attached to another report")
             connection.execute("UPDATE report_evidence SET report_id=? WHERE id=?", (report_id, evidence_id))
-        connection.execute(
-            "INSERT INTO report_messages(id,report_id,author_id,content,evidence_id,created_at) VALUES (?,?,?,?,?,?)",
+        inserted=connection.execute(
+            "INSERT OR IGNORE INTO report_messages(id,report_id,author_id,content,evidence_id,created_at) VALUES (?,?,?,?,?,?)",
             (message_id, report_id, user["id"], content.strip(), evidence_id, now),
         )
+        if not inserted.rowcount:
+            existing=connection.execute("SELECT * FROM report_messages WHERE id=?",(message_id,)).fetchone()
+            if existing["content"]!=content.strip() or existing["evidence_id"]!=evidence_id: raise ValueError("Retry ID already belongs to a different message")
+            return row_dict(existing)
         if user["role"] == "citizen":
             if report["status"] == "REQUESTED_INFO":
                 connection.execute("UPDATE reports SET status='UNDER_REVIEW',updated_at=? WHERE id=?", (now, report_id))
@@ -1114,10 +1150,10 @@ def store_news_signal(value: dict[str, Any]) -> bool:
 
 
 def list_news_signals(review_status: str | None = None) -> list[dict[str, Any]]:
-    query = "SELECT * FROM news_signals"; params: list[Any] = []
+    query = "SELECT n.*,l.hazard_id AS linked_hazard_id FROM news_signals n LEFT JOIN news_hazard_links l ON l.signal_id=n.id"; params: list[Any] = []
     if review_status:
-        query += " WHERE review_status=?"; params.append(review_status)
-    query += " ORDER BY published_at DESC LIMIT 250"
+        query += " WHERE n.review_status=?"; params.append(review_status)
+    query += " ORDER BY n.created_at DESC LIMIT 250"
     with connect_product() as connection:
         return [row_dict(row) for row in connection.execute(query, params).fetchall()]
 
@@ -1125,6 +1161,8 @@ def list_news_signals(review_status: str | None = None) -> list[dict[str, Any]]:
 def review_news_signal(signal_id: str, review_status: str) -> dict[str, Any] | None:
     if review_status not in {"RELEVANT", "DISMISSED", "NEEDS_FIELD_CHECK"}: raise ValueError("Invalid review status")
     with connect_product() as connection:
+        if connection.execute("SELECT 1 FROM news_hazard_links WHERE signal_id=?",(signal_id,)).fetchone():
+            raise ValueError("This signal has a published hazard. Update its official hazard lifecycle instead.")
         changed = connection.execute("UPDATE news_signals SET review_status=? WHERE id=?", (review_status, signal_id)).rowcount
         if not changed: return None
         return row_dict(connection.execute("SELECT * FROM news_signals WHERE id=?", (signal_id,)).fetchone())

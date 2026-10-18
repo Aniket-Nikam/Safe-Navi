@@ -281,36 +281,7 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
     }
 
     private void showReportConversation(String reportId) {
-        api.reportMessages(reportId, new ProductApiClient.ArrayCallback() {
-            @Override public void onSuccess(JSONArray values) { runOnUiThread(() -> {
-                StringBuilder thread = new StringBuilder();
-                if (values.length() == 0) thread.append("No messages yet. Send a clear request or field update to the citizen.");
-                for (int i = 0; i < values.length(); i++) {
-                    JSONObject item = values.optJSONObject(i); if (item == null) continue;
-                    boolean citizen = "CITIZEN".equalsIgnoreCase(item.optString("author_role"));
-                    thread.append(citizen ? "CITIZEN · " : "OFFICIAL · ").append(item.optString("author_name")).append("\n")
-                            .append(item.optString("content"));
-                    if (!item.optString("evidence_id").isEmpty()) thread.append("\n📷 Photograph supplied — open it from the evidence record");
-                    thread.append("\n").append(item.optString("created_at")).append("\n\n");
-                }
-                TextInputEditText reply = new TextInputEditText(GovernmentSafetyDashboardActivity.this);
-                reply.setHint("Message the citizen"); reply.setMinLines(2); reply.setMaxLines(5); reply.setPadding(48, 12, 48, 12);
-                new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this).setTitle("Citizen conversation")
-                        .setMessage(thread.toString().trim()).setView(reply).setNegativeButton("Close", null)
-                        .setPositiveButton("Send", (dialog, which) -> {
-                            String content = reply.getText() == null ? "" : reply.getText().toString().trim();
-                            if (content.isEmpty()) { Toast.makeText(GovernmentSafetyDashboardActivity.this, "Write a message first.", Toast.LENGTH_LONG).show(); return; }
-                            api.createReportMessage(reportId, content, null, new ProductApiClient.ObjectCallback() {
-                                @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
-                                    Toast.makeText(GovernmentSafetyDashboardActivity.this, "Message sent to citizen", Toast.LENGTH_SHORT).show();
-                                    showReportConversation(reportId);
-                                }); }
-                                @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
-                            });
-                        }).show();
-            }); }
-            @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
-        });
+        CaseConversationActivity.open(this,reportId);
     }
 
     private void showEvidencePicker(JSONArray evidence) {
@@ -342,28 +313,7 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
     }
 
     private void openNewsSignals() {
-        api.newsSignals(new ProductApiClient.ArrayCallback() {
-            @Override public void onSuccess(JSONArray values) { runOnUiThread(() -> {
-                if (values.length() == 0) {
-                    MaterialAlertDialogBuilder emptyDialog = new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this).setTitle("News intelligence")
-                            .setMessage("No signals are waiting. Add permitted HTTPS RSS URLs to SAFE_NAVI_NEWS_FEEDS, then run ingestion. News is review-only and never changes routes automatically.")
-                            .setNegativeButton("Close", null);
-                    if (isAdmin()) emptyDialog.setNeutralButton("Schedule", (d,w) -> configureNewsSchedule())
-                            .setPositiveButton("Check internet now", (d,w) -> ingestNews());
-                    emptyDialog.show();
-                    return;
-                }
-                String[] labels = new String[values.length()];
-                for (int i = 0; i < values.length(); i++) { JSONObject item = values.optJSONObject(i); labels[i] = item.optString("category") + " · " + item.optString("headline"); }
-                MaterialAlertDialogBuilder newsDialog = new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this).setTitle("Live internet news signals")
-                        .setItems(labels, (d, which) -> reviewNewsSignal(values.optJSONObject(which)))
-                        .setNegativeButton("Close", null);
-                if (isAdmin()) newsDialog.setNeutralButton("Schedule", (d,w) -> configureNewsSchedule())
-                        .setPositiveButton("Check internet now", (d,w) -> ingestNews());
-                newsDialog.show();
-            }); }
-            @Override public void onError(String message) { runOnUiThread(() -> showError(message)); }
-        });
+        startActivity(new Intent(this,NewsWorkbenchActivity.class));
     }
 
     private void ingestNews() {

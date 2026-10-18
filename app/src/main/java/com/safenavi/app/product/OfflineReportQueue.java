@@ -15,6 +15,7 @@ public final class OfflineReportQueue {
 
     public static synchronized void enqueue(Context context, JSONObject payload, JSONArray evidenceLocalIds) {
         JSONArray values = all(context);
+        for(int i=0;i<values.length();i++){JSONObject existing=values.optJSONObject(i);JSONObject prior=existing==null?null:existing.optJSONObject("payload");if(prior!=null&&ProductSession.email(context).equals(existing.optString("user_id"))&&!payload.optString("client_request_id").isEmpty()&&payload.optString("client_request_id").equals(prior.optString("client_request_id")))return;}
         JSONObject item = new JSONObject();
         try {
             item.put("user_id", ProductSession.email(context));
@@ -23,7 +24,7 @@ public final class OfflineReportQueue {
             item.put("evidence_local_ids", new JSONArray(evidenceLocalIds.toString()));
             values.put(item);
             save(context, values);
-        } catch (Exception ignored) { }
+        } catch (Exception error) { throw new IllegalStateException("The report could not be saved to the upload queue",error); }
     }
 
     public static synchronized JSONArray pending(Context context) {
@@ -55,7 +56,7 @@ public final class OfflineReportQueue {
     }
 
     private static void save(Context context, JSONArray values) {
-        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString("queue", values.toString()).apply();
+        if(!context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putString("queue", values.toString()).commit())throw new IllegalStateException("Device storage did not confirm the queued report");
     }
 
     static synchronized JSONArray allEntries(Context context) { return all(context); }

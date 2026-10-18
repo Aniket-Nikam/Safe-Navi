@@ -56,6 +56,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         UserViewHolder(View itemView) {
             super(itemView);
             text = itemView.findViewById(R.id.text_message);
+            text.setTextIsSelectable(true);
         }
     }
 
@@ -64,6 +65,7 @@ public class ChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         BotViewHolder(View itemView) {
             super(itemView);
             text = itemView.findViewById(R.id.text_message);
+            text.setTextIsSelectable(true);
         }
     }
 }

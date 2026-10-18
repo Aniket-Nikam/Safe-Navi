@@ -29,4 +29,12 @@ public class ClosureGeometryTest {
         h.put("status","RESOLVED");
         assertFalse(OfflineHazardCache.fromJson(response).blocksEdge(19.0657,72.9886,19.0657,73.0086));
     }
+    @Test public void expiredNewsClosureDoesNotRemainInOfflineRouting() throws Exception {
+        JSONObject h=new JSONObject().put("road_status","CLOSED").put("status","ACTIVE").put("latitude",19.0657).put("longitude",72.9986);
+        JSONObject response=new JSONObject().put("hazards",new org.json.JSONArray().put(h));
+        h.put("valid_until","2000-01-01T00:00:00.123456+00:00");
+        assertFalse(OfflineHazardCache.fromJson(response).blocksEdge(19.0657,72.9886,19.0657,73.0086));
+        h.put("valid_until","2099-01-01T00:00:00Z");
+        assertTrue(OfflineHazardCache.fromJson(response).blocksEdge(19.0657,72.9886,19.0657,73.0086));
+    }
 }

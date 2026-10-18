@@ -68,6 +68,8 @@
             android:theme="@style/Theme.SafeNavi" />
 
         <!-- Main Activity -->
+        <activity android:name=".CaseConversationActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.SafeNavi" />
+        <activity android:name=".NewsWorkbenchActivity" android:exported="false" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.SafeNavi" />
         <activity
             android:name=".MainActivity"
             android:exported="false"

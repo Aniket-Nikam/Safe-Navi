@@ -214,6 +214,31 @@ public class ProductApiClient {
     public void reportMessages(String reportId, ArrayCallback callback) {
         getArray("/api/v1/reports/" + reportId + "/messages", true, callback);
     }
+    public void reportMessages(String reportId,String before,String after,ArrayCallback callback) {
+        HttpUrl.Builder url=HttpUrl.parse(baseUrl()+"/api/v1/reports/"+reportId+"/messages").newBuilder().addQueryParameter("limit","50");
+        if(before!=null) url.addQueryParameter("before_id",before);
+        if(after!=null) url.addQueryParameter("after_id",after);
+        getArray(url.build().toString().substring(baseUrl().length()),true,callback);
+    }
+    public void createReportMessage(String reportId,String content,String evidenceId,String requestId,ObjectCallback callback) {
+        try { JSONObject payload=new JSONObject().put("content",content).put("client_request_id",requestId);
+            if(evidenceId!=null && !evidenceId.isEmpty()) payload.put("evidence_id",evidenceId);
+            post("/api/v1/reports/"+reportId+"/messages",payload,true,callback);
+        } catch(Exception error) { callback.onError("Could not prepare the message."); }
+    }
+    public void publishNews(String signalId,JSONObject payload,ObjectCallback callback) {
+        post("/api/v1/government/news-signals/"+signalId+"/publish",payload,true,callback);
+    }
+    public void uploadStoredEvidence(JSONObject item,ObjectCallback callback) {
+        new Thread(() -> {
+            if(!OfflineEvidenceStore.verify(item)) { callback.onError("Local photograph is missing or changed. Select it again."); return; }
+            try {
+                MultipartBody body=new MultipartBody.Builder().setType(MultipartBody.FORM).addFormDataPart("file",item.getString("name"),
+                        RequestBody.create(new java.io.File(item.getString("path")),MediaType.parse(item.getString("media_type")))).build();
+                client.newCall(new Request.Builder().url(baseUrl()+"/api/v1/evidence").header("Authorization","Bearer "+ProductSession.token(context)).post(body).build()).enqueue(objectCallback(callback));
+            } catch(Exception error) { callback.onError("Could not upload the stored photograph."); }
+        },"case-photo-upload").start();
+    }
     public void createReportMessage(String reportId, String content, String evidenceId, ObjectCallback callback) {
         try {
             JSONObject payload = new JSONObject().put("content", content);

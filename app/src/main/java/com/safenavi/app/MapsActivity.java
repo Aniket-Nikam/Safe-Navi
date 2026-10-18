@@ -424,6 +424,13 @@ public class MapsActivity extends AppCompatActivity {
         android.widget.LinearLayout content=sheetContent(); content.addView(sheetText(detailTitle.getText().toString(),20));
         content.addView(sheetText(detailMeta.getText().toString(),12)); content.addView(sheetText(detailReason.getText().toString(),14));
         final String hazardId=currentHazardId;
+        JSONObject record=hazardId==null?null:liveHazardRecords.get(hazardId);
+        if(record!=null&&!com.safenavi.app.product.JsonDisplay.text(record,"news_source_url","").isEmpty()) {
+            content.addView(sheetText("Verified news: "+record.optString("news_publisher")+"\nArticle published: "+record.optString("news_published_at")+"\nHazard valid until: "+record.optString("valid_until"),12));
+            MaterialButton source=sheetButton("Read source article");content.addView(source);source.setOnClickListener(v->{
+                Uri uri=Uri.parse(record.optString("news_source_url"));if("https".equalsIgnoreCase(uri.getScheme())&&uri.getHost()!=null)try{startActivity(new Intent(Intent.ACTION_VIEW,uri));}catch(Exception e){Toast.makeText(this,"No browser available",Toast.LENGTH_SHORT).show();}
+            });
+        }
         if(isGovernmentUser() && hazardId!=null) {
             MaterialButton update=sheetButton("Update official hazard lifecycle"); content.addView(update);
             update.setOnClickListener(v -> { currentHazardId=hazardId; showHazardLifecycleDialog(); });
@@ -845,6 +852,8 @@ public class MapsActivity extends AppCompatActivity {
         boolean changed = !cached && !hazardSignature.isEmpty() && !hazardSignature.equals(signature.toString());
         hazardSignature = signature.toString(); liveHazards.clear(); liveHazards.putAll(loaded);
         liveHazardRecords.clear(); liveHazardRecords.putAll(loadedRecords); renderHazards();
+        String focus=getIntent().getStringExtra("focus_hazard_id");
+        if(focus!=null&&liveHazards.containsKey(focus)){getIntent().removeExtra("focus_hazard_id");showHazard(focus);}
         if (changed && routeResultCard.getVisibility() == View.VISIBLE && !textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) {
             Toast.makeText(this, "Verified safety conditions changed. Re-ranking routes...", Toast.LENGTH_LONG).show(); findRoutes();
         }

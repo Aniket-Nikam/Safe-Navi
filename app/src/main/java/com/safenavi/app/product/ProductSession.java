@@ -13,6 +13,7 @@ public final class ProductSession {
     }
     public static boolean isSignedIn(Context context) { return !token(context).isEmpty(); }
     public static String token(Context context) { return preferences(context).getString("token", ""); }
+    public static String userId(Context context) { return preferences(context).getString("user_id", ""); }
     public static String name(Context context) { return preferences(context).getString("name", "Safe-Navi user"); }
     public static String email(Context context) { return preferences(context).getString("email", ""); }
     public static String role(Context context) { return preferences(context).getString("role", "citizen"); }

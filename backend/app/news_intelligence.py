@@ -8,6 +8,7 @@ import re
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
+from email.utils import parsedate_to_datetime
 
 from .product_database import claim_news_ingestion, finish_news_ingestion, news_configuration, store_news_signal
 
@@ -18,7 +19,7 @@ CATEGORY_TERMS = {
     "TRAFFIC": ("traffic", "collision", "accident", "road closed", "congestion"),
     "CIVIC": ("pothole", "streetlight", "garbage", "drain", "construction"),
 }
-KNOWN_LOCATIONS = ("Navi Mumbai", "Vashi", "Belapur", "Nerul", "Airoli", "Kharghar", "Panvel", "Thane")
+KNOWN_LOCATIONS = ("Nahur", "Bhandup", "Mulund", "Powai", "Chembur", "Sion", "Vashi", "Belapur", "Nerul", "Airoli", "Kharghar", "Panvel", "Thane", "Navi Mumbai", "Mumbai")
 
 
 def configured_feeds() -> list[str]:
@@ -34,7 +35,7 @@ def classify(headline: str, summary: str) -> tuple[str, float]:
 
 def extract_location(text: str) -> str | None:
     lowered = text.lower()
-    return next((name for name in KNOWN_LOCATIONS if name.lower() in lowered), None)
+    return next((name for name in KNOWN_LOCATIONS if re.search(r"(?<!\w)"+re.escape(name.lower())+r"(?!\w)",lowered)), None)
 
 
 def _text(node: ET.Element | None) -> str:
@@ -58,10 +59,20 @@ def parse_feed(content: bytes, publisher: str) -> list[dict]:
         if not headline or not source_url: continue
         category, confidence = classify(headline, summary)
         values.append({"publisher": publisher, "source_url": source_url, "headline": headline[:500],
-                       "summary": summary[:3000], "published_at": published or datetime.now(timezone.utc).isoformat(),
+                       "summary": summary[:3000], "published_at": normalize_date(published),
                        "location_text": extract_location(f"{headline} {summary}"), "category": category,
                        "confidence": confidence})
     return values
+
+
+def normalize_date(value: str) -> str:
+    if not value: return ""
+    try: date=parsedate_to_datetime(value)
+    except (TypeError,ValueError):
+        try: date=datetime.fromisoformat(value.replace("Z","+00:00"))
+        except ValueError: return ""
+    if date.tzinfo is None: return ""  # Do not invent a publisher's timezone or publication time.
+    return date.astimezone(timezone.utc).isoformat()
 
 
 def ingest_configured_feeds(force: bool = True) -> dict:

@@ -1,0 +1,42 @@
+package com.safenavi.app;
+
+import static org.junit.Assert.*;
+import androidx.test.core.app.ActivityScenario;
+import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import android.content.*;
+import android.widget.*;
+import android.view.*;
+import com.safenavi.app.product.*;
+import org.json.*;
+import okhttp3.*;
+import java.lang.reflect.*;
+import java.util.*;
+import org.junit.*;
+import org.junit.runner.RunWith;
+
+/** Opt-in local fixture only. Never uses production accounts, sends live chat, or publishes live hazards. */
+@RunWith(AndroidJUnit4.class)
+public class CasesNewsInstrumentedTest {
+    private Context context;private String oldServer;private Map<String,?> oldSession;
+    @Before public void setup()throws Exception {Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("localWorkflow")));context=InstrumentationRegistry.getInstrumentation().getTargetContext();oldServer=ServerConnection.baseUrl();oldSession=context.getSharedPreferences("safe_navi_session",0).getAll();ServerConnection.save(context,"http://127.0.0.1:8017");login("citizen@ui.test");}
+    @After public void cleanup(){if(context==null)return;ScopedDraftStore.clear(context,"report");ScopedDraftStore.clear(context,"navi");SharedPreferences.Editor editor=context.getSharedPreferences("safe_navi_session",0).edit().clear();for(Map.Entry<String,?> entry:oldSession.entrySet()){Object value=entry.getValue();if(value instanceof String)editor.putString(entry.getKey(),(String)value);else if(value instanceof Boolean)editor.putBoolean(entry.getKey(),(Boolean)value);else if(value instanceof Long)editor.putLong(entry.getKey(),(Long)value);else if(value instanceof Integer)editor.putInt(entry.getKey(),(Integer)value);}editor.commit();ServerConnection.save(context,oldServer);}
+    private void login(String email)throws Exception {JSONObject value=request("POST","/api/v1/auth/login",new JSONObject().put("email",email).put("password","ui-workflow-password"));JSONObject user=value.getJSONObject("user");ProductSession.save(context,value.getString("access_token"),user.getString("id"),user.getString("name"),user.getString("email"),user.getString("role"));}
+    private JSONObject request(String method,String path,JSONObject body)throws Exception {Request.Builder builder=new Request.Builder().url("http://127.0.0.1:8017"+path).header("Authorization","Bearer "+ProductSession.token(context));if(body!=null)builder.method(method,RequestBody.create(body.toString(),MediaType.parse("application/json")));try(Response response=new OkHttpClient().newCall(builder.build()).execute()){assertTrue(response.toString(),response.isSuccessful());String json=response.body().string();return json.startsWith("[")?new JSONObject().put("items",new JSONArray(json)):new JSONObject(json);}}
+    @Test public void caseDraftSurvivesRecreationAndAcknowledgedSendAppears()throws Exception {String id=request("GET","/api/v1/reports",null).getJSONArray("items").getJSONObject(0).getString("id");String scope="case_"+id;ScopedDraftStore.clear(context,scope);
+        try(ActivityScenario<CaseConversationActivity> scenario=ActivityScenario.launch(new Intent(context,CaseConversationActivity.class).putExtra("report_id",id))){
+            scenario.onActivity(activity->{try{((EditText)field(activity,"composer")).setText("UI test: the streetlight is flickering");Method save=activity.getClass().getDeclaredMethod("saveDraft");save.setAccessible(true);save.invoke(activity);}catch(Exception e){throw new AssertionError(e);}});
+            scenario.recreate();scenario.onActivity(activity->{try{assertEquals("UI test: the streetlight is flickering",((EditText)field(activity,"composer")).getText().toString());((com.google.android.material.button.MaterialButton)field(activity,"send")).performClick();}catch(Exception e){throw new AssertionError(e);}});
+            boolean sent=false;for(int i=0;i<100;i++){android.os.SystemClock.sleep(100);final boolean[] ready={false};scenario.onActivity(activity->{try{ready[0]=((EditText)field(activity,"composer")).getText().length()==0;}catch(Exception e){throw new AssertionError(e);}});if(ready[0]){sent=true;break;}}assertTrue("Server acknowledgement did not clear composer",sent);android.os.SystemClock.sleep(1000);shot("case-conversation-1.4.png");
+        }finally{ScopedDraftStore.clear(context,scope);}
+    }
+    @Test public void reportDraftRestoresTextAndLocationAfterViewRecreation()throws Exception {ScopedDraftStore.clear(context,"report");try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(new Intent(context,MainActivity.class))){
+        scenario.onActivity(activity->{ReportFragment report=new ReportFragment();activity.getSupportFragmentManager().beginTransaction().replace(R.id.fragmentContainer,report).commitNow();((EditText)activity.findViewById(R.id.editTextTitle)).setText("UI TEST draft streetlight");((EditText)activity.findViewById(R.id.editTextDescription)).setText("This is a local draft-restoration check, not a real report.");((AutoCompleteTextView)activity.findViewById(R.id.autoCompleteCategory)).setText("Poor lighting",false);try{Field lat=ReportFragment.class.getDeclaredField("latitude"),lon=ReportFragment.class.getDeclaredField("longitude");lat.setAccessible(true);lon.setAccessible(true);lat.set(report,19.07);lon.set(report,73.0);Method save=ReportFragment.class.getDeclaredMethod("saveDraft");save.setAccessible(true);save.invoke(report);}catch(Exception e){throw new AssertionError(e);}});
+        scenario.recreate();scenario.onActivity(activity->{assertEquals("UI TEST draft streetlight",((EditText)activity.findViewById(R.id.editTextTitle)).getText().toString());assertEquals(19.07,ScopedDraftStore.load(activity,"report").optDouble("latitude"),0.00001);});shot("report-draft-1.4.png");
+    }}
+    @Test public void officialWorkbenchRequiresAnExplicitRoadPin()throws Exception {login("official@ui.test");try(ActivityScenario<NewsWorkbenchActivity> scenario=ActivityScenario.launch(new Intent(context,NewsWorkbenchActivity.class))){android.os.SystemClock.sleep(1200);shot("news-workbench-1.4.png");scenario.onActivity(activity->{try{Method method=NewsWorkbenchActivity.class.getDeclaredMethod("publish",JSONObject.class);method.setAccessible(true);method.invoke(activity,new JSONObject().put("id","test-only-no-publish").put("location_text","Vashi"));}catch(Exception e){throw new AssertionError(e);}});InstrumentationRegistry.getInstrumentation().waitForIdleSync();scenario.onActivity(activity->{try{androidx.appcompat.app.AlertDialog dialog=(androidx.appcompat.app.AlertDialog)field(activity,"publicationDialog");dialog.getButton(-1).performClick();assertTrue(dialog.isShowing());assertTrue("Missing road selection must block publishing",hasError(dialog.getWindow().getDecorView()));}catch(Exception e){throw new AssertionError(e);}});shot("news-verification-1.4.png");}}
+    @Test public void draftsAreScopedToAccountAndServer()throws Exception {ScopedDraftStore.save(context,"isolation-test",new JSONObject().put("content","Citizen-only draft"));login("official@ui.test");assertEquals(0,ScopedDraftStore.load(context,"isolation-test").length());login("citizen@ui.test");assertEquals("Citizen-only draft",ScopedDraftStore.load(context,"isolation-test").getString("content"));ServerConnection.save(context,"http://127.0.0.1:8018");assertEquals(0,ScopedDraftStore.load(context,"isolation-test").length());ServerConnection.save(context,"http://127.0.0.1:8017");ScopedDraftStore.clear(context,"isolation-test");}
+    private static Object field(Object instance,String name)throws Exception {Field field=instance.getClass().getDeclaredField(name);field.setAccessible(true);return field.get(instance);}
+    private static boolean hasError(View view){if(view instanceof EditText&&((EditText)view).getError()!=null)return true;if(view instanceof ViewGroup){ViewGroup group=(ViewGroup)view;for(int i=0;i<group.getChildCount();i++)if(hasError(group.getChildAt(i)))return true;}return false;}
+    private void shot(String name)throws Exception {InstrumentationRegistry.getInstrumentation().waitForIdleSync();android.os.SystemClock.sleep(1500);android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();try(java.io.FileOutputStream out=new java.io.FileOutputStream(new java.io.File(context.getExternalFilesDir(null),name))){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();}
+}

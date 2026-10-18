@@ -16,8 +16,14 @@ public final class OfflineHazardCache {
         context.getSharedPreferences(FILE, 0).edit().putString("response", response.toString()).putLong("updated_at", System.currentTimeMillis()).apply();
     }
     public static JSONObject load(Context context) {
-        try { return new JSONObject(context.getSharedPreferences(FILE, 0).getString("response", "{\"hazards\":[]}")); }
+        try { JSONObject response=new JSONObject(context.getSharedPreferences(FILE, 0).getString("response", "{\"hazards\":[]}")); JSONArray values=response.optJSONArray("hazards"), current=new JSONArray(); if(values!=null)for(int i=0;i<values.length();i++){JSONObject hazard=values.optJSONObject(i);if(hazard!=null&&!expired(hazard,System.currentTimeMillis()))current.put(hazard);}response.put("hazards",current);return response; }
         catch (Exception error) { return new JSONObject(); }
+    }
+    private static boolean expired(JSONObject hazard,long now) {
+        String until=hazard.optString("valid_until","");
+        if(until.isEmpty()||"null".equals(until))return false;
+        try { java.text.SimpleDateFormat parser=new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX",java.util.Locale.US);parser.setLenient(false);java.util.Date date=parser.parse(until.replaceFirst("\\.\\d+(?=Z|[+-]\\d{2}:\\d{2}$)",""));return date!=null&&date.getTime()<=now; }
+        catch(java.text.ParseException invalid){return false;}
     }
     public static long ageMillis(Context context) { return System.currentTimeMillis() - context.getSharedPreferences(FILE, 0).getLong("updated_at", 0); }
     public static boolean isNoGo(Context context, double latitude, double longitude) {
@@ -28,6 +34,7 @@ public final class OfflineHazardCache {
         List<Zone> zones = new ArrayList<>(); JSONArray hazards = response.optJSONArray("hazards");
         if (hazards != null) for (int i=0; i<hazards.length(); i++) {
             JSONObject h=hazards.optJSONObject(i); if (h == null) continue;
+            if(expired(h,System.currentTimeMillis()))continue;
             String status=h.optString("status", "ACTIVE");
             if (!"ACTIVE".equals(status) && !"MONITORING".equals(status)) continue;
             boolean closed="CLOSED".equals(h.optString("road_status"));

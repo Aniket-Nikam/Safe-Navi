@@ -21,7 +21,7 @@ from . import evidence_storage
 TABLES = (
     "users", "administration_audit", "administration_settings", "reports", "hazards", "hazard_history",
     "report_evidence", "report_messages", "report_confirmations", "community_posts", "community_votes",
-    "community_comments", "notifications", "news_signals", "news_configuration", "saved_places",
+    "community_comments", "notifications", "news_signals", "news_hazard_links", "news_configuration", "saved_places",
     "emergency_contacts", "journeys",
 )
 

@@ -30,7 +30,7 @@ public final class OfflineReportUploadWorker extends Worker {
         Constraints network = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
         OneTimeWorkRequest request = new OneTimeWorkRequest.Builder(OfflineReportUploadWorker.class).setConstraints(network)
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS).build();
-        WorkManager.getInstance(context).enqueueUniqueWork(WORK, ExistingWorkPolicy.REPLACE, request);
+        WorkManager.getInstance(context).enqueueUniqueWork(WORK, ExistingWorkPolicy.APPEND_OR_REPLACE, request);
     }
 
     @NonNull @Override public Result doWork() {
@@ -51,7 +51,8 @@ public final class OfflineReportUploadWorker extends Worker {
             if (!evidenceReady) continue;
             try { payload.put("evidence_ids", serverIds); } catch (Exception ignored) { }
             if (submit(payload, token)) {
-                OfflineReportQueue.remove(getApplicationContext(), payload.optString("client_request_id"));
+                try { OfflineReportQueue.remove(getApplicationContext(), payload.optString("client_request_id")); }
+                catch(IllegalStateException storageError) { retry=true;continue; }
                 if (localIds != null) for (int e = 0; e < localIds.length(); e++) OfflineEvidenceStore.delete(getApplicationContext(), localIds.optString(e));
             } else retry = true;
         }
