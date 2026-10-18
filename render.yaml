@@ -26,7 +26,7 @@ services:
       - key: SAFE_NAVI_SUPABASE_BUCKET
         value: safenavi-evidence
       - key: SAFE_NAVI_NEWS_SCHEDULER
-        value: external
+        value: internal
       - key: SAFE_NAVI_SCHEDULER_KEY
         generateValue: true
       - key: SAFE_NAVI_NEWS_FEEDS

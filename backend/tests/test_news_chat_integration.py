@@ -104,3 +104,35 @@ def test_official_photo_can_be_shared_with_the_case_owner_but_not_another_citize
 def test_missing_publication_date_is_not_fabricated():
     value=parse_feed(b"<rss><channel><item><title>Flood in Nerul, Navi Mumbai</title><link>https://example.test/a</link></item></channel></rss>","example.test")[0]
     assert value["published_at"]=="" and value["location_text"]=="Nerul"
+
+
+def test_community_retries_do_not_duplicate_posts_or_replies(people):
+    headers=people["citizen"]
+    payload=dict(content="Please take care near this road",client_request_id="community-post-request-123")
+    a=client.post("/api/v1/community/posts",headers=headers,json=payload)
+    assert a.status_code==201,a.text
+    assert client.post("/api/v1/community/posts",headers=headers,json=payload).json()["id"]==a.json()["id"]
+    assert client.post("/api/v1/community/posts",headers=headers,json={**payload,"content":"Changed content"}).status_code==400
+    path=f"/api/v1/community/posts/{a.json()['id']}/comments"
+    reply=dict(content="Thanks for the update",client_request_id="community-reply-request-123")
+    first=client.post(path,headers=headers,json=reply)
+    assert first.status_code==201,first.text
+    assert client.post(path,headers=headers,json=reply).json()["id"]==first.json()["id"]
+    assert len(client.get(path,headers=headers).json())==1
+    assert client.post(path,headers=headers,json={**reply,"content":"Changed reply"}).status_code==400
+    other=client.post("/api/v1/community/posts",headers=people["government"],json=payload)
+    assert other.json()["id"]!=a.json()["id"]
+
+
+def test_verified_crime_news_has_map_labels_and_source(people):
+    assert store_news_signal(dict(headline="Robbery and theft reported in Vashi",publisher="example.test",
+        source_url="https://example.test/crime-test",summary="Official checking required",
+        published_at="",location_text="Vashi",category="CRIME",confidence=.7))
+    news=list_news_signals()[0]["id"]
+    assert client.get("/api/v1/hazards/map").json()["hazards"]==[]
+    payload=publication();payload["road_status"]="UNSAFE"
+    response=client.post(f"/api/v1/government/news-signals/{news}/publish",headers=people["government"],json=payload)
+    assert response.status_code==200,response.text
+    hazard=client.get("/api/v1/hazards/map").json()["hazards"][0]
+    assert "Theft / burglary" in hazard["crime_types"] and "Robbery / snatching" in hazard["crime_types"]
+    assert hazard["news_source_url"]=="https://example.test/crime-test"

@@ -38,7 +38,7 @@ public class NewsWorkbenchActivity extends AppCompatActivity {
         search=new EditText(this);search.setHint("Search headline, locality or publisher");search.setSingleLine(true);search.setTextSize(14);root.addView(search);
         filter=spinner(filters);root.addView(filter);status=text("Loading…",12);status.setOnClickListener(v->load());root.addView(status);
         LinearLayout controls=new LinearLayout(this);MaterialButton refresh=button("Refresh");refresh.setOnClickListener(v->load());controls.addView(refresh);
-        if("admin".equals(ProductSession.role(this))){
+        {
             MaterialButton fetch=button("Check internet"),schedule=button("Schedule");
             fetch.setOnClickListener(v->{
                 fetch.setEnabled(false);
@@ -47,7 +47,7 @@ public class NewsWorkbenchActivity extends AppCompatActivity {
                     public void onError(String message){runOnUiThread(()->{if(alive()){fetch.setEnabled(true);status.setText(message);}});}
                 });
             });
-            schedule.setOnClickListener(v->schedule());controls.addView(fetch);controls.addView(schedule);
+            schedule.setOnClickListener(v->schedule());controls.addView(fetch);if("admin".equals(ProductSession.role(this)))controls.addView(schedule);
         }
         root.addView(controls);
         RecyclerView list=new RecyclerView(this);list.setLayoutManager(new LinearLayoutManager(this));list.setAdapter(rows);root.addView(list,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);

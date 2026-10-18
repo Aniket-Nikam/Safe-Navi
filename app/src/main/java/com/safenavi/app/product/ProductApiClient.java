@@ -25,15 +25,29 @@ import org.json.JSONObject;
 public class ProductApiClient {
     private static final MediaType JSON = MediaType.parse("application/json; charset=utf-8");
     private final Context context;
-    private final OkHttpClient client = new OkHttpClient.Builder()
+    private static final OkHttpClient TRANSPORT = new OkHttpClient.Builder()
             .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
             .readTimeout(90, java.util.concurrent.TimeUnit.SECONDS)
             .writeTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
             .callTimeout(120, java.util.concurrent.TimeUnit.SECONDS).build();
+    private final OkHttpClient client;
     public interface ObjectCallback { void onSuccess(JSONObject value); void onError(String message); }
     public interface ArrayCallback { void onSuccess(JSONArray value); void onError(String message); }
     public interface BytesCallback { void onSuccess(byte[] value, String mediaType); void onError(String message); }
-    public ProductApiClient(Context context) { this.context = context.getApplicationContext(); }
+    public ProductApiClient(Context context) {
+        this.context = context.getApplicationContext();
+        client=TRANSPORT.newBuilder().addInterceptor(chain->{
+            Response response=chain.proceed(chain.request());
+            String authorization=chain.request().header("Authorization");
+            if(response.code()==401 && authorization!=null && authorization.startsWith("Bearer ")) {
+                String origin=chain.request().url().newBuilder().encodedPath("/").query(null).build().toString();
+                origin=origin.substring(0,origin.length()-1);
+                if(ProductSession.reject(this.context,authorization.substring(7),origin))SessionRecovery.rejected();
+            }
+            return response;
+        }).build();
+    }
+    public void validateSession(ObjectCallback callback) { getObject("/api/v1/me",true,callback); }
 
     public WebSocket openLiveUpdates(WebSocketListener listener) {
         String socketUrl = baseUrl().replaceFirst("^http", "ws") + "/api/v1/live";
@@ -184,8 +198,12 @@ public class ProductApiClient {
         getArray("/api/v1/community/posts" + suffix, true, callback);
     }
     public void createCommunityPost(String content, String category, String evidenceId, ObjectCallback callback) {
+        createCommunityPost(content, category, evidenceId, null, callback);
+    }
+    public void createCommunityPost(String content, String category, String evidenceId, String requestId, ObjectCallback callback) {
         try {
             JSONObject payload = new JSONObject().put("content", content).put("category", category);
+            if (requestId != null) payload.put("client_request_id", requestId);
             if (evidenceId != null && !evidenceId.isEmpty()) payload.put("evidence_id", evidenceId);
             post("/api/v1/community/posts", payload, true, callback);
         }
@@ -204,8 +222,12 @@ public class ProductApiClient {
         createCommunityComment(postId, content, null, callback);
     }
     public void createCommunityComment(String postId, String content, String parentId, ObjectCallback callback) {
+        createCommunityComment(postId, content, parentId, null, callback);
+    }
+    public void createCommunityComment(String postId, String content, String parentId, String requestId, ObjectCallback callback) {
         try {
             JSONObject payload = new JSONObject().put("content", content);
+            if (requestId != null) payload.put("client_request_id", requestId);
             if (parentId != null) payload.put("parent_id", parentId);
             post("/api/v1/community/posts/" + postId + "/comments", payload, true, callback);
         }
@@ -350,6 +372,7 @@ public class ProductApiClient {
         };
     }
     private static String errorMessage(String body, int code) {
+        if(code==401)return "Please sign in again. Your drafts are saved on this device.";
         try { return new JSONObject(body).optString("detail", "Request failed (HTTP " + code + ")"); }
         catch (JSONException ignored) { return "Request failed (HTTP " + code + ")"; }
     }

@@ -704,8 +704,8 @@ def hazard_history(hazard_id: str) -> list[dict[str, Any]]:
 
 
 def create_community_post(author_id: str, category: str, content: str,
-                          evidence_id: str | None = None) -> dict[str, Any]:
-    post_id = f"pst_{uuid.uuid4().hex}"
+                          evidence_id: str | None = None, client_request_id: str | None = None) -> dict[str, Any]:
+    post_id = "pst_" + (uuid.uuid5(uuid.NAMESPACE_URL, author_id + "|post|" + client_request_id).hex if client_request_id else uuid.uuid4().hex)
     now = utc_now()
     with connect_product() as connection:
         if evidence_id:
@@ -715,10 +715,13 @@ def create_community_post(author_id: str, category: str, content: str,
             if evidence is None or evidence["owner_id"] != author_id or not evidence["media_type"].startswith("image/"):
                 raise ValueError("Community attachments must be an image uploaded by the author")
         connection.execute(
-            "INSERT INTO community_posts(id,author_id,category,content,evidence_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?)",
+            "INSERT INTO community_posts(id,author_id,category,content,evidence_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
             (post_id, author_id, category, content.strip(), evidence_id, now, now),
         )
-        return get_community_post(connection, post_id, author_id)
+        result = get_community_post(connection, post_id, author_id)
+        if not result or result["content"] != content.strip() or result["category"] != category or result["evidence_id"] != evidence_id:
+            raise ValueError("This submission identifier was already used; refresh before submitting a changed post")
+        return result
 
 
 def get_community_post(connection: sqlite3.Connection, post_id: str, viewer_id: str) -> dict[str, Any] | None:
@@ -779,8 +782,9 @@ def toggle_community_vote(post_id: str, user_id: str) -> dict[str, Any] | None:
         return get_community_post(connection, post_id, user_id)
 
 
-def create_community_comment(post_id: str, author_id: str, content: str, parent_id: str | None = None) -> dict[str, Any] | None:
-    comment_id = f"cmt_{uuid.uuid4().hex}"
+def create_community_comment(post_id: str, author_id: str, content: str, parent_id: str | None = None,
+                             client_request_id: str | None = None) -> dict[str, Any] | None:
+    comment_id = "cmt_" + (uuid.uuid5(uuid.NAMESPACE_URL, author_id + "|comment|" + client_request_id).hex if client_request_id else uuid.uuid4().hex)
     now = utc_now()
     with connect_product() as connection:
         if connection.execute("SELECT 1 FROM community_posts WHERE id=? AND removed=0", (post_id,)).fetchone() is None:
@@ -794,16 +798,19 @@ def create_community_comment(post_id: str, author_id: str, content: str, parent_
             ancestor = ancestor_row["parent_id"] if ancestor_row else None
         if ancestor: raise ValueError("This discussion branch has reached its reply-depth limit; reply to an earlier comment")
         connection.execute(
-            "INSERT INTO community_comments(id,post_id,author_id,content,created_at,parent_id) VALUES (?,?,?,?,?,?)",
+            "INSERT INTO community_comments(id,post_id,author_id,content,created_at,parent_id) VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
             (comment_id, post_id, author_id, content.strip(), now, parent_id),
         )
         connection.execute("UPDATE community_posts SET updated_at=? WHERE id=?", (now, post_id))
         row = connection.execute(
             """SELECT c.id,c.post_id,c.content,c.created_at,c.parent_id,u.id AS author_id,u.name AS author_name
-               FROM community_comments c JOIN users u ON u.id=c.author_id WHERE c.id=?""",
+               FROM community_comments c JOIN users u ON u.id=c.author_id WHERE c.id=? AND c.removed=0""",
             (comment_id,),
         ).fetchone()
-        return row_dict(row)
+        result = row_dict(row) if row else None
+        if not result or result["post_id"] != post_id or result["content"] != content.strip() or result["parent_id"] != parent_id:
+            raise ValueError("This submission identifier was already used; refresh before submitting a changed comment")
+        return result
 
 
 def list_community_comments(post_id: str) -> list[dict[str, Any]]:

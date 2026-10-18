@@ -197,14 +197,7 @@ def haversine_meters(lat1: float, lng1: float, lat2: float, lng2: float) -> floa
     return radius * 2 * math.atan2(math.sqrt(value), math.sqrt(1 - value))
 
 
-CRIME_TERMS = {
-    "Theft / burglary": r"\b(theft|stolen|steal|burglary|pickpocket\w*)\b",
-    "Robbery / snatching": r"\b(robbery|robbed|snatching|mugging)\b",
-    "Assault / violence": r"\b(assault\w*|attack\w*|violence|murder|stabbing)\b",
-    "Harassment": r"\b(harass\w*|stalking|molest\w*)\b",
-    "Fraud / scam": r"\b(fraud\w*|scam\w*|cheating)\b",
-    "Vandalism": r"\b(vandalis\w*|vandaliz\w*)\b",
-}
+from .crime_labels import crime_labels
 
 
 @app.get("/api/v1/risk/area-crime")
@@ -220,7 +213,7 @@ def area_crime(latitude: float = Query(ge=-90, le=90), longitude: float = Query(
         if distance > radius_m:
             continue
         text = " ".join(str(hazard.get(key) or "") for key in ("title", "description", "reason")).lower()
-        types = [name for name, pattern in CRIME_TERMS.items() if re.search(pattern, text)] or ["Crime type unspecified"]
+        types = crime_labels(hazard)
         for name in types:
             counts[name] += 1
         records.append({"hazard_id": hazard["id"], "title": hazard["title"], "types": types,

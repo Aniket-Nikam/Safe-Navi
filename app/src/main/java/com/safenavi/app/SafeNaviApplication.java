@@ -9,6 +9,7 @@ public class SafeNaviApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         com.safenavi.app.product.ServerConnection.initialize(this);
+        com.safenavi.app.product.SessionRecovery.install(this);
         String language = getSharedPreferences("AppPreferences", MODE_PRIVATE)
                 .getString("app_language", "en");
         AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language));

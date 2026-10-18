@@ -35,7 +35,7 @@ public class MapPresentationInstrumentedTest {
             assertNotNull("Map did not initialise", mapRef.get());
             CountDownLatch ready = new CountDownLatch(1);
             scenario.onActivity(activity -> mapRef.get().setStyle(new Style.Builder().fromJson(
-                    "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":\"background\",\"paint\":{\"background-color\":\"#e9f0ed\"}}]}"), style -> {
+                    "{\"version\":8,\"glyphs\":\"https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf\",\"sources\":{},\"layers\":[{\"id\":\"background\",\"type\":\"background\",\"paint\":{\"background-color\":\"#e9f0ed\"}}]}"), style -> {
                 try { Field field = MapsActivity.class.getDeclaredField("mapStyle"); field.setAccessible(true); field.set(activity, style); ready.countDown(); }
                 catch (Exception error) { throw new AssertionError(error); }
             }));
@@ -61,9 +61,18 @@ public class MapPresentationInstrumentedTest {
                     TextView fastest = activity.findViewById(R.id.fastestRecommendation);
                     TextView balanced = activity.findViewById(R.id.balancedRecommendation);
                     TextView safest = activity.findViewById(R.id.safestRecommendation);
-                    assertTrue(fastest.getText().toString().contains("16.6 min"));
-                    assertTrue(balanced.getText().toString().contains("20.2 min"));
-                    assertTrue(safest.getText().toString().contains("22.0 min"));
+                    assertTrue(fastest.getText().toString().contains("17 min"));
+                    assertTrue(balanced.getText().toString().contains("20 min"));
+                    assertTrue(safest.getText().toString().contains("22 min"));
+                    String[] names={"fastest","balanced","safest"};
+                    int[] colors={android.graphics.Color.parseColor("#E53935"),android.graphics.Color.parseColor("#F4C430"),android.graphics.Color.parseColor("#168A4A")};
+                    Field layerField=MapsActivity.class.getDeclaredField("ROUTES_LAYER");layerField.setAccessible(true);
+                    String layerPrefix=(String)layerField.get(null);
+                    for(int i=0;i<3;i++){
+                        org.maplibre.android.style.layers.LineLayer layer=mapRef.get().getStyle().getLayerAs(layerPrefix+"-"+names[i]);
+                        assertNotNull(layer);assertEquals(colors[i],layer.getLineColorAsInt());
+                        assertEquals((i-1)*5f,layer.getLineOffset().getValue(),.01f);
+                    }
                     assertTrue(safest.performClick());
                     assertTrue(((TextView) activity.findViewById(R.id.routeResultTitle)).getText().toString().contains("Safest"));
                     assertNotNull(mapRef.get().getStyle().getLayer("endpoint-start-marker"));
@@ -78,23 +87,50 @@ public class MapPresentationInstrumentedTest {
                 assertTrue("Map needs visible space between search and results", panel.getTop() - search.getBottom() > 60);
                 for (int id : new int[]{R.id.fastestRecommendation, R.id.balancedRecommendation, R.id.safestRecommendation}) {
                     TextView row = activity.findViewById(id);
-                    assertFalse("Comparisons must not cover the map until requested",row.isShown());
+                    assertTrue("Three compact choices must be visible together",row.isShown());
                 }
                 assertFalse(activity.findViewById(R.id.endpointEditor).isShown());
                 assertFalse(activity.findViewById(R.id.safetyScoreCard).isShown());
                 assertEquals("none",mapRef.get().getStyle().getLayer("selected-route-risk-markers").getVisibility().getValue());
             });
-            screenshot("map-redesign.png");
+            android.os.SystemClock.sleep(2500); // Wait for the native map frame and camera animation, not only UI idle.
+            screenshot("map-three-routes-1.5.png");
             scenario.onActivity(activity -> activity.findViewById(R.id.findRouteButton).performClick());
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();
             scenario.onActivity(activity -> {
                 try {
                     Field field=MapsActivity.class.getDeclaredField("activeMapSheet"); field.setAccessible(true);
                     android.app.Dialog sheet=(android.app.Dialog)field.get(activity);
-                    assertNotNull(sheet); assertTrue(hasVisibleText(sheet.getWindow().getDecorView(),"Choose your route"));
+                    assertNotNull(sheet); assertTrue(hasVisibleText(sheet.getWindow().getDecorView(),"Share route"));
                 } catch(Exception e) { throw new AssertionError(e); }
             });
-            screenshot("map-comparison-1.3.png");
+            screenshot("map-details-1.5.png");
+            scenario.onActivity(activity -> {
+                try {
+                    Field sheetField=MapsActivity.class.getDeclaredField("activeMapSheet");sheetField.setAccessible(true);
+                    ((android.app.Dialog)sheetField.get(activity)).dismiss();
+                    RouteCandidate road=new RouteCandidate("shared-test",18,6000,Arrays.asList(
+                        new HazardLocation.GeoPoint(19.0657,72.9986),new HazardLocation.GeoPoint(19.05,73.01),new HazardLocation.GeoPoint(19.042644,73.023428)));
+                    RouteSafetyResult result=new RouteSafetyResult(road,RouteProfile.BALANCED,51,0,Collections.emptyList());
+                    Method render=MapsActivity.class.getDeclaredMethod("renderRankedRoutes",List.class,List.class,RouteProfile.class,PlaceSearchResult.class,PlaceSearchResult.class,String.class,String.class);
+                    render.setAccessible(true);render.invoke(activity,Collections.singletonList(result),Collections.singletonList(road),RouteProfile.BALANCED,
+                        new PlaceSearchResult("A · TEST",19.0657,72.9986),new PlaceSearchResult("B · TEST",19.042644,73.023428),"Test geometry","Test only");
+                    for(String name:new String[]{"fastest","balanced","safest"}){
+                        assertNotNull(mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name));
+                        assertNotNull(mapRef.get().getStyle().getSource("safe-navi-routes-"+name));
+                    }
+                    assertTrue(((TextView)activity.findViewById(R.id.routeStatusText)).getText().toString().contains("Shared road"));
+                    // Local-only record: no network publication and no fabricated production crime.
+                    org.json.JSONObject record=new org.json.JSONObject().put("id","test-crime").put("title","TEST robbery report").put("category_key","CRIME").put("reason","Test only").put("severity","HIGH").put("status","ACTIVE").put("latitude",19.05).put("longitude",73.01).put("crime_types",new org.json.JSONArray().put("Robbery / snatching"));
+                    Method apply=MapsActivity.class.getDeclaredMethod("applyHazardResponse",org.json.JSONObject.class,boolean.class);apply.setAccessible(true);
+                    apply.invoke(activity,new org.json.JSONObject().put("hazards",new org.json.JSONArray().put(record)),true);
+                    org.maplibre.android.style.layers.SymbolLayer labels=mapRef.get().getStyle().getLayerAs("verified-alert-labels");
+                    assertNotNull(labels);assertEquals("Noto Sans Regular",labels.getTextFont().getValue()[0]);
+                    assertEquals("Crime & alerts · 1",((TextView)activity.findViewById(R.id.areaCrimeButton)).getText().toString());
+                }catch(Exception e){throw new AssertionError(e);}
+            });
+            android.os.SystemClock.sleep(2500);
+            screenshot("map-shared-road-1.5.png");
         }
     }
 

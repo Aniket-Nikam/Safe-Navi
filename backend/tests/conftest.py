@@ -40,6 +40,15 @@ def private_storage(monkeypatch, safe_storage_environment):
 
 @pytest.fixture(autouse=True)
 def safe_storage_environment(tmp_path, monkeypatch):
+    # Every case has its own database and client identities, including rate-limit state.
+    from app.main import app
+    from app.security import RateLimitMiddleware
+    middleware = app.middleware_stack
+    while middleware is not None:
+        if isinstance(middleware, RateLimitMiddleware):
+            with middleware.lock:
+                middleware.events.clear()
+        middleware = getattr(middleware, "app", None)
     monkeypatch.setenv("SAFE_NAVI_PRODUCT_DB", str(tmp_path / "product.sqlite"))
     monkeypatch.setenv("SAFE_NAVI_EVIDENCE_DIR", str(tmp_path / "evidence"))
     monkeypatch.setenv("SAFE_NAVI_EVIDENCE_BACKEND", "local")

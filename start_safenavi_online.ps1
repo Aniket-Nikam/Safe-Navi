@@ -42,7 +42,7 @@ $projectRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $backendRoot = Join-Path $projectRoot "backend"
 $pythonPath = Join-Path $backendRoot "venv\Scripts\python.exe"
 $databasePath = Join-Path $backendRoot "data\safe_navi_runtime.sqlite"
-$apkPath = Join-Path $projectRoot "deliverables\Safe-Navi-1.4.apk"
+$apkPath = Join-Path $projectRoot "deliverables\Safe-Navi-1.5.apk"
 $adbPath = Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"
 $healthUrl = "http://127.0.0.1:8000/health"
 
@@ -115,7 +115,7 @@ Write-Host "  PC API docs           http://127.0.0.1:8000/docs"
 Write-Host "  Phone health check    $phoneHealth" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "  APK                   Cases & news 1.4 (cloud default; existing server choice preserved)"
+Write-Host "  APK                   Map, community & news 1.5 (cloud default; existing server choice preserved)"
 Write-Host "  To use THIS laptop's accounts/data: in the app open Server connection, enter http://${lanIp}:8000, then Test and save." -ForegroundColor Cyan
 
 if (Test-Path -LiteralPath $adbPath) {

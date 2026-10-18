@@ -593,7 +593,7 @@ def test_community_photos_and_report_conversation_workflow():
     assert [item["author_role"] for item in citizen_thread] == ["government", "citizen", "government"]
 
 
-def test_admin_controls_persistent_live_news_schedule():
+def test_admin_controls_persistent_live_news_schedule(monkeypatch):
     create_user("News Administrator", "news-admin@example.test", "administrator-password", "admin")
     create_user("News Reviewer", "news-reviewer@example.test", "reviewer-password", "government")
     admin = client.post("/api/v1/auth/login", json={
@@ -617,4 +617,11 @@ def test_admin_controls_persistent_live_news_schedule():
     assert client.patch("/api/v1/government/news/settings", headers=admin_headers,
                         json={"refresh_hours": 6}).status_code == 422
     assert client.get("/api/v1/government/news/settings", headers=reviewer_headers).status_code == 403
-    assert client.post("/api/v1/government/news/ingest", headers=reviewer_headers).status_code == 403
+    calls = []
+    def ingest(force):
+        calls.append(force)
+        return {"inserted": 0, "skipped": "not_due"}
+    monkeypatch.setattr("app.product_api.ingest_configured_feeds", ingest)
+    assert client.post("/api/v1/government/news/ingest", headers=reviewer_headers).status_code == 200
+    assert client.post("/api/v1/government/news/ingest", headers=admin_headers).status_code == 200
+    assert calls == [False, True]

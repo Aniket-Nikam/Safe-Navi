@@ -7,11 +7,17 @@ public final class ProductSession {
     private static final String FILE = "safe_navi_session";
     private ProductSession() { }
     private static SharedPreferences preferences(Context context) { return context.getSharedPreferences(FILE, Context.MODE_PRIVATE); }
-    public static void save(Context context, String token, String userId, String name, String email, String role) {
+    public static synchronized void save(Context context, String token, String userId, String name, String email, String role) {
         preferences(context).edit().putString("token", token).putString("user_id", userId)
-                .putString("name", name).putString("email", email).putString("role", role).apply();
+                .putString("name", name).putString("email", email).putString("role", role)
+                .putString("origin", ServerConnection.baseUrl()).putBoolean("reauth_required",false).apply();
     }
-    public static boolean isSignedIn(Context context) { return !token(context).isEmpty(); }
+    public static boolean isSignedIn(Context context) { return !token(context).isEmpty() && !needsSignIn(context); }
+    public static boolean needsSignIn(Context context) { return preferences(context).getBoolean("reauth_required",false); }
+    public static synchronized boolean reject(Context context,String rejectedToken,String origin) {
+        if(rejectedToken==null || rejectedToken.isEmpty() || !rejectedToken.equals(token(context)) || !origin.equals(ServerConnection.baseUrl()))return false;
+        preferences(context).edit().putBoolean("reauth_required",true).apply(); return true;
+    }
     public static String token(Context context) { return preferences(context).getString("token", ""); }
     public static String userId(Context context) { return preferences(context).getString("user_id", ""); }
     public static String name(Context context) { return preferences(context).getString("name", "Safe-Navi user"); }
@@ -21,5 +27,5 @@ public final class ProductSession {
     public static String activeJourney(Context context) { return preferences(context).getString("active_journey_id", ""); }
     public static void setBackgroundJourneyEnabled(Context context, boolean enabled) { preferences(context).edit().putBoolean("background_journey_enabled", enabled).apply(); }
     public static boolean backgroundJourneyEnabled(Context context) { return preferences(context).getBoolean("background_journey_enabled", false); }
-    public static void clear(Context context) { preferences(context).edit().clear().apply(); }
+    public static synchronized void clear(Context context) { preferences(context).edit().clear().apply(); }
 }

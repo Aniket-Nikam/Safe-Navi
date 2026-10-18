@@ -26,6 +26,11 @@
 
     <com.google.android.material.card.MaterialCardView android:id="@+id/routeControlCard" android:layout_width="0dp" android:layout_height="wrap_content" android:layout_margin="12dp" app:cardBackgroundColor="@color/surface_elevated" app:cardCornerRadius="24dp" app:cardElevation="4dp" app:strokeColor="@color/divider" app:strokeWidth="1dp" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent" app:layout_constraintEnd_toEndOf="parent">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="8dp">
+            <LinearLayout android:id="@+id/routeChoices" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:visibility="gone">
+<TextView android:id="@+id/fastestRecommendation" android:layout_width="0dp" android:layout_height="wrap_content" android:minHeight="58dp" android:layout_weight="1" android:layout_margin="3dp" android:padding="8dp" android:gravity="center" android:text="Fastest" android:textSize="12sp" android:textColor="@color/text_primary" android:clickable="true" android:focusable="true"/>
+<TextView android:id="@+id/balancedRecommendation" android:layout_width="0dp" android:layout_height="wrap_content" android:minHeight="58dp" android:layout_weight="1" android:layout_margin="3dp" android:padding="8dp" android:gravity="center" android:text="Balanced" android:textSize="12sp" android:textColor="@color/text_primary" android:clickable="true" android:focusable="true"/>
+<TextView android:id="@+id/safestRecommendation" android:layout_width="0dp" android:layout_height="wrap_content" android:minHeight="58dp" android:layout_weight="1" android:layout_margin="3dp" android:padding="8dp" android:gravity="center" android:text="Safest" android:textSize="12sp" android:textColor="@color/text_primary" android:clickable="true" android:focusable="true"/>
+            </LinearLayout>
             <TextView android:id="@+id/routeStatusText" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingStart="8dp" android:paddingEnd="8dp" android:text="Choose a destination to begin" android:textSize="12sp" android:maxLines="2" android:textColor="@color/text_secondary"/>
             <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:layout_marginTop="4dp" android:gravity="center_vertical">
                 <com.google.android.material.button.MaterialButton android:id="@+id/travelModeButton" style="@style/Widget.MaterialComponents.Button.TextButton" android:layout_width="80dp" android:layout_height="48dp" android:text="@string/drive" android:textSize="12sp" android:letterSpacing="0" android:textAllCaps="false"/>
@@ -35,19 +40,17 @@
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
+    <com.google.android.material.button.MaterialButton android:id="@+id/areaCrimeButton" android:layout_width="wrap_content" android:layout_height="48dp" android:layout_marginStart="12dp" android:layout_marginTop="6dp" android:text="Crime &amp; alerts" android:textSize="12sp" android:textAllCaps="false" android:letterSpacing="0" android:textColor="@color/text_primary" app:backgroundTint="@color/surface_elevated" app:cornerRadius="24dp" app:layout_constraintTop_toBottomOf="@id/routeSearchCard" app:layout_constraintStart_toStartOf="parent"/>
+
     <!-- Non-presentational state views preserve existing share/journey/role bindings.
          Their content is presented only in user-opened bottom sheets. -->
     <LinearLayout android:layout_width="0dp" android:layout_height="0dp" android:orientation="vertical" android:visibility="gone" app:layout_constraintBottom_toBottomOf="parent" app:layout_constraintStart_toStartOf="parent">
         <ImageButton android:id="@+id/locationButton" android:layout_width="48dp" android:layout_height="48dp"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/mapConnectionButton" android:layout_width="wrap_content" android:layout_height="48dp"/>
-        <com.google.android.material.button.MaterialButton android:id="@+id/areaCrimeButton" android:layout_width="wrap_content" android:layout_height="48dp"/>
         <LinearLayout android:id="@+id/safetyScoreCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
             <TextView android:id="@+id/mapSafetyScore" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
             <TextView android:id="@+id/mapSafetyLabel" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
         </LinearLayout>
-        <TextView android:id="@+id/fastestRecommendation" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-        <TextView android:id="@+id/balancedRecommendation" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-        <TextView android:id="@+id/safestRecommendation" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
         <com.google.android.material.button.MaterialButton android:id="@+id/routeProfileButton" android:layout_width="wrap_content" android:layout_height="48dp"/>
         <LinearLayout android:id="@+id/routeResultCard" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
             <TextView android:id="@+id/routeResultTitle" android:layout_width="match_parent" android:layout_height="wrap_content"/>

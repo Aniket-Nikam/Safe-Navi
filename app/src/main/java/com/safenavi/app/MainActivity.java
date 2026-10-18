@@ -26,6 +26,7 @@ public class MainActivity extends AppCompatActivity {
         initializeViews();
         setupBottomNavigation();
         SafetySyncWorker.schedule(this);
+        if(com.safenavi.app.product.ProductSession.isSignedIn(this))new com.safenavi.app.product.ProductApiClient(this).validateSession(new com.safenavi.app.product.ProductApiClient.ObjectCallback(){public void onSuccess(org.json.JSONObject user){}public void onError(String message){}});
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
                 != PackageManager.PERMISSION_GRANTED) requestPermissions(new String[]{android.Manifest.permission.POST_NOTIFICATIONS}, 902);
 

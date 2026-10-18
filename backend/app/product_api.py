@@ -234,11 +234,13 @@ class CommunityPostCreate(BaseModel):
     category: Literal["general", "question", "help", "update", "neighbourhood"] = "general"
     content: str = Field(min_length=3, max_length=1500)
     evidence_id: str | None = Field(default=None, max_length=80)
+    client_request_id: str | None = Field(default=None, min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class CommunityCommentCreate(BaseModel):
     content: str = Field(min_length=2, max_length=1000)
     parent_id: str | None = Field(default=None, max_length=80)
+    client_request_id: str | None = Field(default=None, min_length=16, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
 
 
 class AssistantTurn(BaseModel):
@@ -504,8 +506,9 @@ def metrics(_: Annotated[dict, Depends(operations_reader)]) -> dict:
 
 
 @router.post("/government/news/ingest")
-def ingest_news(_: Annotated[dict, Depends(admin_user)]) -> dict:
-    return ingest_configured_feeds()
+def ingest_news(user: Annotated[dict, Depends(operations_reader)]) -> dict:
+    # Officials may check when due; only admins can force or change the interval.
+    return ingest_configured_feeds(force=user["role"] == "admin")
 
 
 @router.get("/government/news/settings")
@@ -591,6 +594,9 @@ def map_hazards(
     if bounds and (min_lat > max_lat or min_lng > max_lng):
         raise HTTPException(422, "Invalid map bounds")
     hazards = active_hazards(bounds)  # type: ignore[arg-type]
+    from .crime_labels import crime_labels
+    for hazard in hazards:
+        hazard["crime_types"] = crime_labels(hazard)
     return {"hazards": hazards, "count": len(hazards)}
 
 
@@ -726,7 +732,7 @@ def publish_community_post(
     if not admin_app_settings()["community_posting_enabled"]:
         raise HTTPException(403, "Community posting is currently paused by the administrator")
     try:
-        return create_community_post(user["id"], request.category, request.content, request.evidence_id)
+        return create_community_post(user["id"], request.category, request.content, request.evidence_id, request.client_request_id)
     except ValueError as error:
         raise HTTPException(400, str(error)) from error
 
@@ -752,7 +758,7 @@ def publish_community_comment(
 ) -> dict:
     if not admin_app_settings()["community_posting_enabled"]:
         raise HTTPException(403, "Community posting is currently paused by the administrator")
-    try: comment = create_community_comment(post_id, user["id"], request.content, request.parent_id)
+    try: comment = create_community_comment(post_id, user["id"], request.content, request.parent_id, request.client_request_id)
     except ValueError as error: raise HTTPException(400, str(error)) from error
     if comment is None:
         raise HTTPException(404, "Community post not found")

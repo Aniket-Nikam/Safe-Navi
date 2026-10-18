@@ -32,6 +32,10 @@ public class LoginActivity extends AppCompatActivity {
         loginButton = findViewById(R.id.loginButton);
         progressBar = findViewById(R.id.progressBar);
         expectedRole = getIntent().getStringExtra("LOGIN_TYPE");
+        if(getIntent().getBooleanExtra("SESSION_RECOVERY",false)) {
+            emailEditText.setText(getIntent().getStringExtra("RECOVERY_EMAIL"));
+            rootView.post(()->Snackbar.make(rootView,"Please sign in again to reconnect. Your drafts are saved.",Snackbar.LENGTH_INDEFINITE).setAction("OK",v->{}).show());
+        }
         if (expectedRole == null || expectedRole.equals("user")) expectedRole = "citizen";
         ((TextView) findViewById(R.id.loginTitleTextView)).setText(expectedRole.equals("government")
                 ? "Official sign in" : expectedRole.equals("admin") ? "Admin sign in" : "Welcome back");
@@ -59,7 +63,7 @@ public class LoginActivity extends AppCompatActivity {
         JSONObject user = response.optJSONObject("user");
         if (user == null) { showLoading(false); Snackbar.make(rootView, "Account response is incomplete.", Snackbar.LENGTH_LONG).show(); return; }
         String role = user.optString("role", "citizen");
-        if (!role.equals(expectedRole)) {
+        if (!role.equals(expectedRole) && !getIntent().getBooleanExtra("SESSION_RECOVERY",false)) {
             showLoading(false);
             Snackbar.make(rootView, "This account does not have the selected " + expectedRole + " role.", Snackbar.LENGTH_LONG).show();
             return;
