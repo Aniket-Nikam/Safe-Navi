@@ -36,7 +36,7 @@ public final class OfflineReportUploadWorker extends Worker {
     @NonNull @Override public Result doWork() {
         String token = ProductSession.token(getApplicationContext()); String user = ProductSession.email(getApplicationContext());
         if (token.isEmpty() || user.isEmpty()) return Result.success();
-        JSONArray entries = OfflineReportQueue.allEntries(getApplicationContext()); boolean retry = false;
+        JSONArray entries = OfflineReportQueue.pending(getApplicationContext()); boolean retry = false;
         for (int i = 0; i < entries.length(); i++) {
             JSONObject entry = entries.optJSONObject(i); if (entry == null || !user.equals(entry.optString("user_id"))) continue;
             JSONObject payload = entry.optJSONObject("payload"); if (payload == null) continue;

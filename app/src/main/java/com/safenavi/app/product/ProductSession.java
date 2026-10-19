@@ -28,4 +28,10 @@ public final class ProductSession {
     public static void setBackgroundJourneyEnabled(Context context, boolean enabled) { preferences(context).edit().putBoolean("background_journey_enabled", enabled).apply(); }
     public static boolean backgroundJourneyEnabled(Context context) { return preferences(context).getBoolean("background_journey_enabled", false); }
     public static synchronized void clear(Context context) { preferences(context).edit().clear().apply(); }
+    public static synchronized void invalidateForServerChange(Context context) {
+        // Preserve the email for sign-in and leave backend-scoped drafts untouched.
+        preferences(context).edit().remove("token").remove("user_id").remove("origin")
+                .remove("active_journey_id").putBoolean("background_journey_enabled",false)
+                .putBoolean("reauth_required",false).commit();
+    }
 }

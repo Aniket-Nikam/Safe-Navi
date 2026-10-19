@@ -11,8 +11,27 @@ public final class ServerConnection {
     private static volatile String address=BuildConfig.RISK_API_BASE_URL;
     private ServerConnection() { }
     public static void initialize(Context context) {
-        String saved=context.getSharedPreferences("safe_navi_server",0).getString("address",BuildConfig.RISK_API_BASE_URL);
+        android.content.SharedPreferences prefs=context.getSharedPreferences("safe_navi_server",0);
+        String saved=prefs.getString("address",BuildConfig.RISK_API_BASE_URL);
         try { address=normalize(saved); } catch(IllegalArgumentException error) { address=BuildConfig.RISK_API_BASE_URL; }
+        // Bind legacy pending reports BEFORE changing the origin. Old laptop evidence
+        // must never be silently uploaded to an unrelated cloud account.
+        OfflineReportQueue.bindLegacyOrigin(context,address);
+        if (shouldMigrateToCloud(address,BuildConfig.RISK_API_BASE_URL,prefs.getBoolean("cloud_default_applied_18",false))) {
+            if(prefs.edit().putString("address",CLOUD_ORIGIN).putBoolean("cloud_default_applied_18",true).commit()){
+                address=CLOUD_ORIGIN;
+                ProductSession.invalidateForServerChange(context);
+                com.safenavi.app.safety.network.OfflineHazardCache.clear(context);
+                context.getSharedPreferences("safe_navi_background_alerts",0).edit().clear().apply();
+            }
+        } else if(CLOUD_ORIGIN.equals(BuildConfig.RISK_API_BASE_URL)){
+            prefs.edit().putBoolean("cloud_default_applied_18",true).apply();
+        }
+        String sessionOrigin=context.getSharedPreferences("safe_navi_session",0).getString("origin","");
+        if(!sessionOrigin.isEmpty()&&!sessionOrigin.equals(address))ProductSession.invalidateForServerChange(context);
+    }
+    public static boolean shouldMigrateToCloud(String saved,String buildDefault,boolean applied) {
+        return !applied && CLOUD_ORIGIN.equals(buildDefault) && !CLOUD_ORIGIN.equals(saved);
     }
     public static String baseUrl() { return address; }
     public static boolean requiresCleanQueue(String current, String next) {

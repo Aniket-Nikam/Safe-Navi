@@ -35,7 +35,7 @@ public final class ServerConnectionDialog {
             try { address=ServerConnection.normalize(input.getText().toString()); }
             catch(IllegalArgumentException error){input.setError(error.getMessage());return;}
             if (ServerConnection.requiresCleanQueue(ServerConnection.baseUrl(), address)
-                    && OfflineReportQueue.allEntries(activity).length() > 0) {
+                    && OfflineReportQueue.entriesForCurrentServer(activity).length() > 0) {
                 input.setError("Upload pending offline reports to the current server before switching cloud servers. Your reports and photographs have not been deleted.");
                 return;
             }

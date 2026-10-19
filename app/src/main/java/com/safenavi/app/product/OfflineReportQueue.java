@@ -15,10 +15,11 @@ public final class OfflineReportQueue {
 
     public static synchronized void enqueue(Context context, JSONObject payload, JSONArray evidenceLocalIds) {
         JSONArray values = all(context);
-        for(int i=0;i<values.length();i++){JSONObject existing=values.optJSONObject(i);JSONObject prior=existing==null?null:existing.optJSONObject("payload");if(prior!=null&&ProductSession.email(context).equals(existing.optString("user_id"))&&!payload.optString("client_request_id").isEmpty()&&payload.optString("client_request_id").equals(prior.optString("client_request_id")))return;}
+        for(int i=0;i<values.length();i++){JSONObject existing=values.optJSONObject(i);JSONObject prior=existing==null?null:existing.optJSONObject("payload");if(prior!=null&&belongsToCurrentServer(existing)&&ProductSession.email(context).equals(existing.optString("user_id"))&&!payload.optString("client_request_id").isEmpty()&&payload.optString("client_request_id").equals(prior.optString("client_request_id")))return;}
         JSONObject item = new JSONObject();
         try {
             item.put("user_id", ProductSession.email(context));
+            item.put("origin", ServerConnection.baseUrl());
             item.put("queued_at", System.currentTimeMillis());
             item.put("payload", new JSONObject(payload.toString()));
             item.put("evidence_local_ids", new JSONArray(evidenceLocalIds.toString()));
@@ -33,7 +34,7 @@ public final class OfflineReportQueue {
         String user = ProductSession.email(context);
         for (int i = 0; i < values.length(); i++) {
             JSONObject item = values.optJSONObject(i);
-            if (item != null && user.equals(item.optString("user_id"))) result.put(item);
+            if (item != null && belongsToCurrentServer(item) && user.equals(item.optString("user_id"))) result.put(item);
         }
         return result;
     }
@@ -44,7 +45,8 @@ public final class OfflineReportQueue {
         for (int i = 0; i < values.length(); i++) {
             JSONObject item = values.optJSONObject(i);
             JSONObject payload = item == null ? null : item.optJSONObject("payload");
-            if (payload == null || !clientRequestId.equals(payload.optString("client_request_id"))) kept.put(item);
+            if (payload == null || !belongsToCurrentServer(item) || !ProductSession.email(context).equals(item.optString("user_id"))
+                    || !clientRequestId.equals(payload.optString("client_request_id"))) kept.put(item);
         }
         save(context, kept);
     }
@@ -60,4 +62,19 @@ public final class OfflineReportQueue {
     }
 
     static synchronized JSONArray allEntries(Context context) { return all(context); }
+    private static boolean belongsToCurrentServer(JSONObject item) {
+        return ServerConnection.baseUrl().equals(item.optString("origin",ServerConnection.baseUrl()));
+    }
+    static synchronized JSONArray entriesForCurrentServer(Context context) {
+        JSONArray result=new JSONArray(),values=all(context);
+        for(int i=0;i<values.length();i++){JSONObject item=values.optJSONObject(i);if(item!=null&&belongsToCurrentServer(item))result.put(item);}
+        return result;
+    }
+    static synchronized void bindLegacyOrigin(Context context,String origin) {
+        JSONArray values=all(context);boolean changed=false;
+        try {
+            for(int i=0;i<values.length();i++){JSONObject item=values.optJSONObject(i);if(item!=null&&!item.has("origin")){item.put("origin",origin);changed=true;}}
+        }catch(org.json.JSONException error){throw new IllegalStateException("Cannot retain the queued report origin",error);}
+        if(changed)save(context,values);
+    }
 }

@@ -4,6 +4,12 @@ import org.junit.Test;
 import com.safenavi.app.product.ServerConnection;
 
 public class ServerConnectionTest {
+    @Test public void cloudUpdateMigratesOldLaptopOriginOnce(){
+        org.junit.Assert.assertTrue(ServerConnection.shouldMigrateToCloud("http://192.168.1.2:8000",ServerConnection.CLOUD_ORIGIN,false));
+        org.junit.Assert.assertFalse(ServerConnection.shouldMigrateToCloud(ServerConnection.CLOUD_ORIGIN,ServerConnection.CLOUD_ORIGIN,false));
+        org.junit.Assert.assertFalse(ServerConnection.shouldMigrateToCloud("http://192.168.1.2:8000",ServerConnection.CLOUD_ORIGIN,true));
+        org.junit.Assert.assertFalse(ServerConnection.shouldMigrateToCloud("http://192.168.1.2:8000","http://192.168.1.2:8000",false));
+    }
     @Test public void acceptsPrivateHotspotAndHealthLink() {
         assertEquals("http://172.24.168.186:8000",ServerConnection.normalize("172.24.168.186:8000"));
         assertEquals("http://192.168.29.221:8000",ServerConnection.normalize("http://192.168.29.221:8000/health"));
