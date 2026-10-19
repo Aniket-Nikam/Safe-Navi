@@ -167,7 +167,7 @@ public class DatasetRiskService {
                 } else factorSummary = topFactors(item.optJSONObject("factor_averages"));
             }
         }
-        ranked.sort(Comparator.comparingDouble(RouteSafetyResult::getScore));
+        ranked = com.safenavi.app.safety.service.RouteRecommendations.rank(ranked, profile);
         return new DatasetRouteEvaluation(ranked, root.getString("time_period"), coverage, factorSummary,
                 provider, modelVersion, confidence);
     }

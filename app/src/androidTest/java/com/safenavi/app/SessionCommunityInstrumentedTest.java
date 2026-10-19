@@ -37,6 +37,7 @@ public class SessionCommunityInstrumentedTest {
         assertFalse(ProductSession.reject(context,"test-token","http://127.0.0.1:9999"));
         assertTrue(ProductSession.isSignedIn(context));
         assertTrue(ProductSession.reject(context,"test-token",ServerConnection.baseUrl()));
+        assertFalse("Repeated failures must not start another recovery",ProductSession.reject(context,"test-token",ServerConnection.baseUrl()));
         assertFalse(ProductSession.isSignedIn(context));
         assertEquals("session@ui.test",ProductSession.email(context));
         ProductSession.save(context,"new-token","ui-user","Test user","session@ui.test","citizen");
@@ -47,7 +48,40 @@ public class SessionCommunityInstrumentedTest {
         respond(503);assertTrue(ProductSession.isSignedIn(context));
         respond(401);assertTrue(ProductSession.needsSignIn(context));
     }
-    private void respond(int status) throws Exception {
+    @Test public void rejectedLoginExplainsCredentialsWithoutInvalidatingSession() throws Exception {
+        String error=respond(401,true);
+        assertTrue(error.contains("Email or password was not accepted"));
+        assertFalse(error.contains("sign in again"));
+        assertTrue(ProductSession.isSignedIn(context));
+    }
+    @Test public void loginFieldsRemainReadableInBothThemes() throws Exception {
+        int previous=androidx.appcompat.app.AppCompatDelegate.getDefaultNightMode();
+        try {
+            for(boolean dark:new boolean[]{false,true}) {
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                        dark?androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES:androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO));
+                try(ActivityScenario<LoginActivity> scenario=ActivityScenario.launch(new Intent(context,LoginActivity.class).putExtra("LOGIN_TYPE","citizen"))) {
+                    scenario.onActivity(a->{
+                        EditText email=a.findViewById(R.id.emailEditText), password=a.findViewById(R.id.passwordEditText);
+                        email.setText("citizen@example.test"); password.setText("example-password");
+                        assertTrue(email.isSingleLine()); assertTrue(password.isSingleLine());
+                        assertTrue(email.getWidth()>0); assertTrue(password.getWidth()>0);
+                        // Material owns the single field background; no separate EditText underline.
+                        assertTrue(email.getBackground() instanceof com.google.android.material.shape.MaterialShapeDrawable);
+                        assertTrue(password.getBackground() instanceof com.google.android.material.shape.MaterialShapeDrawable);
+                        assertTrue(a.findViewById(R.id.loginServerAddress).isShown());
+                    });
+                    InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+                    android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
+                    try(FileOutputStream out=new FileOutputStream(new File(context.getExternalFilesDir(null),"login-1.6-"+(dark?"dark":"light")+".png"))){bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
+                }
+            }
+        } finally {
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(previous));
+        }
+    }
+    private String respond(int status) throws Exception { return respond(status,false); }
+    private String respond(int status,boolean login) throws Exception {
         try(ServerSocket listener=new ServerSocket(0,1,InetAddress.getByName("127.0.0.1"))){
             ServerConnection.save(context,"http://127.0.0.1:"+listener.getLocalPort());
             Thread server=new Thread(()->{try(Socket socket=listener.accept()){
@@ -57,8 +91,12 @@ public class SessionCommunityInstrumentedTest {
                 OutputStream out=socket.getOutputStream();out.write(("HTTP/1.1 "+status+" Test\r\nContent-Type: application/json\r\nContent-Length: "+body.length+"\r\nConnection: close\r\n\r\n").getBytes(java.nio.charset.StandardCharsets.UTF_8));out.write(body);out.flush();
             }catch(Exception e){throw new RuntimeException(e);}});server.setDaemon(true);server.start();
             CountDownLatch done=new CountDownLatch(1);
-            new ProductApiClient(context).validateSession(new ProductApiClient.ObjectCallback(){public void onSuccess(JSONObject value){done.countDown();}public void onError(String message){done.countDown();}});
+            java.util.concurrent.atomic.AtomicReference<String> error=new java.util.concurrent.atomic.AtomicReference<>("");
+            ProductApiClient.ObjectCallback callback=new ProductApiClient.ObjectCallback(){public void onSuccess(JSONObject value){done.countDown();}public void onError(String message){error.set(message);done.countDown();}};
+            if(login)new ProductApiClient(context).login("person@example.test","incorrect-password",callback);
+            else new ProductApiClient(context).validateSession(callback);
             assertTrue(done.await(10,TimeUnit.SECONDS));server.join(2000);
+            return error.get();
         }
     }
     @Test public void communityComposerIsCollapsedAndDraftSurvivesRecreation() throws Exception {

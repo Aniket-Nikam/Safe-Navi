@@ -15,7 +15,7 @@ public final class ProductSession {
     public static boolean isSignedIn(Context context) { return !token(context).isEmpty() && !needsSignIn(context); }
     public static boolean needsSignIn(Context context) { return preferences(context).getBoolean("reauth_required",false); }
     public static synchronized boolean reject(Context context,String rejectedToken,String origin) {
-        if(rejectedToken==null || rejectedToken.isEmpty() || !rejectedToken.equals(token(context)) || !origin.equals(ServerConnection.baseUrl()))return false;
+        if(needsSignIn(context) || rejectedToken==null || rejectedToken.isEmpty() || !rejectedToken.equals(token(context)) || !origin.equals(ServerConnection.baseUrl()))return false;
         preferences(context).edit().putBoolean("reauth_required",true).apply(); return true;
     }
     public static String token(Context context) { return preferences(context).getString("token", ""); }

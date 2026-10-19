@@ -992,7 +992,7 @@ public class MapsActivity extends AppCompatActivity {
                     @Override public void onSuccess(OfflineRouter.Result result) { runOnUiThread(() -> {
                         if (!isRouteRequestActive(requestId)) return;
                         RouteSafetyResult ranked = new RouteSafetyResult(result.route, selectedRouteProfile(), result.riskExposure,
-                                result.route.getTravelMinutes() + (selectedRouteProfile() == RouteProfile.SAFEST ? 1.0 : selectedRouteProfile() == RouteProfile.BALANCED ? 0.35 : 0.0) * result.riskExposure);
+                                RouteRecommendations.score(result.route.getTravelMinutes(), result.riskExposure, selectedRouteProfile()));
                         renderRankedRoutes(java.util.Collections.singletonList(ranked), java.util.Collections.singletonList(result.route),
                                 selectedRouteProfile(), source, destination, "On-device Navi Mumbai graph",
                                 "Offline conservative dataset risk · verified closure cache");
@@ -1067,15 +1067,18 @@ public class MapsActivity extends AppCompatActivity {
             RouteSafetyResult recommendation = RouteRecommendations.rank(evaluated, option).get(0);
             distinct.add(recommendation.getRoute().getProviderRouteId());
             TextView row = findViewById(rowIds[i]);
-            row.setText(String.format(Locale.US, "%s\n%.0f min",
-                    profileName(option), recommendation.getRoute().getTravelMinutes()));
+            row.setText(String.format(Locale.US, "%s\n%.0f min\nRisk %.1f",
+                    profileName(option), recommendation.getRoute().getTravelMinutes(), recommendation.getRiskExposure()));
             styleRouteOption(row, option, option == profile);
             row.setContentDescription(row.getText() + ". Tap to highlight this recommendation.");
             row.setOnClickListener(v -> {
                 routeProfile = option; routeProfileButton.setText(profileName(option));
                 renderRankedRoutes(evaluated, allowed, option, source, destination, routeProviderLabel, sourceLabel);
             });
-            objectives.append(String.format(Locale.US, "%s: %.1f min + %.2f × %.1f risk = %.2f\n",
+            if (option == RouteProfile.SAFEST) objectives.append(String.format(Locale.US,
+                    "Safest: lowest assessed risk %.2f; time %.1f min breaks risk ties.\n",
+                    recommendation.getRiskExposure(), recommendation.getRoute().getTravelMinutes()));
+            else objectives.append(String.format(Locale.US, "%s: %.1f min + %.2f × %.1f risk = %.2f\n",
                     profileName(option), recommendation.getRoute().getTravelMinutes(), RouteRecommendations.weight(option),
                     recommendation.getRiskExposure(), recommendation.getScore()));
         }
@@ -1098,7 +1101,7 @@ public class MapsActivity extends AppCompatActivity {
                     result.getRoute().getTravelMinutes(), result.getRiskExposure()));
         }
         comparison.append(objectives).append("Scores express different preferences, not different safety predictions. Same road = same time and exposure.\n")
-                .append("Line colours: red Fastest, yellow Balanced, green Safest. Parallel colour bands denote shared roads. A = start, B = destination.");
+                .append("Distinct roads: red Fastest, yellow Balanced, green Safest. A road shared by preferences is drawn once in slate blue, not as artificial parallel routes. A = start, B = destination. Safest means lowest assessed exposure among available evaluated roads, not guaranteed safety.");
         routeResultRisk.setText(comparison.toString());
         renderSelectedRiskPoints(best);
         renderRiskSections(best);
@@ -1115,12 +1118,12 @@ public class MapsActivity extends AppCompatActivity {
         ((TextView)findViewById(R.id.routeStatusText)).setText(risksVisible?"Estimates only. Grey = unassessed, not safe.":(displayedOffline?"Offline snapshot · ":"")+profileName(profile)+" · "+String.format(Locale.US,"%.1f km",best.getRoute().getDistanceMeters()/1000));
         findViewById(R.id.routeChoices).setVisibility(View.VISIBLE);
         findRouteButton.setText("Route details");
-        ((TextView)findViewById(R.id.routeStatusText)).setText(distinct.size()==1?"Shared road · three preferences":profileName(profile)+" selected");
+        ((TextView)findViewById(R.id.routeStatusText)).setText(distinct.size()==1?"One road wins all three · drawn once":distinct.size()+" recommended roads · shared = slate blue");
         comparison.append("\n\nSelected-route explanations:\n");
         for (RouteRiskPoint point : selectedRiskPoints.values()) comparison.append(point.isVerified() ? "Official: " : "Estimate: ")
                 .append(point.getTitle()).append("\n").append(point.getReason()).append("\n\n");
         if (selectedRiskPoints.isEmpty()) comparison.append("No elevated risk markers available. This is not a guarantee of safety.\n");
-        comparison.append("Estimated zones use synthetic area-cell data, not precise crime observations. Red pins are verified reports; amber pins are estimates.");
+        comparison.append("Estimated zones use synthetic area-cell data, not precise crime observations. Official hazard labels and source details are separate from amber baseline estimates.");
         routeResultRisk.setText(comparison.toString());
         findViewById(R.id.routeDetailsPanel).setVisibility(View.GONE);
         ((MaterialButton) findViewById(R.id.routeDetailsToggle)).setText("Why this route? · Details & actions");
@@ -1378,16 +1381,25 @@ public class MapsActivity extends AppCompatActivity {
         removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE);
         removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
         RouteProfile[] preferences={RouteProfile.FASTEST,RouteProfile.BALANCED,RouteProfile.SAFEST};
+        Map<String,Integer> winnerCounts=new LinkedHashMap<>();
+        for(RouteProfile preference:preferences){
+            String id=RouteRecommendations.rank(evaluated,preference).get(0).getRoute().getProviderRouteId();
+            winnerCounts.put(id,winnerCounts.getOrDefault(id,0)+1);
+        }
+        java.util.Set<String> drawn=new java.util.HashSet<>();
         for(int i=0;i<preferences.length;i++){
             RouteProfile preference=preferences[i];
             RouteCandidate recommended=RouteRecommendations.rank(evaluated,preference).get(0).getRoute();
+            String id=recommended.getProviderRouteId();
+            if(!drawn.add(id))continue;
+            boolean shared=winnerCounts.get(id)>1;
             String suffix="-"+profileName(preference).toLowerCase(Locale.ROOT);
             Feature feature=Feature.fromGeometry(lineString(recommended));
             feature.addStringProperty("preference",profileName(preference));
             mapStyle.addSource(new GeoJsonSource(ROUTES_SOURCE+suffix,feature));
             mapStyle.addLayer(new LineLayer(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix).withProperties(
-                lineColor(routeColor(preference)),lineWidth(preference==routeProfile?5f:4f),
-                lineOpacity(1f),org.maplibre.android.style.layers.PropertyFactory.lineOffset((i-1)*5f),
+                lineColor(shared?Color.parseColor("#526C85"):routeColor(preference)),lineWidth(recommended.getProviderRouteId().equals(selected.getProviderRouteId())?7f:5f),
+                lineOpacity(1f),
                 org.maplibre.android.style.layers.PropertyFactory.lineCap("round"),
                 org.maplibre.android.style.layers.PropertyFactory.lineJoin("round")));
         }

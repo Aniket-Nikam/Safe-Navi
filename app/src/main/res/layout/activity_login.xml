@@ -14,7 +14,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="32dp"
+            android:padding="24dp"
             android:gravity="center">
 
             <!-- Logo and Title Section -->
@@ -23,8 +23,8 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:layout_marginTop="60dp"
-                android:layout_marginBottom="48dp">
+                android:layout_marginTop="28dp"
+                android:layout_marginBottom="28dp">
 
                 <ImageView
                     android:layout_width="80dp"
@@ -58,14 +58,15 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="28dp">
+                    android:padding="20dp">
 
                     <!-- Email Input -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:hint="Username"
-                        app:boxBackgroundMode="filled"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        android:hint="Email address"
+                        app:boxBackgroundMode="outline"
                         app:boxBackgroundColor="@color/input_background"
                         app:boxCornerRadiusTopStart="16dp"
                         app:boxCornerRadiusTopEnd="16dp"
@@ -82,6 +83,11 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="textEmailAddress"
+                            android:autofillHints="username"
+                            android:singleLine="true"
+                            android:minHeight="60dp"
+                            android:background="@null"
+                            android:textColor="@color/text_primary"
                             android:textSize="16sp"
                             android:padding="16dp" />
 
@@ -92,8 +98,9 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
+                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
                         android:hint="Password"
-                        app:boxBackgroundMode="filled"
+                        app:boxBackgroundMode="outline"
                         app:boxBackgroundColor="@color/input_background"
                         app:boxCornerRadiusTopStart="16dp"
                         app:boxCornerRadiusTopEnd="16dp"
@@ -111,6 +118,11 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:inputType="textPassword"
+                            android:autofillHints="password"
+                            android:singleLine="true"
+                            android:minHeight="60dp"
+                            android:background="@null"
+                            android:textColor="@color/text_primary"
                             android:textSize="16sp"
                             android:padding="16dp" />
 
@@ -130,6 +142,16 @@
                         android:padding="8dp" />
 
                     <!-- Login Button -->
+                    <TextView
+                        android:id="@+id/loginErrorText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:accessibilityLiveRegion="polite"
+                        android:textColor="@color/error"
+                        android:textSize="14sp"
+                        android:visibility="gone" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/loginButton"
                         android:layout_width="match_parent"
@@ -143,6 +165,14 @@
                         app:cornerRadius="16dp"
                         app:elevation="4dp" />
                     <com.google.android.material.button.MaterialButton android:id="@+id/loginServerConnectionButton" style="@style/Widget.SafeNavi.DashboardAction" android:layout_marginTop="8dp" android:text="Server connection" />
+                    <TextView
+                        android:id="@+id/loginServerAddress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
 
                 </LinearLayout>
 

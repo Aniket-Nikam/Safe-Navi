@@ -353,7 +353,7 @@ public class ProductApiClient {
             @Override public void onResponse(Call call, Response response) {
                 try (Response ignored = response) {
                     String body = response.body() == null ? "" : response.body().string();
-                    if (!response.isSuccessful()) { callback.onError(errorMessage(body, response.code())); return; }
+                    if (!response.isSuccessful()) { callback.onError(errorMessage(body, response)); return; }
                     callback.onSuccess(new JSONArray(body));
                 } catch (Exception error) { callback.onError("The server returned an unreadable response."); }
             }
@@ -365,14 +365,20 @@ public class ProductApiClient {
             @Override public void onResponse(Call call, Response response) {
                 try (Response ignored = response) {
                     String body = response.body() == null ? "" : response.body().string();
-                    if (!response.isSuccessful()) { callback.onError(errorMessage(body, response.code())); return; }
+                    if (!response.isSuccessful()) { callback.onError(errorMessage(body, response)); return; }
                     callback.onSuccess(new JSONObject(body));
                 } catch (Exception error) { callback.onError("The server returned an unreadable response."); }
             }
         };
     }
-    private static String errorMessage(String body, int code) {
-        if(code==401)return "Please sign in again. Your drafts are saved on this device.";
+    private static String errorMessage(String body, Response response) {
+        int code=response.code();
+        if(code==401) {
+            if(response.request().url().encodedPath().equals("/api/v1/auth/login"))
+                return "Email or password was not accepted. Check your details and the selected server.";
+            if(response.request().header("Authorization")!=null)
+                return "Your session is no longer valid. Sign in again; your drafts are saved on this device.";
+        }
         try { return new JSONObject(body).optString("detail", "Request failed (HTTP " + code + ")"); }
         catch (JSONException ignored) { return "Request failed (HTTP " + code + ")"; }
     }

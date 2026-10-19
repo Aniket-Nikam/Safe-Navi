@@ -21,9 +21,18 @@ public class RouteRecommendationsTest {
         assertEquals(20, RouteRecommendations.rank(values, RouteProfile.FASTEST).get(0).getScore(), .001);
         assertEquals(37.5, RouteRecommendations.rank(values, RouteProfile.BALANCED).get(0).getScore(), .001);
         RouteSafetyResult safest = RouteRecommendations.rank(values, RouteProfile.SAFEST).get(0);
-        assertEquals(70, safest.getScore(), .001);
+        assertEquals(50, safest.getScore(), .001);
         assertEquals(50, safest.getRiskExposure(), .001);
         assertEquals(20, safest.getRoute().getTravelMinutes(), .001);
+    }
+    @Test public void safestPrioritisesRiskEvenWhenFasterRoadWinsWeightedSum() {
+        List<RouteSafetyResult> values=Arrays.asList(result("quick",10,50),result("lower-risk",25,49));
+        assertEquals("quick",RouteRecommendations.rank(values,RouteProfile.BALANCED).get(0).getRoute().getProviderRouteId());
+        assertEquals("lower-risk",RouteRecommendations.rank(values,RouteProfile.SAFEST).get(0).getRoute().getProviderRouteId());
+    }
+    @Test public void equalRiskUsesTravelTimeBeforeProviderIdentifier() {
+        List<RouteSafetyResult> values=Arrays.asList(result("a-slow",30,49),result("z-quick",20,49));
+        assertEquals("z-quick",RouteRecommendations.rank(values,RouteProfile.SAFEST).get(0).getRoute().getProviderRouteId());
     }
     @Test public void apiPayloadNeverSamplesClosureGeometry() throws Exception {
         List<HazardLocation.GeoPoint> geometry = new ArrayList<>();

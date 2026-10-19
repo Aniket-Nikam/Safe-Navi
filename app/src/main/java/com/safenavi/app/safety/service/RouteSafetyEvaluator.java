@@ -24,11 +24,10 @@ public class RouteSafetyEvaluator {
         for (RouteCandidate candidate : providerCandidates) {
             double exposure = exposure(candidate, hazards, atTimeMillis);
             double normalizedTravel = candidate.getTravelMinutes();
-            double score = normalizedTravel + profile.getSafetyWeight() * exposure;
+            double score = RouteRecommendations.score(normalizedTravel, exposure, profile);
             results.add(new RouteSafetyResult(candidate, profile, exposure, score));
         }
-        results.sort(Comparator.comparingDouble(RouteSafetyResult::getScore));
-        return results;
+        return RouteRecommendations.rank(results, profile);
     }
 
     private double exposure(RouteCandidate route, List<Hazard> hazards, long atTimeMillis) {

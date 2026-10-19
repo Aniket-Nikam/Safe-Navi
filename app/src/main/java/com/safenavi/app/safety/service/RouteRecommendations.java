@@ -12,11 +12,16 @@ public final class RouteRecommendations {
     public static double weight(RouteProfile profile) {
         return profile == RouteProfile.SAFEST ? 1.0 : profile == RouteProfile.BALANCED ? 0.35 : 0.0;
     }
+    public static double score(double minutes, double risk, RouteProfile profile) {
+        return profile == RouteProfile.SAFEST ? risk : minutes + weight(profile) * risk;
+    }
     public static List<RouteSafetyResult> rank(List<RouteSafetyResult> evaluated, RouteProfile profile) {
         List<RouteSafetyResult> output = new ArrayList<>();
         for (RouteSafetyResult value : evaluated) output.add(new RouteSafetyResult(value.getRoute(), profile,
-                value.getRiskExposure(), value.getRoute().getTravelMinutes() + weight(profile) * value.getRiskExposure(), value.getRiskPoints(), value.getRiskSections()));
+                value.getRiskExposure(), score(value.getRoute().getTravelMinutes(), value.getRiskExposure(), profile), value.getRiskPoints(), value.getRiskSections()));
         output.sort(Comparator.comparingDouble(RouteSafetyResult::getScore)
+                .thenComparingDouble(value -> value.getRoute().getTravelMinutes())
+                .thenComparingDouble(RouteSafetyResult::getRiskExposure)
                 .thenComparing(value -> value.getRoute().getProviderRouteId()));
         return output;
     }

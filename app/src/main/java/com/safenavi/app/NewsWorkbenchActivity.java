@@ -55,11 +55,21 @@ public class NewsWorkbenchActivity extends AppCompatActivity {
         filter.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){public void onItemSelected(AdapterView<?> p,View v,int n,long id){rows.filter();}public void onNothingSelected(AdapterView<?> p){}});load();
     }
     private void load(){if(loading||!alive())return;loading=true;status.setText("Refreshing news review queue…");api.newsSignals(new ProductApiClient.ArrayCallback(){public void onSuccess(JSONArray values){runOnUiThread(()->{if(!alive())return;loading=false;signals.clear();for(int i=0;i<values.length();i++)if(values.optJSONObject(i)!=null)signals.add(values.optJSONObject(i));rows.filter();status.setText(signals.isEmpty()?"No news signals available. An administrator can check configured internet feeds.":signals.size()+" latest signals. Tap a story to inspect its source and review state.");});}public void onError(String message){runOnUiThread(()->{if(alive()){loading=false;status.setText(message+" Tap here to retry.");}});}});}
+    private String routingEffect(JSONObject signal){
+        switch(signal.optString("routing_effect")){
+            case "EXCLUDES_INTERSECTING_ROUTES":return "LIVE RESTRICTION: intersecting routes are excluded.";
+            case "INCREASES_NEARBY_ROUTE_RISK":return "LIVE HAZARD: nearby route exposure is increased.";
+            case "INACTIVE":return "NOT ACTIVE: the published hazard has expired or been resolved.";
+            default:return "NOT ON MAP YET: an official must confirm the exact road and publish.";
+        }
+    }
+    private void openHazard(JSONObject signal,String id){startActivity(new Intent(this,MapsActivity.class).putExtra("focus_hazard_id",id).putExtra("focus_latitude",signal.optDouble("latitude")).putExtra("focus_longitude",signal.optDouble("longitude")));}
     private void review(JSONObject signal){LinearLayout content=column();content.addView(text(signal.optString("headline"),20));content.addView(text(signal.optString("publisher")+"\nPublished: "+JsonDisplay.text(signal,"published_at","Unknown")+"\nLocality hint: "+JsonDisplay.text(signal,"location_text","Not located")+"\n"+signal.optString("category")+" · "+signal.optString("review_status"),13));
+        content.addView(text(routingEffect(signal),15));
         content.addView(text(signal.optString("summary"),15));content.addView(text("Classification is keyword-based, not a trained news model. Match score: "+Math.round(signal.optDouble("confidence")*100)+"%. A locality hint is not an exact incident location.",12));
         MaterialButton source=button("Read source article");source.setOnClickListener(v->openSource(signal.optString("source_url")));content.addView(source);
         String linked=JsonDisplay.text(signal,"linked_hazard_id","");
-        if(!linked.isEmpty()){MaterialButton map=button("View published hazard on map");content.addView(map);map.setOnClickListener(v->startActivity(new Intent(this,MapsActivity.class).putExtra("focus_hazard_id",linked).putExtra("focus_latitude",signal.optDouble("latitude")).putExtra("focus_longitude",signal.optDouble("longitude"))));content.addView(text("Already published. Resolve or change severity through the official hazard lifecycle; dismissing this article cannot silently remove a road restriction.",13));}
+        if(!linked.isEmpty()){MaterialButton map=button("View published hazard on map");content.addView(map);map.setEnabled(!"INACTIVE".equals(signal.optString("routing_effect")));map.setOnClickListener(v->openHazard(signal,linked));content.addView(text("Already published. Resolve or change severity through the official hazard lifecycle; dismissing this article cannot silently remove a road restriction.",13));}
         else {String[] labels={"Retain as relevant","Request field check","Dismiss signal"},states={"RELEVANT","NEEDS_FIELD_CHECK","DISMISSED"};for(int i=0;i<labels.length;i++){final String state=states[i];MaterialButton action=button(labels[i]);content.addView(action);action.setOnClickListener(v->{action.setEnabled(false);api.reviewNews(signal.optString("id"),state,new ProductApiClient.ObjectCallback(){public void onSuccess(JSONObject result){runOnUiThread(()->{if(alive()){Toast.makeText(NewsWorkbenchActivity.this,"Review saved",Toast.LENGTH_SHORT).show();load();action.setEnabled(true);}});}public void onError(String message){runOnUiThread(()->{if(alive()){action.setEnabled(true);Toast.makeText(NewsWorkbenchActivity.this,message,Toast.LENGTH_LONG).show();}});}});});}
             if("government".equals(ProductSession.role(this))){MaterialButton publish=button("Verify location & publish hazard");content.addView(publish);publish.setOnClickListener(v->{if(storyDialog!=null)storyDialog.dismiss();publish(signal);});}
         }
@@ -80,7 +90,12 @@ public class NewsWorkbenchActivity extends AppCompatActivity {
         dialog.setOnDismissListener(d->{disposed[0]=true;preview.onPause();preview.onStop();preview.onDestroy();if(publicationDialog==dialog)publicationDialog=null;});
         dialog.setOnShowListener(d->{preview.onStart();preview.onResume();dialog.getButton(-1).setOnClickListener(v->{if(busy[0])return;if(location[0]==null){address.setError("Pin the affected road first");return;}if(address.getText().toString().trim().length()<5){address.setError("Enter a location");return;}if(note.getText().toString().trim().length()<10){note.setError("Explain your current-incident verification");return;}if(!current.isChecked()){current.setError("Confirmation is required");return;}
             try{JSONObject payload=new JSONObject().put("latitude",location[0]).put("longitude",location[1]).put("address",address.getText().toString().trim()).put("severity",severity.getSelectedItem().toString()).put("road_status",road.getSelectedItem().toString()).put("valid_hours",new int[]{3,6,12,24}[expiry.getSelectedItemPosition()]).put("verification_note",note.getText().toString().trim()).put("confirmed_current",true);String buffer=radius.getText().toString().trim();if(!buffer.isEmpty())payload.put("no_go_radius_m",Double.parseDouble(buffer));busy[0]=true;dialog.getButton(-1).setEnabled(false);dialog.getButton(-1).setText("Publishing…");
-                api.publishNews(signal.optString("id"),payload,new ProductApiClient.ObjectCallback(){public void onSuccess(JSONObject hazard){runOnUiThread(()->{if(!alive())return;dialog.dismiss();Toast.makeText(NewsWorkbenchActivity.this,"Published. Verified severity affects route risk; closures use existing exclusion rules.",Toast.LENGTH_LONG).show();load();});}public void onError(String message){runOnUiThread(()->{if(!alive()||disposed[0])return;busy[0]=false;dialog.getButton(-1).setEnabled(true);dialog.getButton(-1).setText("Retry publish");note.setError(message);});}});
+                api.publishNews(signal.optString("id"),payload,new ProductApiClient.ObjectCallback(){public void onSuccess(JSONObject hazard){runOnUiThread(()->{if(!alive())return;dialog.dismiss();load();
+                    String effect="CLOSED".equals(hazard.optString("road_status"))||("CRITICAL".equals(hazard.optString("severity"))&&"UNSAFE".equals(hazard.optString("road_status")))?"Routes crossing the official exclusion buffer are now excluded.":"Nearby routes now receive increased assessed exposure.";
+                    new MaterialAlertDialogBuilder(NewsWorkbenchActivity.this).setTitle("Hazard published to backend")
+                            .setMessage(effect+"\nThe source link is attached to the map marker. Open the map and compare a route to inspect the impact. This hazard automatically expires at "+JsonDisplay.text(hazard,"valid_until","its configured expiry")+".")
+                            .setNegativeButton("Stay here",null).setPositiveButton("View on map",(d,w)->openHazard(hazard,hazard.optString("id"))).show();
+                });}public void onError(String message){runOnUiThread(()->{if(!alive()||disposed[0])return;busy[0]=false;dialog.getButton(-1).setEnabled(true);dialog.getButton(-1).setText("Retry publish");note.setError(message);});}});
             }catch(Exception error){radius.setError("Enter a valid radius between 10 and 500 metres");}
         });});dialog.show();
     }
@@ -93,6 +108,27 @@ public class NewsWorkbenchActivity extends AppCompatActivity {
     private TextInputEditText input(String hint,int lines){TextInputEditText v=new TextInputEditText(this);v.setHint(hint);v.setMinLines(lines);v.setMaxLines(4);v.setTextSize(14);v.setInputType(lines>1?131073:1);return v;}
     private Spinner spinner(String[] values){Spinner v=new Spinner(this);v.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,values));return v;}
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
-    private final class Rows extends RecyclerView.Adapter<Row>{final List<JSONObject> visible=new ArrayList<>();void filter(){visible.clear();String query=search.getText().toString().trim().toLowerCase(Locale.ROOT);String state=filters[filter.getSelectedItemPosition()];for(JSONObject signal:signals)if(("All".equals(state)||state.equals(signal.optString("review_status")))&&(signal.optString("headline")+" "+signal.optString("publisher")+" "+JsonDisplay.text(signal,"location_text","")).toLowerCase(Locale.ROOT).contains(query))visible.add(signal);notifyDataSetChanged();}public Row onCreateViewHolder(ViewGroup parent,int type){LinearLayout view=column();view.setLayoutParams(new RecyclerView.LayoutParams(-1,-2));TextView headline=text("",16),meta=text("",12);headline.setMaxLines(3);headline.setEllipsize(TextUtils.TruncateAt.END);view.addView(headline);view.addView(meta);return new Row(view,headline,meta);}public void onBindViewHolder(Row row,int position){JSONObject value=visible.get(position);row.headline.setText(value.optString("headline"));row.meta.setText(value.optString("review_status")+" · "+value.optString("category")+"\n"+value.optString("publisher")+"\n"+JsonDisplay.text(value,"location_text","Location requires review"));row.itemView.setOnClickListener(v->review(value));}public int getItemCount(){return visible.size();}}
+    private final class Rows extends RecyclerView.Adapter<Row>{
+        final List<JSONObject> visible=new ArrayList<>();
+        void filter(){
+            visible.clear();String query=search.getText().toString().trim().toLowerCase(Locale.ROOT);
+            String state=filters[filter.getSelectedItemPosition()];
+            for(JSONObject signal:signals)if(("All".equals(state)||state.equals(signal.optString("review_status")))&&
+                (signal.optString("headline")+" "+signal.optString("publisher")+" "+JsonDisplay.text(signal,"location_text","")).toLowerCase(Locale.ROOT).contains(query))visible.add(signal);
+            notifyDataSetChanged();
+        }
+        public Row onCreateViewHolder(ViewGroup parent,int type){
+            LinearLayout view=column();view.setLayoutParams(new RecyclerView.LayoutParams(-1,-2));
+            TextView headline=text("",16),meta=text("",12);headline.setMaxLines(3);headline.setEllipsize(TextUtils.TruncateAt.END);
+            view.addView(headline);view.addView(meta);return new Row(view,headline,meta);
+        }
+        public void onBindViewHolder(Row row,int position){
+            JSONObject value=visible.get(position);row.headline.setText(value.optString("headline"));
+            row.meta.setText(value.optString("review_status")+" · "+value.optString("category")+"\n"+
+                value.optString("publisher")+"\n"+JsonDisplay.text(value,"location_text","Location requires review")+"\n"+routingEffect(value));
+            row.itemView.setOnClickListener(v->review(value));
+        }
+        public int getItemCount(){return visible.size();}
+    }
     private static class Row extends RecyclerView.ViewHolder{final TextView headline,meta;Row(View v,TextView h,TextView m){super(v);headline=h;meta=m;}}
 }

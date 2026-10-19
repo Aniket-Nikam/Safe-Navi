@@ -22,6 +22,7 @@ public class LoginActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private View rootView;
     private String expectedRole;
+    private TextView loginError;
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -31,6 +32,8 @@ public class LoginActivity extends AppCompatActivity {
         passwordEditText = findViewById(R.id.passwordEditText);
         loginButton = findViewById(R.id.loginButton);
         progressBar = findViewById(R.id.progressBar);
+        loginError = findViewById(R.id.loginErrorText);
+        ((TextView)findViewById(R.id.loginServerAddress)).setText("Server: " + com.safenavi.app.product.ServerConnection.baseUrl());
         expectedRole = getIntent().getStringExtra("LOGIN_TYPE");
         if(getIntent().getBooleanExtra("SESSION_RECOVERY",false)) {
             emailEditText.setText(getIntent().getStringExtra("RECOVERY_EMAIL"));
@@ -48,6 +51,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void signIn() {
+        loginError.setVisibility(View.GONE);
         String email = emailEditText.getText().toString().trim();
         String password = passwordEditText.getText().toString();
         if (!Patterns.EMAIL_ADDRESS.matcher(email).matches()) { emailEditText.setError("Enter a valid email"); return; }
@@ -55,7 +59,12 @@ public class LoginActivity extends AppCompatActivity {
         showLoading(true);
         new ProductApiClient(this).login(email, password, new ProductApiClient.ObjectCallback() {
             @Override public void onSuccess(JSONObject response) { runOnUiThread(() -> completeLogin(response)); }
-            @Override public void onError(String message) { runOnUiThread(() -> { showLoading(false); Snackbar.make(rootView, message, Snackbar.LENGTH_LONG).show(); }); }
+            @Override public void onError(String message) { runOnUiThread(() -> {
+                if(isFinishing() || isDestroyed()) return;
+                showLoading(false);
+                loginError.setText(message);
+                loginError.setVisibility(View.VISIBLE);
+            }); }
         });
     }
 
