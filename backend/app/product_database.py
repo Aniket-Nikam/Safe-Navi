@@ -1157,12 +1157,30 @@ def store_news_signal(value: dict[str, Any]) -> bool:
 
 
 def list_news_signals(review_status: str | None = None) -> list[dict[str, Any]]:
-    query = "SELECT n.*,l.hazard_id AS linked_hazard_id FROM news_signals n LEFT JOIN news_hazard_links l ON l.signal_id=n.id"; params: list[Any] = []
+    query = """SELECT n.*,l.hazard_id AS published_hazard_id,h.status AS hazard_status,
+        h.severity AS hazard_severity,h.road_status AS hazard_road_status,h.valid_until AS hazard_valid_until
+        FROM news_signals n LEFT JOIN news_hazard_links l ON l.signal_id=n.id
+        LEFT JOIN hazards h ON h.id=COALESCE(l.hazard_id,n.linked_hazard_id)"""; params: list[Any] = []
     if review_status:
         query += " WHERE n.review_status=?"; params.append(review_status)
     query += " ORDER BY n.created_at DESC LIMIT 250"
     with connect_product() as connection:
-        return [row_dict(row) for row in connection.execute(query, params).fetchall()]
+        values = [row_dict(row) for row in connection.execute(query, params).fetchall()]
+    for value in values:
+        # n.* already contains linked_hazard_id. A duplicate SQL alias makes SQLite
+        # retain its old NULL instead of the joined link, hiding published hazards.
+        value["linked_hazard_id"] = value.pop("published_hazard_id", None) or value.get("linked_hazard_id")
+        if not value.get("linked_hazard_id"):
+            value["routing_effect"] = "AWAITING_OFFICIAL_VERIFICATION"
+        elif value.get("hazard_status") not in {"ACTIVE", "MONITORING", "VERIFIED"} or (
+                value.get("hazard_valid_until") and value["hazard_valid_until"] <= utc_now()):
+            value["routing_effect"] = "INACTIVE"
+        elif value.get("hazard_road_status") == "CLOSED" or (
+                value.get("hazard_severity") == "CRITICAL" and value.get("hazard_road_status") == "UNSAFE"):
+            value["routing_effect"] = "EXCLUDES_INTERSECTING_ROUTES"
+        else:
+            value["routing_effect"] = "INCREASES_NEARBY_ROUTE_RISK"
+    return values
 
 
 def review_news_signal(signal_id: str, review_status: str) -> dict[str, Any] | None:

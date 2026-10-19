@@ -10,6 +10,7 @@ def test_health_and_stats():
     stats = client.get("/api/v1/dataset/stats").json()
     assert stats["factor_count"] == 10
     assert stats["physical_road_segments"] == 452466
+    assert client.get("/api/v1/risk/provider").json()["ranking_policy"] == "risk_first_v2"
 
 
 def test_point_risk_uses_dataset():
@@ -37,4 +38,5 @@ def test_route_profiles_change_ranking_score():
     fastest = client.post("/api/v1/risk/route", json={"time_period": "evening_peak", "profile": "fastest", "routes": [route]}).json()
     safest = client.post("/api/v1/risk/route", json={"time_period": "evening_peak", "profile": "safest", "routes": [route]}).json()
     assert fastest["results"][0]["ranking_score"] == 20
-    assert safest["results"][0]["ranking_score"] > 20
+    assert safest["results"][0]["ranking_score"] == safest["results"][0]["risk_exposure"]
+    assert safest["ranking_policy"] == "risk_first_v2"

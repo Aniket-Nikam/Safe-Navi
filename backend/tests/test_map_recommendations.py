@@ -48,3 +48,16 @@ def test_empty_crime_information_is_unknown_not_safe(monkeypatch):
     value = main.area_crime(19, 73, 3000)
     assert value["types"] == []
     assert "does not mean no crime" in value["notice"]
+
+
+def test_safest_is_risk_first_even_when_time_weighted_sum_prefers_quick():
+    rows = [dict(route_id="quick", travel_minutes=10, risk_exposure=50),
+            dict(route_id="safer", travel_minutes=25, risk_exposure=49)]
+    assert min(rows, key=lambda r: main.ranking_key(r, "safest"))["route_id"] == "safer"
+    assert min(rows, key=lambda r: main.ranking_key(r, "balanced"))["route_id"] == "quick"
+
+
+def test_equal_risk_uses_eta_then_stable_id():
+    rows = [dict(route_id="a-slow", travel_minutes=30, risk_exposure=49),
+            dict(route_id="z-fast", travel_minutes=20, risk_exposure=49)]
+    assert min(rows, key=lambda r: main.ranking_key(r, "safest"))["route_id"] == "z-fast"

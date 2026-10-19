@@ -29,7 +29,7 @@ def publish_news(signal_id, actor, payload):
             (hazard_id,signal["headline"],category,signal["summary"],payload["latitude"],payload["longitude"],payload["address"],
              payload["severity"],payload["road_status"],reason,actor["id"],now,now,expiry,payload.get("no_go_radius_m")))
         db.execute("INSERT OR IGNORE INTO news_hazard_links VALUES (?,?,?,?,?)",(signal_id,hazard_id,actor["id"],now,note))
-        db.execute("UPDATE news_signals SET review_status='PUBLISHED',latitude=?,longitude=? WHERE id=?",(payload["latitude"],payload["longitude"],signal_id))
+        db.execute("UPDATE news_signals SET review_status='PUBLISHED',latitude=?,longitude=?,linked_hazard_id=? WHERE id=?",(payload["latitude"],payload["longitude"],hazard_id,signal_id))
         if created.rowcount:
             db.execute("INSERT INTO hazard_history VALUES (?,?,?,?,?,?,?,?,?)",("hst_"+uuid.uuid4().hex,hazard_id,None,actor["id"],"NEWS_HAZARD_VERIFIED",None,"ACTIVE",reason,now))
         return row_dict(db.execute("SELECT * FROM hazards WHERE id=?",(hazard_id,)).fetchone())

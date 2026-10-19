@@ -31,6 +31,17 @@ from .route_explanations import explain as explain_route, markers as explanation
 PERIODS = {"morning_peak", "midday", "evening_peak", "night"}
 WEIGHTS = {"fastest": 0.0, "balanced": 0.35, "safest": 1.0}
 
+
+def ranking_score(route: dict, profile: str) -> float:
+    # Safest is risk-first, not a second time/risk compromise.
+    if profile == "safest":
+        return route["risk_exposure"]
+    return route["travel_minutes"] + WEIGHTS[profile] * route["risk_exposure"]
+
+
+def ranking_key(route: dict, profile: str) -> tuple:
+    return (ranking_score(route, profile), route["travel_minutes"], route["risk_exposure"], route["route_id"])
+
 logger = logging.getLogger("safenavi.news")
 
 
@@ -139,7 +150,9 @@ def dataset_stats() -> dict:
 
 @app.get("/api/v1/risk/provider")
 def risk_provider() -> dict:
-    return provider_metadata()
+    return {**provider_metadata(), "ranking_policy": "risk_first_v2",
+            "objectives": {"fastest": "lowest_time", "balanced": "time + 0.35 * assessed_risk",
+                           "safest": "lowest_assessed_risk_then_time"}}
 
 
 @app.get("/api/v1/risk/point")
@@ -416,7 +429,7 @@ def route_risk(request: RouteRiskRequest) -> dict:
                            "title": h["title"], "reason": h["reason"], "verified": True,
                            "source": "government_verified_hazard", "risk_exposure": SEVERITY_RISK.get(h["severity"], 0)}
                           for h in affecting_hazards]
-        score = route.travel_minutes + WEIGHTS[request.profile] * combined_exposure
+        score = ranking_score({"travel_minutes": route.travel_minutes, "risk_exposure": combined_exposure}, request.profile)
         results.append(
             {
                 "route_id": route.route_id,
@@ -459,15 +472,17 @@ def route_risk(request: RouteRiskRequest) -> dict:
             result["model_factor_contributions"] = prediction["factor_contributions"]
             result["dataset_risk_exposure"] = prediction["risk_exposure"]
             result["risk_exposure"] = combine_risk(prediction["risk_exposure"], result["verified_hazard_exposure"])
-            result["ranking_score"] = round(result["travel_minutes"] + WEIGHTS[request.profile] * result["risk_exposure"], 2)
-    results.sort(key=lambda result: result["ranking_score"])
+            result["ranking_score"] = round(ranking_score(result, request.profile), 2)
+    results.sort(key=lambda result: ranking_key(result, request.profile))
     recommendations = {}
     for profile, weight in WEIGHTS.items():
-        chosen = min(results, key=lambda item: (item["travel_minutes"] + weight * item["risk_exposure"], item["route_id"]))
+        chosen = min(results, key=lambda item: ranking_key(item, profile))
         recommendations[profile] = {"route_id": chosen["route_id"], "travel_minutes": chosen["travel_minutes"],
                                     "distance_meters": chosen["distance_meters"], "risk_exposure": chosen["risk_exposure"],
                                     "risk_weight": weight,
-                                    "ranking_score": round(chosen["travel_minutes"] + weight * chosen["risk_exposure"], 2)}
+                                    "objective": "lowest_assessed_risk_then_time" if profile == "safest" else
+                                                 "lowest_time" if profile == "fastest" else "time_risk_tradeoff",
+                                    "ranking_score": round(ranking_score(chosen, profile), 2)}
     return {
         "profile": request.profile,
         "time_period": request.time_period,
@@ -480,6 +495,7 @@ def route_risk(request: RouteRiskRequest) -> dict:
         "closures_enforced": True,
         "recommendations": recommendations,
         "distinct_recommended_routes": len({item["route_id"] for item in recommendations.values()}),
-        "ranking_formula": "travel_minutes + risk_weight * risk_exposure (lower is better; score is not ETA)",
+        "ranking_policy": "risk_first_v2",
+        "ranking_formula": "fastest: time; balanced: time + 0.35 * risk; safest: risk, then time (among evaluated non-excluded roads)",
         "results": results,
     }

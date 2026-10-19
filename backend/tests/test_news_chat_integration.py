@@ -40,6 +40,7 @@ def routes():
 def test_news_only_enters_map_and_excludes_route_after_official_publication(people):
     news=signal(); path=f"/api/v1/government/news-signals/{news}/publish"
     assert client.get("/api/v1/hazards/map").json()["hazards"]==[]
+    assert client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]["routing_effect"]=="AWAITING_OFFICIAL_VERIFICATION"
     for role in ("citizen","admin"):
         assert client.post(path,headers=people[role],json=publication()).status_code==403
     payload=publication();payload["confirmed_current"]=False
@@ -47,6 +48,13 @@ def test_news_only_enters_map_and_excludes_route_after_official_publication(peop
     published=client.post(path,headers=people["government"],json=publication())
     assert published.status_code==200,published.text
     hazard=published.json();assert hazard["source"]=="NEWS_VERIFIED" and hazard["valid_until"]
+    published_signal=client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]
+    assert published_signal["routing_effect"]=="EXCLUDES_INTERSECTING_ROUTES"
+    assert published_signal["linked_hazard_id"]==hazard["id"]
+    # Existing published records from before the canonical-column fix still work.
+    with connect_product() as db:
+        db.execute("UPDATE news_signals SET linked_hazard_id=NULL WHERE id=?",(news,))
+    assert client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]["linked_hazard_id"]==hazard["id"]
     record=client.get("/api/v1/hazards/map").json()["hazards"][0]
     assert record["news_source_url"]=="https://example.test/vashi-flood"
     evaluated=client.post("/api/v1/risk/route",json=routes()).json()
@@ -58,6 +66,7 @@ def test_news_only_enters_map_and_excludes_route_after_official_publication(peop
         assert db.execute("SELECT COUNT(*) FROM hazard_history WHERE hazard_id=?",(hazard["id"],)).fetchone()[0]==1
         db.execute("UPDATE hazards SET valid_until=? WHERE id=?",("2000-01-01T00:00:00+00:00",hazard["id"]))
     assert client.get("/api/v1/hazards/map").json()["hazards"]==[]
+    assert client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]["routing_effect"]=="INACTIVE"
     assert client.post("/api/v1/risk/route",json=routes()).json()["excluded_routes"]==[]
 
 
@@ -69,6 +78,7 @@ def test_news_severity_changes_exposure_without_an_automatic_closure(people):
     a={r["route_id"]:r for r in before["results"]};b={r["route_id"]:r for r in after["results"]}
     assert b["crossing"]["risk_exposure"]>a["crossing"]["risk_exposure"]
     assert after["excluded_routes"]==[]
+    assert client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]["routing_effect"]=="INCREASES_NEARBY_ROUTE_RISK"
 
 
 def test_chat_retries_are_idempotent_and_pagination_is_case_scoped(people):
