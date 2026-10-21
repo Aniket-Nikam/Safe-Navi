@@ -62,4 +62,3 @@ In the final long-trip dark-mode screenshot, the A marker is not clearly visible
 - Backend default: https://safe-navi-api.onrender.com
 
 Implementation references: [Android guidance on launching external activities without a package-visibility precheck](https://developer.android.com/training/package-visibility/use-cases), [Google Maps universal directions URLs](https://developers.google.com/maps/documentation/urls/get-started).
-
