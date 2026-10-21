@@ -6,17 +6,26 @@ Safe-Navi is server-mediated. Two Android phones do not connect directly to each
 both connect to the same FastAPI backend and product database.
 
 - Two citizen phones can exchange community posts, photographs, comments and helpful votes.
-- A citizen phone and a government/admin phone can exchange private report messages and
+- A citizen phone and a government-official phone can exchange private report messages and
   citizen follow-up photographs.
 - Verified hazards created on the official phone are pushed to active maps and cause
   route refresh/re-ranking on the citizen phone.
 - This is persistent application communication, not an arbitrary person-to-person DM system.
 
-## Current local demo address
+## Current cloud demonstration (Android 1.7.2)
 
-The current debug build uses `http://192.168.29.221:8000`. Both phones must be connected
-to the same trusted Wi-Fi network as this PC. If the PC address changes, update
-`RISK_API_BASE_URL` in the Git-ignored `local.properties` file and rebuild the APK.
+Use `https://safe-navi-api.onrender.com`. The laptop does not have to run, and the
+phones may use different Wi-Fi or mobile-data networks. Both must have internet.
+The app's Server connection setting must show this HTTPS origin, not an old laptop IP.
+After a long idle period the free cloud service may need 50 seconds or more to wake.
+Open `https://safe-navi-api.onrender.com/health` before the demonstration and wait for
+`"status":"ok"`. Do not repeatedly tap Login while the service is waking.
+
+## Optional isolated local demonstration
+
+Use this only for explicitly labelled fixture data; never publish fictional hazards
+on the shared cloud map. Set the app's Server connection to the actual laptop LAN IP
+with port 8000. Both phones must use the same trusted Wi-Fi as that laptop.
 
 Start the backend from the repository root with `run_local.ps1`, or run Uvicorn from the
 backend directory with host `0.0.0.0` and port `8000`.
@@ -55,6 +64,7 @@ development server directly.
 
 ## Networking check
 
-Before installing the APK, open `http://192.168.29.221:8000/health` in each phone's
-browser. If it does not show a JSON response, the issue is Wi-Fi isolation, the PC's
-address, the backend listener or Windows Firewall—not the Android accounts.
+For the cloud demo, open `https://safe-navi-api.onrender.com/health` in each phone's
+browser. Local Wi-Fi isolation and Windows Firewall rules apply only to the optional
+laptop server, not the cloud service. Account credentials belong to the selected
+server; a laptop-only account is not automatically a cloud account.
