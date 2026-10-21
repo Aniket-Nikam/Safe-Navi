@@ -13,6 +13,7 @@ import static org.maplibre.android.style.layers.PropertyFactory.fillOpacity;
 import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ActivityNotFoundException;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Bitmap;
@@ -59,6 +60,7 @@ import com.safenavi.app.safety.network.DatasetRiskService;
 import com.safenavi.app.safety.network.OfflineRouter;
 import com.safenavi.app.safety.network.OfflineHazardCache;
 import com.safenavi.app.safety.service.RouteRecommendations;
+import com.safenavi.app.safety.service.RouteUserSummary;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -166,6 +168,9 @@ public class MapsActivity extends AppCompatActivity {
     private boolean locatingSource = true;
     private String activeJourneyId;
     private String activeJourneyToken;
+    private boolean journeyRequestPending;
+    private androidx.appcompat.app.AlertDialog journeyProgressDialog;
+    private static final int JOURNEY_LOCATION_REQUEST = 4402;
     private TravelMode travelMode = TravelMode.DRIVING;
     private RouteProfile routeProfile = RouteProfile.BALANCED;
     private WebSocket liveUpdateSocket;
@@ -343,13 +348,14 @@ public class MapsActivity extends AppCompatActivity {
         activeRouteRequest++; setRouteBusy(false); routeResultCard.setVisibility(View.GONE);
         detailCard.setVisibility(View.GONE); selectedRiskPoints.clear(); lastRouteSummary = ""; lastDestination = null;
         displayedRoute=null;
+        findViewById(R.id.routeDistanceTime).setVisibility(View.GONE);
         ((TextView)findViewById(R.id.mapSearchSummary)).setText(textOf(destinationInput).isEmpty()?"Where to?":textOf(destinationInput));
         findRouteButton.setText("Plan route");
         ((TextView)findViewById(R.id.routeStatusText)).setText("Ready to compare all three preferences");
         int[] ids = {R.id.fastestRecommendation, R.id.balancedRecommendation, R.id.safestRecommendation};
         RouteProfile[] profiles = {RouteProfile.FASTEST, RouteProfile.BALANCED, RouteProfile.SAFEST};
         for (int i = 0; i < ids.length; i++) {
-            TextView option = findViewById(ids[i]); option.setText(profileName(profiles[i]) + "\n—\nRisk —");
+            TextView option = findViewById(ids[i]); option.setText(profileName(profiles[i]));
             styleRouteOption(option, profiles[i], profiles[i] == routeProfile);
             RouteProfile preference = profiles[i];
             option.setOnClickListener(v -> { routeProfile = preference; invalidateRouteForEndpoints(); });
@@ -479,8 +485,7 @@ public class MapsActivity extends AppCompatActivity {
             if(layer!=null) layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(risksVisible?org.maplibre.android.style.layers.Property.VISIBLE:org.maplibre.android.style.layers.Property.NONE));
         }
         ((MaterialButton)findViewById(R.id.riskLayerButton)).setText(risksVisible?"Hide route risks":"Route risks");
-        if(risksVisible && displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText("Estimates only. Grey = unassessed, not safe.");
-        else if(displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText((displayedOffline?"Offline snapshot · ":"")+profileName(routeProfile)+" · "+String.format(Locale.US,"%.1f km",displayedRoute.getRoute().getDistanceMeters()/1000));
+        if(displayedRoute!=null) updateJourneySummary();
     }
     private void renderRiskSections(RouteSafetyResult result) {
         if(!hasUsableMapStyle()) return;
@@ -499,26 +504,73 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void showRouteDetailsSheet() {
-        if(activeMapSheet!=null)activeMapSheet.dismiss();
-        com.google.android.material.bottomsheet.BottomSheetDialog sheet = new com.google.android.material.bottomsheet.BottomSheetDialog(this);
-        activeMapSheet=sheet; sheet.setOnDismissListener(d->{if(activeMapSheet==sheet)activeMapSheet=null;});
-        android.widget.LinearLayout content = new android.widget.LinearLayout(this); content.setOrientation(android.widget.LinearLayout.VERTICAL);
-        int pad = Math.round(18 * getResources().getDisplayMetrics().density); content.setPadding(pad,pad,pad,pad);
-        TextView title = new TextView(this); title.setText(routeResultTitle.getText()); title.setTextSize(20);
-        title.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.text_primary)); content.addView(title);
-        TextView explanation = new TextView(this); explanation.setText(routeResultRisk.getText()); explanation.setTextSize(14);
-        explanation.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.text_secondary)); explanation.setPadding(0,pad,0,pad);
-        content.addView(explanation);
-        String[] actions = {"Share route", "Navigate", "Save destination", activeJourneyId == null ? "Share journey" : "End shared journey", "Refresh comparison", "Close"};
-        for (int i=0;i<actions.length;i++) {
-            final int action=i; MaterialButton button=new MaterialButton(this); button.setText(actions[i]); button.setAllCaps(false);
-            button.setOnClickListener(v -> { sheet.dismiss();
-                if(action==0) shareRoute(); else if(action==1) openNavigation(); else if(action==2) saveDestination();
-                else if(action==3) { if(activeJourneyId==null) startSharedJourney(); else endSharedJourney(); }
-                else if(action==4) findRoutes();
-            }); content.addView(button);
+        if(displayedRoute==null) { showActionError("Plan a route first", "Choose your starting point and destination, then tap Plan route."); return; }
+        android.widget.LinearLayout content=sheetContent();
+        content.addView(sheetText(profileName(routeProfile)+" route",20));
+        TextView metrics=sheetText(RouteUserSummary.metrics(displayedRoute),24);
+        metrics.setTypeface(android.graphics.Typeface.DEFAULT,android.graphics.Typeface.BOLD); content.addView(metrics);
+        content.addView(sheetText(RouteUserSummary.purpose(routeProfile),14));
+        content.addView(sheetText(RouteUserSummary.alerts(displayedRoute),14));
+        if(displayedOffline) content.addView(sheetText("Offline estimate. Live alerts may have changed.",14));
+        // Diagnostics stay available by choice; they never push the actions off screen.
+        MaterialButton explain=sheetButton("About route safety"); content.addView(explain);
+        explain.setOnClickListener(v -> showRouteSafetySheet());
+        addRouteAction(content,"Open directions",this::openNavigation,true);
+        addRouteAction(content,"Share route",this::shareRoute,false);
+        addRouteAction(content,"Save destination",this::saveDestination,false);
+        addRouteAction(content,activeJourneyId==null?"Share journey":"Manage shared journey",this::showJourneyOptions,false);
+        addRouteAction(content,"Refresh routes",this::findRoutes,false);
+        addRouteAction(content,"Back to map",() -> { },false);
+        presentSheet(content);
+    }
+
+    private void addRouteAction(android.widget.LinearLayout content,String label,Runnable action,boolean primary) {
+        MaterialButton button=primary?new MaterialButton(this):sheetButton(label);
+        button.setText(label); button.setAllCaps(false); button.setLetterSpacing(0);
+        if(primary) {
+            button.setBackgroundTintList(android.content.res.ColorStateList.valueOf(androidx.core.content.ContextCompat.getColor(this,R.color.accent)));
+            button.setTextColor(androidx.core.content.ContextCompat.getColor(this,R.color.on_accent));
         }
-        android.widget.ScrollView scroll=new android.widget.ScrollView(this); scroll.addView(content); sheet.setContentView(scroll); sheet.show();
+        button.setOnClickListener(v -> {
+            if(activeMapSheet!=null) activeMapSheet.dismiss();
+            action.run();
+        }); content.addView(button);
+    }
+
+    private void updateJourneySummary() {
+        if(displayedRoute==null) return;
+        TextView metrics=findViewById(R.id.routeDistanceTime);
+        metrics.setText(RouteUserSummary.metrics(displayedRoute)); metrics.setVisibility(View.VISIBLE);
+        ((TextView)findViewById(R.id.routeStatusText)).setText(displayedOffline?"Offline estimate. Live alerts may have changed."
+                :risksVisible?"Area estimates only. Grey sections have no assessment.":profileName(routeProfile)+" route selected");
+    }
+
+    private void showRouteSafetySheet() {
+        if(displayedRoute==null) return;
+        android.widget.LinearLayout content=sheetContent(); content.addView(sheetText("About route safety",20));
+        content.addView(sheetText(RouteUserSummary.alerts(displayedRoute),14));
+        content.addView(sheetText("Red pins are official alerts. Other risk colours are estimates, not confirmed crimes. Missing pins do not mean a road is safe.",14));
+        content.addView(sheetText("The current model uses simulated area data. It cannot tell you the chance of a crime happening.",14));
+        TextView technical=sheetText(routeResultRisk.getText().toString(),14); technical.setTag("routeTechnicalDetails"); technical.setVisibility(View.GONE);
+        MaterialButton expand=sheetButton("Show technical details"); content.addView(expand); content.addView(technical);
+        expand.setOnClickListener(v -> {
+            boolean show=technical.getVisibility()!=View.VISIBLE; technical.setVisibility(show?View.VISIBLE:View.GONE);
+            expand.setText(show?"Hide technical details":"Show technical details");
+        });
+        addRouteAction(content,"Back to route",this::showRouteDetailsSheet,false); presentSheet(content);
+    }
+
+    private void showActionError(String title,String message) {
+        if(isFinishing()||isDestroyed()) return;
+        new MaterialAlertDialogBuilder(this).setTitle(title).setMessage(message).setPositiveButton("OK",null).show();
+    }
+
+    private boolean requireRouteAccount(String action) {
+        if(ProductSession.isSignedIn(this)) return true;
+        new MaterialAlertDialogBuilder(this).setTitle("Sign in to "+action)
+                .setMessage("Your account keeps saved places and shared journeys private. You can still explore the map without signing in.")
+                .setPositiveButton("Sign in",(d,w)->startActivity(new Intent(this,LoginActivity.class)))
+                .setNegativeButton("Not now",null).show(); return false;
     }
 
     private void showMapTools() {
@@ -1076,8 +1128,7 @@ public class MapsActivity extends AppCompatActivity {
             RouteSafetyResult recommendation = RouteRecommendations.rank(evaluated, option).get(0);
             distinct.add(recommendation.getRoute().getProviderRouteId());
             TextView row = findViewById(rowIds[i]);
-            row.setText(String.format(Locale.US, "%s\n%.0f min\nRisk %.1f",
-                    profileName(option), recommendation.getRoute().getTravelMinutes(), recommendation.getRiskExposure()));
+            row.setText(RouteUserSummary.choice(recommendation,option));
             styleRouteOption(row, option, option == profile);
             row.setContentDescription(row.getText() + ". Tap to highlight this recommendation.");
             row.setOnClickListener(v -> {
@@ -1124,10 +1175,10 @@ public class MapsActivity extends AppCompatActivity {
         ((TextView) findViewById(R.id.routeRiskSummary)).setText((distinct.size() == 1
                 ? "Same road wins all 3. " : distinct.size() + " recommended roads. ")
                 + verified + " official hazard(s) · " + estimates + " estimated risk zone(s). Tap a pin for why.");
-        ((TextView)findViewById(R.id.routeStatusText)).setText(risksVisible?"Estimates only. Grey = unassessed, not safe.":(displayedOffline?"Offline snapshot · ":"")+profileName(profile)+" · "+String.format(Locale.US,"%.1f km",best.getRoute().getDistanceMeters()/1000));
+        updateJourneySummary();
         findViewById(R.id.routeChoices).setVisibility(View.VISIBLE);
         findRouteButton.setText("Route details");
-        ((TextView)findViewById(R.id.routeStatusText)).setText(distinct.size()==1?"One road wins all three · drawn once":distinct.size()+" recommended roads · shared = slate blue");
+        if(distinct.size()==1 && !risksVisible && !displayedOffline) ((TextView)findViewById(R.id.routeStatusText)).setText("All three recommend the same road");
         comparison.append("\n\nSelected-route explanations:\n");
         for (RouteRiskPoint point : selectedRiskPoints.values()) comparison.append(point.isVerified() ? "Official: " : "Estimate: ")
                 .append(point.getTitle()).append("\n").append(point.getReason()).append("\n\n");
@@ -1137,7 +1188,11 @@ public class MapsActivity extends AppCompatActivity {
         findViewById(R.id.routeDetailsPanel).setVisibility(View.GONE);
         ((MaterialButton) findViewById(R.id.routeDetailsToggle)).setText("Why this route? · Details & actions");
         lastDestination = destination;
-        lastRouteSummary = routeResultTitle.getText() + "\n" + routeResultMeta.getText() + "\n" + comparison;
+        lastRouteSummary = "Safe-Navi " + profileName(profile).toLowerCase(Locale.US) + " route\n"
+                + source.getPrimaryText() + " to " + destination.getPrimaryText() + "\n"
+                + RouteUserSummary.metrics(best) + " (estimated)\n" + selectedTravelMode().getLabel() + "\n"
+                + RouteUserSummary.alerts(best) + "\nRisk estimates are not a guarantee of safety."
+                + (displayedOffline?"\nOffline snapshot; live alerts may have changed.":"");
         routeResultCard.setVisibility(View.VISIBLE);
         sourceInput.setText(shortName(source.getDisplayName()));
         destinationInput.setText(shortName(destination.getDisplayName()));
@@ -1148,24 +1203,45 @@ public class MapsActivity extends AppCompatActivity {
 
     private void shareRoute() {
         if (lastRouteSummary.isEmpty()) { Toast.makeText(this, "Compare a route first.", Toast.LENGTH_SHORT).show(); return; }
-        startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain")
+        launchExternal(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain")
                 .putExtra(Intent.EXTRA_SUBJECT, "Safe-Navi route")
-                .putExtra(Intent.EXTRA_TEXT, lastRouteSummary + "\nShared from Safe-Navi. Safety scores are guidance, not a guarantee."), "Share route"));
+                .putExtra(Intent.EXTRA_TEXT, lastRouteSummary), "Share route"),"No sharing app is available on this phone.");
     }
 
     private void saveDestination() {
         if (lastDestination == null) { Toast.makeText(this, "Compare a route first.", Toast.LENGTH_SHORT).show(); return; }
-        TextInputEditText label = new TextInputEditText(this); label.setHint("Label, for example College or Home"); label.setPadding(48, 8, 48, 8);
-        new MaterialAlertDialogBuilder(this).setTitle("Save destination").setView(label).setNegativeButton("Cancel", null)
-                .setPositiveButton("Save", (d,w) -> {
+        if(!requireRouteAccount("save places")) return;
+        final PlaceSearchResult destinationToSave=lastDestination;
+        TextInputLayout field=new TextInputLayout(this); field.setHint("Place name");
+        int padding=Math.round(20*getResources().getDisplayMetrics().density); field.setPadding(padding,padding,padding,0);
+        TextInputEditText label=new TextInputEditText(this); label.setSingleLine(true); label.setText(shortName(destinationToSave.getDisplayName())); field.addView(label);
+        androidx.appcompat.app.AlertDialog dialog=new MaterialAlertDialogBuilder(this).setTitle("Save destination").setView(field).setNegativeButton("Cancel", null)
+                .setPositiveButton("Save",null).create();
+        dialog.setOnShowListener(shown -> dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
                     String name = label.getText() == null ? "" : label.getText().toString().trim();
-                    if (name.isEmpty()) name = shortName(lastDestination.getDisplayName());
-                    new ProductApiClient(this).savePlace(name, lastDestination.getDisplayName(), lastDestination.getLatitude(), lastDestination.getLongitude(),
-                            simpleApiCallback("Destination saved"));
-                }).show();
+                    if (name.isEmpty()) name = shortName(destinationToSave.getDisplayName());
+                    dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+                    dialog.setTitle("Saving destination…"); field.setError(null); label.setEnabled(false);
+                    new ProductApiClient(this).savePlace(name, destinationToSave.getDisplayName(), destinationToSave.getLatitude(), destinationToSave.getLongitude(),
+                            new ProductApiClient.ObjectCallback() {
+                                @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
+                                    dialog.dismiss();
+                                    if(!isFinishing()&&!isDestroyed()) new MaterialAlertDialogBuilder(MapsActivity.this).setTitle("Destination saved")
+                                            .setMessage("Find it in Map tools > Saved places.").setPositiveButton("OK",null).show();
+                                }); }
+                                @Override public void onError(String message) { runOnUiThread(() -> {
+                                    if(isFinishing()||isDestroyed()) return;
+                                    if(dialog.isShowing()) {
+                                        dialog.setTitle("Save destination"); field.setError(message); label.setEnabled(true);
+                                        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setEnabled(true);
+                                    } else showActionError("Couldn't save destination",message);
+                                }); }
+                            });
+                })); dialog.show();
     }
 
     private void showSavedPlaces() {
+        if(!requireRouteAccount("view saved places")) return;
         new ProductApiClient(this).savedPlaces(new ProductApiClient.ArrayCallback() {
             @Override public void onSuccess(JSONArray values) { runOnUiThread(() -> {
                 if (values.length() == 0) {
@@ -1182,8 +1258,10 @@ public class MapsActivity extends AppCompatActivity {
                     new MaterialAlertDialogBuilder(MapsActivity.this).setTitle(place.optString("label"))
                             .setMessage(place.optString("address"))
                             .setPositiveButton("Use destination", (choice, button) -> {
-                                destinationInput.setText(place.optString("address"));
-                                lastDestination = new PlaceSearchResult(place.optString("address"), place.optDouble("latitude"), place.optDouble("longitude"));
+                                setSelectedPlace(false,new PlaceSearchResult(place.optString("address"),place.optDouble("latitude"),place.optDouble("longitude")));
+                                invalidateRouteForEndpoints();
+                                if(!textOf(sourceInput).isEmpty()) findRoutes();
+                                else ((TextView)findViewById(R.id.routeStatusText)).setText("Saved destination selected. Choose a starting point above.");
                             })
                             .setNegativeButton("Delete", (choice, button) -> new ProductApiClient(MapsActivity.this)
                                     .deleteSavedPlace(place.optString("id"), simpleApiCallback("Saved place deleted")))
@@ -1195,8 +1273,10 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void restoreActiveJourney() {
+        if(!ProductSession.isSignedIn(this) || journeyRequestPending) return;
         new ProductApiClient(this).journeys(new ProductApiClient.ArrayCallback() {
             @Override public void onSuccess(JSONArray values) { runOnUiThread(() -> {
+                if(isFinishing()||isDestroyed()||journeyRequestPending) return;
                 for (int i = 0; i < values.length(); i++) { JSONObject journey = values.optJSONObject(i);
                     if (journey != null && "ACTIVE".equals(journey.optString("status"))) {
                         activeJourneyId = journey.optString("id"); activeJourneyToken = journey.optString("share_token");
@@ -1215,12 +1295,36 @@ public class MapsActivity extends AppCompatActivity {
 
     private void startSharedJourney() {
         if (lastDestination == null || lastRouteSummary.isEmpty()) { Toast.makeText(this, "Compare a route before sharing a journey.", Toast.LENGTH_SHORT).show(); return; }
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            locationClient.getLastLocation().addOnSuccessListener(location -> createSharedJourney(location == null ? null : location.getLatitude(), location == null ? null : location.getLongitude()));
-        } else createSharedJourney(null, null);
+        if(!requireRouteAccount("share a journey")) return;
+        if(journeyRequestPending) { Toast.makeText(this,"Please wait for your journey request.",Toast.LENGTH_SHORT).show(); return; }
+        new MaterialAlertDialogBuilder(this).setTitle("Share this journey?")
+                .setMessage("Anyone with your private link can view this journey. Your location is shared only when available and permitted. You can stop sharing at any time.")
+                .setPositiveButton("Create link",(d,w)->createSharedJourney(null,null)).setNegativeButton("Cancel",null).show();
+    }
+
+    private void showJourneyOptions() {
+        if(journeyRequestPending) { Toast.makeText(this,"Please wait for your journey request.",Toast.LENGTH_SHORT).show(); return; }
+        if(activeJourneyId==null) { startSharedJourney(); return; }
+        new MaterialAlertDialogBuilder(this).setTitle("Shared journey")
+                .setItems(new String[]{"Share journey link","Background location sharing","End shared journey"},(d,which)->{
+                    if(which==0) shareJourneyLink();
+                    else if(which==1) offerBackgroundJourneyTracking();
+                    else new MaterialAlertDialogBuilder(this).setTitle("End shared journey?").setMessage("This stops location updates for this journey.")
+                            .setPositiveButton("End journey",(confirm,w)->endSharedJourney()).setNegativeButton("Keep sharing",null).show();
+                }).setNegativeButton("Back to map",null).show();
+    }
+
+    private void journeyBusy(boolean busy,String message) {
+        journeyRequestPending=busy;
+        if(journeyProgressDialog!=null) { journeyProgressDialog.dismiss(); journeyProgressDialog=null; }
+        if(busy&&!isFinishing()&&!isDestroyed()) journeyProgressDialog=new MaterialAlertDialogBuilder(this)
+                .setTitle(message).setMessage("Connecting securely. If the cloud server is waking up, this may take a minute.")
+                .setCancelable(false).show();
     }
 
     private void createSharedJourney(Double latitude, Double longitude) {
+        if(journeyRequestPending) return;
+        journeyBusy(true,"Creating your journey link…");
         try {
             JSONObject payload = new JSONObject().put("source_label", textOf(sourceInput)).put("destination_label", lastDestination.getDisplayName())
                     .put("destination_latitude", lastDestination.getLatitude()).put("destination_longitude", lastDestination.getLongitude())
@@ -1229,26 +1333,38 @@ public class MapsActivity extends AppCompatActivity {
             if (latitude != null) payload.put("latitude", latitude); if (longitude != null) payload.put("longitude", longitude);
             new ProductApiClient(this).startJourney(payload, new ProductApiClient.ObjectCallback() {
                 @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
+                    journeyBusy(false,"");
+                    if(value.optString("id").isEmpty()||value.optString("share_token").isEmpty()) {
+                        showActionError("Couldn't create a link","The server returned an incomplete journey. Try again."); return;
+                    }
                     activeJourneyId = value.optString("id"); activeJourneyToken = value.optString("share_token");
                     ProductSession.setActiveJourney(MapsActivity.this, activeJourneyId);
+                    if(isFinishing()||isDestroyed()) return;
                     journeyButton.setText("End journey"); refreshHandler.removeCallbacks(journeyRefresh); refreshHandler.post(journeyRefresh);
-                    shareJourneyLink();
-                    offerBackgroundJourneyTracking();
+                    new MaterialAlertDialogBuilder(MapsActivity.this).setTitle("Journey link ready")
+                            .setMessage("Share the link with someone you trust. Without location permission, they can see the journey but not your live position.")
+                            .setPositiveButton("Share link",(d,w)->shareJourneyLink())
+                            .setNeutralButton("Location options",(d,w)->offerBackgroundJourneyTracking()).setNegativeButton("Later",null).show();
                 }); }
-                @Override public void onError(String message) { runOnUiThread(() -> Toast.makeText(MapsActivity.this, message, Toast.LENGTH_LONG).show()); }
+                @Override public void onError(String message) { runOnUiThread(() -> { journeyBusy(false,""); showActionError("Couldn't share journey",message); }); }
             });
-        } catch (Exception ignored) { }
+        } catch (JSONException error) { journeyBusy(false,""); showActionError("Couldn't share journey","The journey details could not be prepared. Please plan the route again."); }
     }
 
     private void shareJourneyLink() {
-        if (activeJourneyToken == null) return;
+        if (activeJourneyToken == null || activeJourneyToken.isEmpty()) { showActionError("Link unavailable","Open the map again to reload your shared journey."); return; }
         String text = "Follow my Safe-Navi journey to " + (lastDestination == null ? "my destination" : shortName(lastDestination.getDisplayName()))
                 + ": " + ProductApiClient.journeyShareUrl(activeJourneyToken);
-        startActivity(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share live journey"));
+        launchExternal(Intent.createChooser(new Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share journey link"),"No sharing app is available on this phone.");
     }
 
     private void offerBackgroundJourneyTracking() {
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return;
+        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            new MaterialAlertDialogBuilder(this).setTitle("Location permission needed")
+                    .setMessage("Enable location, then reopen Manage shared journey to enable background sharing.")
+                    .setPositiveButton("Enable location",(d,w)->ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},JOURNEY_LOCATION_REQUEST))
+                    .setNegativeButton("Not now",null).show(); return;
+        }
         new MaterialAlertDialogBuilder(this).setTitle("Keep this journey live?")
                 .setMessage("Safe-Navi can continue sharing your latest location after you leave the map. Android will show a persistent notification, and you can end the journey from that notification at any time.")
                 .setNegativeButton("Only while map is open", null)
@@ -1266,14 +1382,18 @@ public class MapsActivity extends AppCompatActivity {
 
     private void endSharedJourney() {
         if (activeJourneyId == null) return;
+        if(journeyRequestPending) return;
+        journeyBusy(true,"Ending your shared journey…");
         String journeyToEnd = activeJourneyId;
         new ProductApiClient(this).endJourney(journeyToEnd, new ProductApiClient.ObjectCallback() {
             @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
+                journeyBusy(false,"");
                 finishJourneyLocally("Journey ended and retained in your private history.");
             }); }
             @Override public void onError(String message) { runOnUiThread(() -> {
+                journeyBusy(false,"");
                 JourneyEndWorker.schedule(MapsActivity.this, journeyToEnd);
-                finishJourneyLocally("Sharing stopped. Server closure will retry when connectivity returns.");
+                finishJourneyLocally("Location updates stopped on this phone. Ending the journey on the server will retry when connectivity returns.");
             }); }
         });
     }
@@ -1298,11 +1418,19 @@ public class MapsActivity extends AppCompatActivity {
 
     private void openNavigation() {
         if (lastDestination == null) { Toast.makeText(this, "Compare a route first.", Toast.LENGTH_SHORT).show(); return; }
-        Uri uri = Uri.parse(String.format(Locale.US, "geo:0,0?q=%.6f,%.6f(%s)", lastDestination.getLatitude(),
-                lastDestination.getLongitude(), Uri.encode(shortName(lastDestination.getDisplayName()))));
-        Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-        if (intent.resolveActivity(getPackageManager()) != null) startActivity(intent);
-        else Toast.makeText(this, "No navigation application is installed.", Toast.LENGTH_LONG).show();
+        if(selectedSourcePlace==null) { showActionError("Choose a starting point","Select A on the map and plan your route again."); return; }
+        Uri uri=Uri.parse(RouteUserSummary.directions(selectedSourcePlace.getLatitude(),selectedSourcePlace.getLongitude(),
+                lastDestination.getLatitude(),lastDestination.getLongitude(),selectedTravelMode()));
+        new MaterialAlertDialogBuilder(this).setTitle("Open Google Maps directions?")
+                .setMessage("Your start, destination and travel mode will be sent to Google Maps or your browser. It may choose a different road from Safe-Navi's recommendation.")
+                .setPositiveButton("Open directions",(d,w)->launchExternal(new Intent(Intent.ACTION_VIEW,uri),"Install or enable a browser or maps app to open directions."))
+                .setNegativeButton("Stay here",null).show();
+    }
+
+    private void launchExternal(Intent intent,String unavailable) {
+        // Package visibility can hide installed handlers from resolveActivity on Android 11+.
+        try { startActivity(intent); }
+        catch(ActivityNotFoundException | SecurityException error) { showActionError("Couldn't open another app",unavailable); }
     }
 
     private void showEmergencyTools() {
@@ -1493,9 +1621,8 @@ public class MapsActivity extends AppCompatActivity {
         RouteRiskPoint point=selectedRiskPoints.get(id); if(point==null) return;
         currentHazardId=point.isVerified()?id:null;
         detailTitle.setText(point.getTitle());
-        detailMeta.setText(point.isVerified()?"Government-verified · selected route"
-                :String.format(Locale.US,"Estimated exposure %.0f/100 · approximate area-cell location",point.getRisk()));
-        detailReason.setText(point.getReason()+"\nTap this text for the full explanation.");
+        detailMeta.setText(point.isVerified()?"Official alert along your route":"Area estimate, not a reported incident");
+        detailReason.setText(point.isVerified()?point.getReason():"This area has an estimated concern based on simulated data, not a confirmed crime. Stay aware of your surroundings. Open About route safety for the model details.");
         openHazardDetailSheet();
         if(map!=null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(point.getLatitude(),point.getLongitude()),14.8));
     }
@@ -1703,6 +1830,10 @@ public class MapsActivity extends AppCompatActivity {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == LOCATION_REQUEST && grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) useLastLocation();
+        if(requestCode==JOURNEY_LOCATION_REQUEST) {
+            if(grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED) { updateActiveJourneyLocation(); offerBackgroundJourneyTracking(); }
+            else showActionError("Location remains off","Your journey link still works, but live location needs location permission.");
+        }
     }
 
     private void setRouteBusy(boolean busy) {
@@ -1712,6 +1843,8 @@ public class MapsActivity extends AppCompatActivity {
         for (int id : new int[]{R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation}) findViewById(id).setEnabled(!busy);
         if (busy) {
             displayedRoute=null;
+            lastDestination=null; lastRouteSummary="";
+            findViewById(R.id.routeDistanceTime).setVisibility(View.GONE);
             findViewById(R.id.routeChoices).setVisibility(View.GONE);
             routeResultCard.setVisibility(View.GONE); detailCard.setVisibility(View.GONE);
             selectedRiskPoints.clear();
@@ -1795,6 +1928,7 @@ public class MapsActivity extends AppCompatActivity {
     @Override protected void onStop() { mapView.onStop(); super.onStop(); }
     @Override public void onLowMemory() { super.onLowMemory(); mapView.onLowMemory(); }
     @Override protected void onDestroy() {
+        if(journeyProgressDialog!=null) journeyProgressDialog.dismiss();
         if(activePlaceSearch!=null) activePlaceSearch.dismiss();
         if(activeMapSheet!=null) activeMapSheet.dismiss();
         activeRouteRequest++;

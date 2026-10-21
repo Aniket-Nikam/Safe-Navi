@@ -139,7 +139,10 @@ public class MapPresentationInstrumentedTest {
                         assertNull("Do not duplicate identical geometry",mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name));
                         assertNull(mapRef.get().getStyle().getSource("safe-navi-routes-"+name));
                     }
-                    assertEquals("One road wins all three · drawn once",((TextView)activity.findViewById(R.id.routeStatusText)).getText().toString());
+                    assertEquals("All three recommend the same road",((TextView)activity.findViewById(R.id.routeStatusText)).getText().toString());
+                    assertEquals("6.0 km · 18 min",((TextView)activity.findViewById(R.id.routeDistanceTime)).getText().toString());
+                    activity.findViewById(R.id.riskLayerButton).performClick();
+                    assertEquals("Distance must remain visible with the risk overlay",android.view.View.VISIBLE,activity.findViewById(R.id.routeDistanceTime).getVisibility());
                     // Local-only record: no network publication and no fabricated production crime.
                     org.json.JSONObject record=new org.json.JSONObject().put("id","test-crime").put("title","TEST robbery report").put("category_key","CRIME").put("reason","Test only").put("severity","HIGH").put("status","ACTIVE").put("latitude",19.05).put("longitude",73.01).put("crime_types",new org.json.JSONArray().put("Robbery / snatching"));
                     Method apply=MapsActivity.class.getDeclaredMethod("applyHazardResponse",org.json.JSONObject.class,boolean.class);apply.setAccessible(true);

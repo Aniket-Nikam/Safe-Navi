@@ -121,12 +121,28 @@ public class CloudRehearsalInstrumentedTest {
                 assertTrue(a.findViewById(R.id.fastestRecommendation).isShown());
                 assertTrue(a.findViewById(R.id.balancedRecommendation).isShown());
                 assertTrue(a.findViewById(R.id.safestRecommendation).isShown());
+                TextView metrics=a.findViewById(R.id.routeDistanceTime);
+                assertTrue("Selected distance and ETA must be visible",metrics.isShown());
+                assertTrue(metrics.getText().toString().contains("km"));
+                String before=metrics.getText().toString();
+                a.findViewById(R.id.riskLayerButton).performClick();
+                assertEquals("Risk overlay must not overwrite distance",before,metrics.getText().toString());
+                a.findViewById(R.id.riskLayerButton).performClick();
                 try{assertFalse("Must not silently pass using offline fallback",(Boolean)field(a,"displayedOffline"));}
                 catch(Exception e){throw new AssertionError(e);}
                 assertTrue(((TextView)a.findViewById(R.id.routeResultRisk)).getText().toString().contains("ML safe-route-linear"));
             });
-            android.os.SystemClock.sleep(1500);
-            shot("cloud-map-endpoints-1.7.3.png");
+            until(scenario,a->{try{
+                org.maplibre.android.maps.MapLibreMap map=(org.maplibre.android.maps.MapLibreMap)field(a,"map");
+                PlaceSearchResult source=(PlaceSearchResult)field(a,"selectedSourcePlace"), destination=(PlaceSearchResult)field(a,"selectedDestinationPlace");
+                org.maplibre.android.geometry.LatLngBounds bounds=map.getProjection().getVisibleRegion().latLngBounds;
+                return bounds.contains(new org.maplibre.android.geometry.LatLng(source.getLatitude(),source.getLongitude()))
+                    &&bounds.contains(new org.maplibre.android.geometry.LatLng(destination.getLatitude(),destination.getLongitude()));
+            }catch(Exception e){throw new AssertionError(e);}},20);
+            android.os.SystemClock.sleep(2500); // Let native tile/camera frames settle after the full-route fit, not just API completion.
+            shot("cloud-map-endpoints-1.7.4.png");
+            scenario.onActivity(a->a.findViewById(R.id.findRouteButton).performClick());
+            shot("cloud-route-details-1.7.4.png");
         }
     }
     @Test public void b_cloudCommunityAndThreadRenderRetainedDemoActivity()throws Exception{
