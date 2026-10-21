@@ -33,7 +33,7 @@ public class LoginActivity extends AppCompatActivity {
         loginButton = findViewById(R.id.loginButton);
         progressBar = findViewById(R.id.progressBar);
         loginError = findViewById(R.id.loginErrorText);
-        ((TextView)findViewById(R.id.loginServerAddress)).setText("Server: " + com.safenavi.app.product.ServerConnection.baseUrl());
+        findViewById(R.id.loginServerAddress).setVisibility(View.GONE);
         expectedRole = getIntent().getStringExtra("LOGIN_TYPE");
         if(getIntent().getBooleanExtra("SESSION_RECOVERY",false)) {
             emailEditText.setText(getIntent().getStringExtra("RECOVERY_EMAIL"));
