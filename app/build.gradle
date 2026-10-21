@@ -18,8 +18,8 @@ android {
         applicationId "com.safenavi.app"
         minSdk 24
         targetSdk 34
-        versionCode 18
-        versionName "1.7.1-cloud-default"
+        versionCode 19
+        versionName "1.7.2-demo-verified"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         

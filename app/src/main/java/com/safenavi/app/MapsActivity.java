@@ -190,9 +190,11 @@ public class MapsActivity extends AppCompatActivity {
         bindViews();
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(mapLibreMap -> {
+            if(isFinishing() || isDestroyed()) return;
             map = mapLibreMap;
             map.getUiSettings().setCompassEnabled(false);
             map.setStyle(new Style.Builder().fromUri(MAP_STYLE), style -> {
+                if(isFinishing() || isDestroyed()) return;
                 mapStyle = style;
                 loadHazards();
                 loadPendingReports();
@@ -467,16 +469,16 @@ public class MapsActivity extends AppCompatActivity {
         dialog[0]=presentSheet(content);
     }
     private void applyRiskVisibility() {
-        if(mapStyle!=null) for(String id:new String[]{RISK_POINTS_LAYER,RISK_SECTIONS_LAYER}) {
+        if(hasUsableMapStyle()) for(String id:new String[]{RISK_POINTS_LAYER,RISK_SECTIONS_LAYER}) {
             org.maplibre.android.style.layers.Layer layer=mapStyle.getLayer(id);
-            if(layer!=null) layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(risksVisible?"visible":"none"));
+            if(layer!=null) layer.setProperties(org.maplibre.android.style.layers.PropertyFactory.visibility(risksVisible?org.maplibre.android.style.layers.Property.VISIBLE:org.maplibre.android.style.layers.Property.NONE));
         }
         ((MaterialButton)findViewById(R.id.riskLayerButton)).setText(risksVisible?"Hide route risks":"Route risks");
         if(risksVisible && displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText("Estimates only. Grey = unassessed, not safe.");
         else if(displayedRoute!=null) ((TextView)findViewById(R.id.routeStatusText)).setText((displayedOffline?"Offline snapshot · ":"")+profileName(routeProfile)+" · "+String.format(Locale.US,"%.1f km",displayedRoute.getRoute().getDistanceMeters()/1000));
     }
     private void renderRiskSections(RouteSafetyResult result) {
-        if(mapStyle==null) return;
+        if(!hasUsableMapStyle()) return;
         removeLayerAndSource(RISK_SECTIONS_LAYER,RISK_SECTIONS_SOURCE); List<Feature> features=new ArrayList<>();
         for(RouteRiskSection section:result.getRiskSections()) {
             List<Point> shape=new ArrayList<>(); for(HazardLocation.GeoPoint point:section.geometry) shape.add(Point.fromLngLat(point.getLongitude(),point.getLatitude()));
@@ -656,7 +658,7 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void renderPendingReports() {
-        if (mapStyle == null) return;
+        if (!hasUsableMapStyle()) return;
         String sourceId = "pending-report-source";
         String layerId = "pending-report-point";
         if (mapStyle.getLayer(layerId) != null) mapStyle.removeLayer(layerId);
@@ -745,7 +747,7 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void renderGeometryDraft() {
-        if (mapStyle == null) return;
+        if (!hasUsableMapStyle()) return;
         String sourceId = "hazard-geometry-draft-source", layerId = "hazard-geometry-draft-line";
         if (mapStyle.getLayer(layerId) != null) mapStyle.removeLayer(layerId);
         if (mapStyle.getSource(sourceId) != null) mapStyle.removeSource(sourceId);
@@ -758,7 +760,7 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void renderHazards() {
-        if (mapStyle == null) return;
+        if (!hasUsableMapStyle()) return;
         for (HazardSeverity severity : HazardSeverity.values()) {
             List<Feature> features = new ArrayList<>();
             for (Hazard hazard : liveHazards.values()) {
@@ -883,6 +885,8 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void applyHazardResponse(JSONObject value, boolean cached) {
+        // A network response can arrive after the user leaves this map.
+        if (isFinishing() || isDestroyed()) return;
         JSONArray items = value.optJSONArray("hazards"); Map<String, Hazard> loaded = new LinkedHashMap<>();
         Map<String, JSONObject> loadedRecords = new LinkedHashMap<>(); StringBuilder signature = new StringBuilder();
         if (items != null) for (int i = 0; i < items.length(); i++) { JSONObject item = items.optJSONObject(i); if (item == null) continue;
@@ -1376,7 +1380,7 @@ public class MapsActivity extends AppCompatActivity {
 
     private void renderRoutes(List<RouteCandidate> candidates, RouteCandidate selected, List<RouteSafetyResult> evaluated,
                               PlaceSearchResult source, PlaceSearchResult destination) {
-        if (mapStyle == null) return;
+        if (!hasUsableMapStyle()) return;
         for(String suffix:new String[]{"-fastest","-balanced","-safest"})removeLayerAndSource(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix);
         removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE);
         removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
@@ -1400,8 +1404,8 @@ public class MapsActivity extends AppCompatActivity {
             mapStyle.addLayer(new LineLayer(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix).withProperties(
                 lineColor(shared?Color.parseColor("#526C85"):routeColor(preference)),lineWidth(recommended.getProviderRouteId().equals(selected.getProviderRouteId())?7f:5f),
                 lineOpacity(1f),
-                org.maplibre.android.style.layers.PropertyFactory.lineCap("round"),
-                org.maplibre.android.style.layers.PropertyFactory.lineJoin("round")));
+                org.maplibre.android.style.layers.PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                org.maplibre.android.style.layers.PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)));
         }
 
         renderHazards();
@@ -1415,6 +1419,7 @@ public class MapsActivity extends AppCompatActivity {
         bounds.include(new LatLng(destination.getLatitude(), destination.getLongitude()));
         try {
             findViewById(R.id.routeControlCard).post(() -> {
+                if(!hasUsableMapStyle() || map==null) return;
                 int gap = Math.round(18 * getResources().getDisplayMetrics().density);
                 int top = findViewById(R.id.routeSearchCard).getBottom() + gap;
                 int bottom = mapView.getHeight() - findViewById(R.id.routeControlCard).getTop() + gap;
@@ -1453,7 +1458,7 @@ public class MapsActivity extends AppCompatActivity {
                     record.optString("title"),record.optString("reason")+"\n"+record.optString("road_status")+" · within "+Math.round(distance)+" m of route",
                     0,true,"government_verified_hazard"));
         }
-        if(mapStyle==null) return;
+        if(!hasUsableMapStyle()) return;
         removeLayerAndSource(RISK_POINTS_LAYER,RISK_POINTS_SOURCE);
         List<Feature> features=new ArrayList<>();
         for(RouteRiskPoint point:selectedRiskPoints.values()) {
@@ -1491,6 +1496,7 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void renderEndpoint(String key, String label, PlaceSearchResult place, String color) {
+        if (!hasUsableMapStyle()) return;
         String sourceId = "endpoint-" + key, layerId = sourceId + "-marker";
         removeLayerAndSource(layerId, sourceId);
         float density = getResources().getDisplayMetrics().density;
@@ -1519,8 +1525,13 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void removeLayerAndSource(String layerId, String sourceId) {
+        if (!hasUsableMapStyle()) return;
         if (mapStyle.getLayer(layerId) != null) mapStyle.removeLayer(layerId);
         if (mapStyle.getSource(sourceId) != null) mapStyle.removeSource(sourceId);
+    }
+
+    private boolean hasUsableMapStyle() {
+        return !isFinishing() && !isDestroyed() && mapStyle != null && mapStyle.isFullyLoaded();
     }
 
     private interface PlaceCallback { void accept(PlaceSearchResult place); }
@@ -1781,6 +1792,7 @@ public class MapsActivity extends AppCompatActivity {
         if(activeMapSheet!=null) activeMapSheet.dismiss();
         activeRouteRequest++;
         activeScoreRequest++;
+        mapStyle = null;
         mapView.onDestroy();
         super.onDestroy();
     }

@@ -35,7 +35,7 @@ public class CaseConversationActivity extends AppCompatActivity {
         LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(12),dp(8),dp(12),dp(8)); root.setBackgroundColor(color(R.color.background));
         LinearLayout header=new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
         MaterialButton back=button("Back"); back.setOnClickListener(v -> finish()); header.addView(back);
-        TextView title=text("Case conversation",19); title.setTypeface(null,1); header.addView(title,new LinearLayout.LayoutParams(0,-2,1)); root.addView(header);
+        TextView title=text("Case conversation",19); title.setTypeface(null,android.graphics.Typeface.BOLD); header.addView(title,new LinearLayout.LayoutParams(0,-2,1)); root.addView(header);
         status=text("Connecting securely…",12); status.setPadding(dp(6),dp(6),dp(6),dp(6)); status.setOnClickListener(v -> fetch(false)); root.addView(status);
         older=button("Load earlier messages"); older.setOnClickListener(v -> fetch(true)); root.addView(older);
         list=new RecyclerView(this); layout=new LinearLayoutManager(this); layout.setStackFromEnd(true); list.setLayoutManager(layout); list.setAdapter(messages); root.addView(list,new LinearLayout.LayoutParams(-1,0,1));

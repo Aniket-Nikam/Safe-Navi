@@ -21,6 +21,21 @@ import org.maplibre.android.maps.Style;
 /** Isolated rendering test. These artificial paths are never written to product data. */
 @RunWith(AndroidJUnit4.class)
 public class MapPresentationInstrumentedTest {
+    @Test public void lateHazardResponseAfterLeavingMapIsIgnored() throws Exception {
+        AtomicReference<MapsActivity> closedMap = new AtomicReference<>();
+        try(ActivityScenario<MapsActivity> scenario=ActivityScenario.launch(new Intent(
+                InstrumentationRegistry.getInstrumentation().getTargetContext(),MapsActivity.class))) {
+            scenario.onActivity(closedMap::set);
+        }
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            try {
+                assertTrue(closedMap.get().isDestroyed());
+                Method apply=MapsActivity.class.getDeclaredMethod("applyHazardResponse",org.json.JSONObject.class,boolean.class);
+                apply.setAccessible(true);
+                apply.invoke(closedMap.get(),new org.json.JSONObject(),false);
+            } catch(Exception error) { throw new AssertionError(error); }
+        });
+    }
     @Test public void allPreferencesAndEndpointMarkersRenderAndSelectWithoutClipping() throws Exception {
         Intent intent = new Intent(InstrumentationRegistry.getInstrumentation().getTargetContext(), MapsActivity.class);
         try (ActivityScenario<MapsActivity> scenario = ActivityScenario.launch(intent)) {
@@ -71,7 +86,9 @@ public class MapPresentationInstrumentedTest {
                     for(int i=0;i<3;i++){
                         org.maplibre.android.style.layers.LineLayer layer=mapRef.get().getStyle().getLayerAs(layerPrefix+"-"+names[i]);
                         assertNotNull(layer);assertEquals(colors[i],layer.getLineColorAsInt());
-                        assertEquals((i-1)*5f,layer.getLineOffset().getValue(),.01f);
+                        Float offset=layer.getLineOffset().getValue();
+                        // Unset is MapLibre's zero-offset default; explicit zero is also valid.
+                        if(offset!=null) assertEquals("Real roads must not be shifted into artificial parallel paths",0f,offset,.01f);
                     }
                     assertTrue(safest.performClick());
                     assertTrue(((TextView) activity.findViewById(R.id.routeResultTitle)).getText().toString().contains("Safest"));
@@ -115,11 +132,14 @@ public class MapPresentationInstrumentedTest {
                     Method render=MapsActivity.class.getDeclaredMethod("renderRankedRoutes",List.class,List.class,RouteProfile.class,PlaceSearchResult.class,PlaceSearchResult.class,String.class,String.class);
                     render.setAccessible(true);render.invoke(activity,Collections.singletonList(result),Collections.singletonList(road),RouteProfile.BALANCED,
                         new PlaceSearchResult("A · TEST",19.0657,72.9986),new PlaceSearchResult("B · TEST",19.042644,73.023428),"Test geometry","Test only");
-                    for(String name:new String[]{"fastest","balanced","safest"}){
-                        assertNotNull(mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name));
-                        assertNotNull(mapRef.get().getStyle().getSource("safe-navi-routes-"+name));
+                    org.maplibre.android.style.layers.LineLayer shared=mapRef.get().getStyle().getLayerAs("safe-navi-route-options-fastest");
+                    assertNotNull("The shared road must be rendered once",shared);
+                    assertEquals(android.graphics.Color.parseColor("#526C85"),shared.getLineColorAsInt());
+                    for(String name:new String[]{"balanced","safest"}){
+                        assertNull("Do not duplicate identical geometry",mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name));
+                        assertNull(mapRef.get().getStyle().getSource("safe-navi-routes-"+name));
                     }
-                    assertTrue(((TextView)activity.findViewById(R.id.routeStatusText)).getText().toString().contains("Shared road"));
+                    assertEquals("One road wins all three · drawn once",((TextView)activity.findViewById(R.id.routeStatusText)).getText().toString());
                     // Local-only record: no network publication and no fabricated production crime.
                     org.json.JSONObject record=new org.json.JSONObject().put("id","test-crime").put("title","TEST robbery report").put("category_key","CRIME").put("reason","Test only").put("severity","HIGH").put("status","ACTIVE").put("latitude",19.05).put("longitude",73.01).put("crime_types",new org.json.JSONArray().put("Robbery / snatching"));
                     Method apply=MapsActivity.class.getDeclaredMethod("applyHazardResponse",org.json.JSONObject.class,boolean.class);apply.setAccessible(true);

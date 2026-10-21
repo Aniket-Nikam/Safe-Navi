@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
 from email.utils import parsedate_to_datetime
 
-from .product_database import claim_news_ingestion, finish_news_ingestion, news_configuration, store_news_signal
+from .product_database import claim_news_ingestion, finish_news_ingestion, news_configuration, store_news_signals
 
 
 CATEGORY_TERMS = {
@@ -93,9 +93,10 @@ def ingest_configured_feeds(force: bool = True) -> dict:
                 content = response.read(2_000_001)
             if len(content) > 2_000_000: raise ValueError("feed exceeds 2 MB")
             publisher = parsed.hostname.removeprefix("www.")
-            for signal in parse_feed(content, publisher):
-                if store_news_signal(signal): inserted += 1
-                else: skipped += 1
+            signals = parse_feed(content, publisher)
+            added = store_news_signals(signals)
+            inserted += added
+            skipped += len(signals) - added
         except Exception as error:
             errors.append(f"{parsed.hostname}: {type(error).__name__}")
     schedule = finish_news_ingestion(lease, len(errors) < len(feeds))

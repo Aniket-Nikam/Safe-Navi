@@ -17,6 +17,28 @@ import org.junit.runner.RunWith;
 /** Explicit opt-in read-only integration check. Never creates product records. */
 @RunWith(AndroidJUnit4.class)
 public class LiveMapSmokeInstrumentedTest {
+    private android.content.Context testContext;
+    private String oldServer;
+    private Map<String,?> oldSession;
+    @Before public void useActualCloudForLiveProbe(){
+        Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("liveProviders")));
+        testContext=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        oldServer=com.safenavi.app.product.ServerConnection.baseUrl();
+        oldSession=testContext.getSharedPreferences("safe_navi_session",0).getAll();
+        com.safenavi.app.product.ProductSession.clear(testContext);
+        com.safenavi.app.product.ServerConnection.save(testContext,com.safenavi.app.product.ServerConnection.CLOUD_ORIGIN);
+    }
+    @After public void restoreProbeSettings(){
+        if(testContext==null)return;
+        android.content.SharedPreferences.Editor editor=testContext.getSharedPreferences("safe_navi_session",0).edit().clear();
+        for(Map.Entry<String,?> item:oldSession.entrySet()){
+            Object value=item.getValue();String key=item.getKey();
+            if(value instanceof String)editor.putString(key,(String)value);
+            else if(value instanceof Boolean)editor.putBoolean(key,(Boolean)value);
+            else if(value instanceof Long)editor.putLong(key,(Long)value);
+            else if(value instanceof Integer)editor.putInt(key,(Integer)value);
+        }editor.commit();com.safenavi.app.product.ServerConnection.save(testContext,oldServer);
+    }
     @Test public void realSearchRoutesAndCloudModelRender() throws Exception {
         Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("liveProviders")));
         boolean dark="true".equals(InstrumentationRegistry.getArguments().getString("dark"));
@@ -66,7 +88,12 @@ public class LiveMapSmokeInstrumentedTest {
             android.os.SystemClock.sleep(5000); // Let the real map renderer complete its camera/tile frame.
             save("map-live-1.3"+(dark?"-dark":"")+".png");
             scenario.onActivity(activity -> { activity.findViewById(R.id.riskLayerButton).performClick(); try {
-                Field field=MapsActivity.class.getDeclaredField("activeMapSheet"); field.setAccessible(true); ((android.app.Dialog)field.get(activity)).dismiss();
+                Field field=MapsActivity.class.getDeclaredField("risksVisible"); field.setAccessible(true);
+                assertTrue("The risk button must enable the on-map overlay directly",field.getBoolean(activity));
+                Field styleField=MapsActivity.class.getDeclaredField("mapStyle"); styleField.setAccessible(true);
+                org.maplibre.android.maps.Style style=(org.maplibre.android.maps.Style)styleField.get(activity);
+                assertNotNull(style);
+                assertEquals("visible",style.getLayer("selected-route-risk-markers").getVisibility().getValue());
             } catch(Exception e) { throw new AssertionError(e); } });
             android.os.SystemClock.sleep(1500);
             save("map-risk-1.3"+(dark?"-dark":"")+".png");

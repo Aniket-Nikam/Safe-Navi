@@ -1139,21 +1139,33 @@ def evidence_record(evidence_id: str, user: dict[str, Any]) -> dict[str, Any] | 
 
 
 def store_news_signal(value: dict[str, Any]) -> bool:
-    normalized = f"{value['headline'].strip().lower()}|{value.get('summary','').strip().lower()}"
-    digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return store_news_signals([value]) == 1
+
+
+def store_news_signals(values: list[dict[str, Any]]) -> int:
+    """Insert a bounded feed in one transaction, without one cloud connection per article."""
+    if not values:
+        return 0
+    inserted = 0
     with connect_product() as connection:
-        try:
-            connection.execute(
+        # Bound parameter count for both SQLite and PostgreSQL.
+        for start in range(0, len(values), 50):
+            parameters: list[Any] = []
+            batch = values[start:start + 50]
+            for value in batch:
+                normalized = f"{value['headline'].strip().lower()}|{value.get('summary','').strip().lower()}"
+                digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+                parameters.extend((f"news_{uuid.uuid4().hex}", value["publisher"], value["source_url"], value["headline"],
+                                   value.get("summary", ""), value["published_at"], value.get("latitude"), value.get("longitude"),
+                                   value.get("location_text"), value["category"], float(value["confidence"]), digest, "UNVERIFIED", utc_now()))
+            cursor = connection.execute(
                 """INSERT INTO news_signals(id,publisher,source_url,headline,summary,published_at,latitude,longitude,
                    location_text,category,confidence,content_hash,review_status,created_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                (f"news_{uuid.uuid4().hex}", value["publisher"], value["source_url"], value["headline"],
-                 value.get("summary", ""), value["published_at"], value.get("latitude"), value.get("longitude"),
-                 value.get("location_text"), value["category"], float(value["confidence"]), digest, "UNVERIFIED", utc_now()),
+                   VALUES """ + ",".join(["(?,?,?,?,?,?,?,?,?,?,?,?,?,?)"] * len(batch)) + " ON CONFLICT DO NOTHING",
+                parameters,
             )
-            return True
-        except sqlite3.IntegrityError:
-            return False
+            inserted += cursor.rowcount
+    return inserted
 
 
 def list_news_signals(review_status: str | None = None) -> list[dict[str, Any]]:
