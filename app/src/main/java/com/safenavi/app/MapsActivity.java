@@ -119,6 +119,7 @@ public class MapsActivity extends AppCompatActivity {
     private boolean displayedOffline;
     private RouteSafetyResult displayedRoute;
     private com.google.android.material.bottomsheet.BottomSheetDialog activeMapSheet;
+    private PlaceSearchSheet activePlaceSearch;
 
     private MapView mapView;
     private MapLibreMap map;
@@ -259,8 +260,8 @@ public class MapsActivity extends AppCompatActivity {
         findRouteButton.setOnClickListener(v -> { if(displayedRoute==null) findRoutes(); else showRouteDetailsSheet(); });
         findViewById(R.id.mapSearchSummary).setOnClickListener(v -> openPlaceSearch(false));
         findViewById(R.id.editEndpointsButton).setOnClickListener(v -> {
-            View editor=findViewById(R.id.endpointEditor);
-            editor.setVisibility(editor.getVisibility()==View.VISIBLE?View.GONE:View.VISIBLE);
+            findViewById(R.id.endpointEditor).setVisibility(View.VISIBLE);
+            openPlaceSearch(true);
         });
         findViewById(R.id.riskLayerButton).setOnClickListener(v -> {
             if(displayedRoute==null) { Toast.makeText(this,"Plan a route first to inspect its coverage.",Toast.LENGTH_SHORT).show(); return; }
@@ -306,23 +307,27 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void openPlaceSearch(boolean source) {
+        if(activePlaceSearch!=null) activePlaceSearch.dismiss();
         LatLng center = map == null ? null : map.getCameraPosition().target;
-        new PlaceSearchSheet(this, openMapService, offlineRouter, source ? "Choose starting point" : "Search destination",
+        activePlaceSearch = new PlaceSearchSheet(this, openMapService, offlineRouter, source ? "Choose starting point" : "Search destination",
                 textOf(source ? sourceInput : destinationInput), center == null ? 19.043 : center.getLatitude(),
                 center == null ? 73.023 : center.getLongitude(), new PlaceSearchSheet.Listener() {
             @Override public void onPlace(PlaceSearchResult place) {
                 setSelectedPlace(source, place); invalidateRouteForEndpoints();
-                findViewById(R.id.endpointEditor).setVisibility(View.GONE);
+                findViewById(R.id.endpointEditor).setVisibility(View.VISIBLE);
                 if (map != null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(place.getLatitude(), place.getLongitude()), 14.5));
                 if (!textOf(sourceInput).isEmpty() && !textOf(destinationInput).isEmpty()) findRoutes();
-                else if(!source && textOf(sourceInput).isEmpty()) { locatingSource=true; enableLocationWithContext(); }
+                else ((TextView)findViewById(R.id.routeStatusText)).setText(source
+                        ? "Starting point selected. Choose a destination above."
+                        : "Destination selected. Choose a starting point above, or use My location.");
             }
             @Override public void onMapPin() {
                 routePinTarget = source ? 1 : 2;
                 ((TextView)findViewById(R.id.routeStatusText)).setText("Tap the exact " + (source ? "starting point" : "destination") + " on the map");
             }
             @Override public void onDeviceLocation() { locatingSource = source; enableLocationWithContext(); }
-        }).show();
+        });
+        activePlaceSearch.show();
     }
 
     private void setSelectedPlace(boolean source, PlaceSearchResult place) {
@@ -1054,7 +1059,7 @@ public class MapsActivity extends AppCompatActivity {
         RouteSafetyResult best = ranked.get(0);
         displayedRoute=best;
         displayedOffline=sourceLabel.startsWith("Offline");
-        findViewById(R.id.endpointEditor).setVisibility(View.GONE);
+        findViewById(R.id.endpointEditor).setVisibility(View.VISIBLE);
         RouteSafetyResult fastest = best;
         for (RouteSafetyResult result : ranked) if (result.getRoute().getTravelMinutes() < fastest.getRoute().getTravelMinutes()) fastest = result;
         // Only evaluated, non-excluded roads may be displayed as route alternatives.
@@ -1571,16 +1576,17 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private void choosePlace(String query, List<PlaceSearchResult> results, int requestId, boolean source, PlaceCallback callback) {
-        if (results.isEmpty()) { showRouteError(requestId, "No match. Try the full place name and locality, or latitude, longitude."); return; }
-        setRouteBusy(false);
-        new PlaceSearchSheet(this, openMapService, offlineRouter, source ? "Choose starting point" : "Search destination",
-                query, 19.043, 73.023, new PlaceSearchSheet.Listener() {
-            @Override public void onPlace(PlaceSearchResult place) {
-                if (isRouteRequestActive(requestId)) { setSelectedPlace(source, place); setRouteBusy(true); callback.accept(place); }
-            }
-            @Override public void onMapPin() { routePinTarget = source ? 1 : 2; }
-            @Override public void onDeviceLocation() { locatingSource = source; enableLocationWithContext(); }
-        }).showResults(results);
+        if (!isRouteRequestActive(requestId)) return;
+        LatLng center = map == null ? null : map.getCameraPosition().target;
+        List<PlaceSearchResult> matches = com.safenavi.app.safety.service.PlaceRelevance.rank(query,
+                OpenMapService.uniquePlaces(results), center == null ? 19.043 : center.getLatitude(),
+                center == null ? 73.023 : center.getLongitude());
+        if (matches.isEmpty()) { showMissingPlace(query, requestId); return; }
+        // Both endpoints use best-match submission. The visible field can be reopened
+        // to pick a different result; do not force a second source-only selection.
+        PlaceSearchResult place = matches.get(0);
+        setSelectedPlace(source, place);
+        callback.accept(place);
     }
 
     private void showMissingPlace(String query, int requestId) {
@@ -1789,6 +1795,7 @@ public class MapsActivity extends AppCompatActivity {
     @Override protected void onStop() { mapView.onStop(); super.onStop(); }
     @Override public void onLowMemory() { super.onLowMemory(); mapView.onLowMemory(); }
     @Override protected void onDestroy() {
+        if(activePlaceSearch!=null) activePlaceSearch.dismiss();
         if(activeMapSheet!=null) activeMapSheet.dismiss();
         activeRouteRequest++;
         activeScoreRequest++;

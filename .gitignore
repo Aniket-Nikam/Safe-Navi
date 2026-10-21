@@ -45,4 +45,10 @@ backend/data/safe_navi_product.sqlite
 .cxx
 local.properties
 google-services.json
+**/*.private.json
+deliverables/Safe-Navi-Cloud-Additional-Checks.json
+deliverables/Safe-Navi-Cloud-Endpoint-Coverage.json
+deliverables/Safe-Navi-Cloud-Feature-Log.jsonl
+deliverables/Safe-Navi-Cloud-Rehearsal.json
+deliverables/Safe-Navi-Verified-Route-List.json
 /app/google-services.json

@@ -106,7 +106,7 @@ public class MapPresentationInstrumentedTest {
                     TextView row = activity.findViewById(id);
                     assertTrue("Three compact choices must be visible together",row.isShown());
                 }
-                assertFalse(activity.findViewById(R.id.endpointEditor).isShown());
+                assertTrue("Both endpoints must remain editable after comparison",activity.findViewById(R.id.endpointEditor).isShown());
                 assertFalse(activity.findViewById(R.id.safetyScoreCard).isShown());
                 assertEquals("none",mapRef.get().getStyle().getLayer("selected-route-risk-markers").getVisibility().getValue());
             });

@@ -117,6 +117,7 @@ public final class PlaceSearchSheet {
     }
 
     public void show() { dialog.show(); }
+    public void dismiss() { dialog.dismiss(); }
     public void showResults(List<PlaceSearchResult> places) {
         invalidate(); adapter.set(ranked(places));
         status.setText("Go uses the best match. Or tap another place below."); dialog.show();
