@@ -515,7 +515,7 @@ public class MapsActivity extends AppCompatActivity {
         // Diagnostics stay available by choice; they never push the actions off screen.
         MaterialButton explain=sheetButton("About route safety"); content.addView(explain);
         explain.setOnClickListener(v -> showRouteSafetySheet());
-        addRouteAction(content,"Open directions",this::openNavigation,true);
+        addRouteAction(content,"Start navigation",this::openNavigation,true);
         addRouteAction(content,"Share route",this::shareRoute,false);
         addRouteAction(content,"Save destination",this::saveDestination,false);
         addRouteAction(content,activeJourneyId==null?"Share journey":"Manage shared journey",this::showJourneyOptions,false);
@@ -1417,6 +1417,25 @@ public class MapsActivity extends AppCompatActivity {
     }; }
 
     private void openNavigation() {
+        if(displayedRoute==null||displayedRoute.getRoute().getGeometry().size()<2) { showActionError("Plan a route first","Choose your start and destination, then plan your route."); return; }
+        new MaterialAlertDialogBuilder(this).setTitle("Navigate in Safe-Navi")
+                .setItems(new String[]{"Demo preview (no GPS)","Live location (screen open)","Open Google Maps instead"},(d,which)->{
+                    if(which==2) { openExternalNavigation();return; }
+                    if(which==0) launchInAppNavigation(true);
+                    else new MaterialAlertDialogBuilder(this).setTitle("Foreground navigation preview")
+                            .setMessage("Uses your phone's location while this screen is open. This demonstration prototype has no live traffic or automatic rerouting. Follow road signs and do not operate the phone while driving.")
+                            .setPositiveButton("Start",(confirm,w)->launchInAppNavigation(false)).setNegativeButton("Cancel",null).show();
+                }).setNegativeButton("Cancel",null).show();
+    }
+
+    private void launchInAppNavigation(boolean demo) {
+        if(displayedRoute==null) {showActionError("Route changed","Please plan the route again.");return;}
+        try {
+            startActivity(com.safenavi.app.navigation.NavigationRouteStore.intent(this,displayedRoute,textOf(sourceInput),textOf(destinationInput),demo));
+        } catch(Exception error) {showActionError("Couldn't start navigation","Please compare your route again. This route may be too large or unavailable.");}
+    }
+
+    private void openExternalNavigation() {
         if (lastDestination == null) { Toast.makeText(this, "Compare a route first.", Toast.LENGTH_SHORT).show(); return; }
         if(selectedSourcePlace==null) { showActionError("Choose a starting point","Select A on the map and plan your route again."); return; }
         Uri uri=Uri.parse(RouteUserSummary.directions(selectedSourcePlace.getLatitude(),selectedSourcePlace.getLongitude(),

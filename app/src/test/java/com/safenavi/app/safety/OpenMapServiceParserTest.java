@@ -9,6 +9,16 @@ import java.util.List;
 import org.junit.Test;
 
 public class OpenMapServiceParserTest {
+    @Test public void parsesInstructionsAndOffsetsShapeIndicesAcrossLegs() throws Exception {
+        String json="{\"trip\":{\"summary\":{\"time\":120,\"length\":1},\"legs\":["
+                +"{\"shape\":\"??AA\",\"maneuvers\":[{\"begin_shape_index\":0,\"instruction\":\"Head north\"},{\"begin_shape_index\":1,\"instruction\":\"Turn right\"}]},"
+                +"{\"shape\":\"AACC\",\"maneuvers\":[{\"begin_shape_index\":1,\"instruction\":\"Arrive\"},{\"begin_shape_index\":99,\"instruction\":\"Bad index\"}]}]}}";
+        RouteCandidate route=OpenMapService.parseRoutes(json).get(0);
+        assertEquals(3,route.getGeometry().size());assertEquals(3,route.getNavigationSteps().size());
+        assertEquals("Turn right",route.getNavigationSteps().get(1).instruction);
+        assertEquals(2,route.getNavigationSteps().get(2).shapeIndex);
+        assertEquals("Arrive",route.getNavigationSteps().get(2).instruction);
+    }
     @Test public void searchRowsKeepShortNameAndSeparateLocalityAndRemoveNearbyDuplicates() {
         PlaceSearchResult place = new PlaceSearchResult("Nahur, Mumbai, India", 19.15, 72.94);
         assertEquals("Nahur", place.getPrimaryText());

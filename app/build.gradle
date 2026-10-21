@@ -18,8 +18,8 @@ android {
         applicationId "com.safenavi.app"
         minSdk 24
         targetSdk 34
-        versionCode 21
-        versionName "1.7.4-simple-routes"
+        versionCode 22
+        versionName "1.8-navigation-preview"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         

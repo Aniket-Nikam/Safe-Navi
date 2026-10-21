@@ -11,6 +11,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <queries>
+        <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
+    </queries>
 
     <application
         android:name=".SafeNaviApplication"
@@ -83,6 +86,7 @@
             android:theme="@style/Theme.SafeNavi" />
             
         <!-- Maps Activity -->
+        <activity android:name=".NavigationActivity" android:exported="false" android:screenOrientation="portrait" android:theme="@style/Theme.SafeNavi" />
         <activity
             android:name=".MapsActivity"
             android:label="Maps"

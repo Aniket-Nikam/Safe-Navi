@@ -32,7 +32,8 @@ public class RouteActionsInstrumentedTest {
         scenario.onActivity(activity -> {
             try {
                 ProductSession.clear(activity);
-                RouteCandidate road=new RouteCandidate("ui-test",20.4,5100,Collections.emptyList());
+                RouteCandidate road=new RouteCandidate("ui-test",20.4,5100,java.util.Arrays.asList(
+                        new HazardLocation.GeoPoint(19.0637159,73.0002509),new HazardLocation.GeoPoint(19.042644,73.023428)));
                 set(activity,"displayedRoute",new RouteSafetyResult(road,RouteProfile.BALANCED,45,0));
                 set(activity,"lastDestination",new PlaceSearchResult("SIES GST, Nerul",19.042644,73.023428));
                 set(activity,"selectedSourcePlace",new PlaceSearchResult("Vashi Station",19.0637159,73.0002509));
@@ -45,7 +46,7 @@ public class RouteActionsInstrumentedTest {
 
     @Test public void simpleDetailsShowDistanceAndKeepDiagnosticsOptIn() throws Exception {
         try(ActivityScenario<MapsActivity> scenario=openRoute()) {
-            visible("5.1 km · 20 min"); visible("Open directions"); tap("About route safety");
+            visible("5.1 km · 20 min"); visible("Start navigation"); tap("About route safety");
             visible("The current model uses simulated area data. It cannot tell you the chance of a crime happening.");
             technicalVisibility(scenario,View.GONE);
             tap("Show technical details"); technicalVisibility(scenario,View.VISIBLE);
@@ -81,7 +82,7 @@ public class RouteActionsInstrumentedTest {
         AtomicReference<Intent> sent=new AtomicReference<>();
         Instrumentation.ActivityMonitor monitor=intercept(Intent.ACTION_VIEW,sent);
         try(ActivityScenario<MapsActivity> scenario=openRoute()) {
-            tap("Open directions"); visible("Open Google Maps directions?");
+            tap("Start navigation"); tap("Open Google Maps instead"); visible("Open Google Maps directions?");
             assertNull(sent.get());
             tap("Open directions");
             assertNotNull(sent.get());
@@ -113,7 +114,7 @@ public class RouteActionsInstrumentedTest {
     }
     // Espresso 3.5 uses a removed InputManager API on this API 36 emulator. Use the
     // public UiAutomation input API instead, retaining real screen-coordinate taps.
-    private static AccessibilityNodeInfo visible(String text) {
+    static AccessibilityNodeInfo visible(String text) {
         Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();
         for(int attempt=0;attempt<50;attempt++) {
             instrumentation.waitForIdleSync();
@@ -125,7 +126,7 @@ public class RouteActionsInstrumentedTest {
         }
         throw new AssertionError("Expected visible text: "+text);
     }
-    private static void tap(String text) {
+    static void tap(String text) {
         Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();
         AccessibilityNodeInfo node=visible(text); Rect bounds=new Rect(); node.getBoundsInScreen(bounds);
         assertFalse("Button must have a real hit area: "+text,bounds.isEmpty());

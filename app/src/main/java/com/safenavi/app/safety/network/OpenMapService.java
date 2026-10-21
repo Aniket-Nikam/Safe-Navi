@@ -6,6 +6,7 @@ import com.safenavi.app.BuildConfig;
 import com.safenavi.app.safety.model.HazardLocation;
 import com.safenavi.app.safety.model.PlaceSearchResult;
 import com.safenavi.app.safety.model.RouteCandidate;
+import com.safenavi.app.safety.model.NavigationStep;
 import com.safenavi.app.safety.model.TravelMode;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -201,7 +202,9 @@ public class OpenMapService {
                     .put(new JSONObject().put("lat", toLat).put("lon", toLon)));
             request.put("costing", mode.getProviderProfile());
             request.put("alternates", 2);
-            request.put("directions_type", "none");
+            request.put("directions_type", "instructions");
+            request.put("units", "kilometers");
+            request.put("language", "en-US");
             request.put("directions_options", new JSONObject().put("units", "kilometers"));
             executePost(parsed, request.toString(), body -> parseRoutes(body), callback);
         } catch (JSONException error) {
@@ -305,14 +308,24 @@ public class OpenMapService {
         JSONObject summary = trip.getJSONObject("summary");
         JSONArray legs = trip.getJSONArray("legs");
         List<HazardLocation.GeoPoint> geometry = new ArrayList<>();
+        List<NavigationStep> steps = new ArrayList<>();
         for (int i = 0; i < legs.length(); i++) {
-            List<HazardLocation.GeoPoint> leg = decodePolyline6(legs.getJSONObject(i).getString("shape"));
+            JSONObject legData=legs.getJSONObject(i);
+            int offset=geometry.isEmpty()?0:geometry.size()-1;
+            List<HazardLocation.GeoPoint> leg = decodePolyline6(legData.getString("shape"));
+            JSONArray maneuvers=legData.optJSONArray("maneuvers");
+            if(maneuvers!=null) for(int m=0;m<maneuvers.length();m++) {
+                JSONObject maneuver=maneuvers.optJSONObject(m); if(maneuver==null) continue;
+                int index=maneuver.optInt("begin_shape_index",-1);
+                String instruction=maneuver.optString("instruction","").trim();
+                if(index>=0 && index<leg.size() && !instruction.isEmpty()) steps.add(new NavigationStep(offset+index,instruction));
+            }
             if (!geometry.isEmpty() && !leg.isEmpty()) leg.remove(0);
             geometry.addAll(leg);
         }
         output.add(new RouteCandidate("osm-route-" + (output.size() + 1),
                 summary.getDouble("time") / 60.0,
-                summary.getDouble("length") * 1000.0, geometry));
+                summary.getDouble("length") * 1000.0, geometry, steps));
     }
 
     /** Decodes Valhalla's signed polyline format at six decimal places. */

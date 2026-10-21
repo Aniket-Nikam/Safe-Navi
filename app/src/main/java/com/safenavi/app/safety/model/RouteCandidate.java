@@ -9,17 +9,25 @@ public class RouteCandidate {
     private final double travelMinutes;
     private final double distanceMeters;
     private final List<HazardLocation.GeoPoint> geometry;
+    private final List<NavigationStep> navigationSteps;
 
     public RouteCandidate(String providerRouteId, double travelMinutes, double distanceMeters,
                           List<HazardLocation.GeoPoint> geometry) {
+        this(providerRouteId,travelMinutes,distanceMeters,geometry,Collections.emptyList());
+    }
+
+    public RouteCandidate(String providerRouteId, double travelMinutes, double distanceMeters,
+                          List<HazardLocation.GeoPoint> geometry,List<NavigationStep> navigationSteps) {
         this.providerRouteId = providerRouteId;
         this.travelMinutes = travelMinutes;
         this.distanceMeters = distanceMeters;
         this.geometry = new ArrayList<>(geometry);
+        this.navigationSteps = new ArrayList<>(navigationSteps);
     }
 
     public String getProviderRouteId() { return providerRouteId; }
     public double getTravelMinutes() { return travelMinutes; }
     public double getDistanceMeters() { return distanceMeters; }
     public List<HazardLocation.GeoPoint> getGeometry() { return Collections.unmodifiableList(geometry); }
+    public List<NavigationStep> getNavigationSteps() { return Collections.unmodifiableList(navigationSteps); }
 }
