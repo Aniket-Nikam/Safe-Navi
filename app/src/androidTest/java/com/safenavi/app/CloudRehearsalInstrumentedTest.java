@@ -40,6 +40,8 @@ public class CloudRehearsalInstrumentedTest {
     }
     @After public void restore(){
         if(context==null)return;
+        try { if(ProductSession.isSignedIn(context))api("/api/v1/auth/logout",new JSONObject()); }
+        catch(Exception ignored) { /* Best effort: never revoke another device's sessions. */ }
         SharedPreferences.Editor editor=context.getSharedPreferences("safe_navi_session",0).edit().clear();
         for(Map.Entry<String,?> entry:oldSession.entrySet()){
             Object v=entry.getValue();String k=entry.getKey();
@@ -191,6 +193,63 @@ public class CloudRehearsalInstrumentedTest {
                 assertTrue(a.findViewById(R.id.sourceInput).isShown());
                 assertTrue(a.findViewById(R.id.destinationInput).isShown());
             });
+        }
+    }
+    @Test public void e_privatePresentationAlertsRenderFromTheCloud()throws Exception {
+        Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("presentationSeeded")));
+        JSONArray expected=access.getJSONArray("presentation_hazards");
+        assertEquals(12,expected.length());
+        JSONObject mapResponse=api("/api/v1/hazards/map",null);
+        Set<String> ids=new HashSet<>();int news=0;
+        for(Object row:iter(mapResponse.getJSONArray("hazards"))){JSONObject h=(JSONObject)row;ids.add(h.getString("id"));if("NEWS_VERIFIED".equals(h.optString("source")))news++;}
+        for(int i=0;i<expected.length();i++)assertTrue("Missing published sample",ids.contains(expected.getString(i)));
+        assertTrue("News replay markers must have source records",news>=2);
+        try(ActivityScenario<MapsActivity> scenario=ActivityScenario.launch(new Intent(context,MapsActivity.class))){
+            until(scenario,a->{try{
+                org.maplibre.android.maps.Style style=(org.maplibre.android.maps.Style)field(a,"mapStyle");
+                Map<?,?> loaded=(Map<?,?>)field(a,"liveHazardRecords");
+                return style!=null&&style.isFullyLoaded()&&style.getLayer("verified-alert-labels")!=null&&loaded.keySet().containsAll(ids);
+            }catch(Exception error){throw new AssertionError(error);}},90);
+            scenario.onActivity(a->{try{
+                Map<?,?> loaded=(Map<?,?>)field(a,"liveHazardRecords");assertTrue(loaded.keySet().containsAll(ids));
+                assertTrue(((TextView)a.findViewById(R.id.areaCrimeButton)).getText().toString().contains(String.valueOf(ids.size())));
+                org.maplibre.android.geometry.LatLngBounds.Builder bounds=new org.maplibre.android.geometry.LatLngBounds.Builder();
+                for(Object value:loaded.values()){JSONObject h=(JSONObject)value;bounds.include(new org.maplibre.android.geometry.LatLng(h.getDouble("latitude"),h.getDouble("longitude")));}
+                float density=a.getResources().getDisplayMetrics().density;
+                ((org.maplibre.android.maps.MapLibreMap)field(a,"map")).moveCamera(org.maplibre.android.camera.CameraUpdateFactory.newLatLngBounds(bounds.build(),(int)(20*density),(int)(190*density),(int)(20*density),(int)(100*density)));
+            }catch(Exception error){throw new AssertionError(error);}});
+            android.os.SystemClock.sleep(5000);shot("cloud-presentation-alerts.png");
+            scenario.onActivity(a->a.findViewById(R.id.areaCrimeButton).performClick());
+            android.os.SystemClock.sleep(500);shot("cloud-presentation-alert-list.png");
+        }
+    }
+    @Test public void f_presentationPinsProduceThreeCloudRecommendationsInTheApp()throws Exception {
+        Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("presentationSeeded")));
+        try(ActivityScenario<MapsActivity> scenario=ActivityScenario.launch(new Intent(context,MapsActivity.class))){
+            scenario.onActivity(a->{try{
+                // Exact previously geocoded pins; real providers still supply all roads and ML scores.
+                Method select=MapsActivity.class.getDeclaredMethod("setSelectedPlace",boolean.class,PlaceSearchResult.class);select.setAccessible(true);
+                select.invoke(a,true,new PlaceSearchResult("Vashi Railway Station",19.0637159,73.0002509));
+                select.invoke(a,false,new PlaceSearchResult("SIES GST, Nerul",19.042644,73.023428));
+                a.findViewById(R.id.findRouteButton).performClick();
+            }catch(Exception error){throw new AssertionError(error);}});
+            until(scenario,a->{try{
+                org.maplibre.android.maps.Style style=(org.maplibre.android.maps.Style)field(a,"mapStyle");
+                return field(a,"displayedRoute")!=null&&style!=null&&style.isFullyLoaded()
+                    &&((TextView)a.findViewById(R.id.routeRiskSummary)).getText().toString().startsWith("3 recommended roads.");
+            }catch(Exception error){throw new AssertionError(error);}},150);
+            scenario.onActivity(a->{try{
+                assertFalse("This must be the live cloud, not the offline graph",(Boolean)field(a,"displayedOffline"));
+                assertTrue(((TextView)a.findViewById(R.id.routeResultRisk)).getText().toString().contains("ML safe-route-linear"));
+                org.maplibre.android.maps.Style style=(org.maplibre.android.maps.Style)field(a,"mapStyle");
+                for(String suffix:new String[]{"fastest","balanced","safest"})assertNotNull(style.getLayer("safe-navi-route-options-"+suffix));
+                assertTrue(a.findViewById(R.id.fastestRecommendation).isShown());
+                assertTrue(a.findViewById(R.id.balancedRecommendation).isShown());
+                assertTrue(a.findViewById(R.id.safestRecommendation).isShown());
+            }catch(Exception error){throw new AssertionError(error);}});
+            android.os.SystemClock.sleep(5000);shot("cloud-presentation-three-routes.png");
+            scenario.onActivity(a->a.findViewById(R.id.findRouteButton).performClick());
+            android.os.SystemClock.sleep(500);shot("cloud-presentation-route-choices.png");
         }
     }
     private static List<Object> iter(JSONArray values)throws JSONException{
