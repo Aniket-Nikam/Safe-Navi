@@ -231,8 +231,9 @@ public class CloudRehearsalInstrumentedTest {
             android.os.SystemClock.sleep(500);shot("cloud-presentation-alert-list.png");
         }
     }
-    @Test public void f_presentationPinsProduceThreeCloudRecommendationsInTheApp()throws Exception {
+    @Test public void f_presentationPinsUseCloudRecommendationsAndVisibleColors()throws Exception {
         Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("presentationSeeded")));
+        int expectedRoads=Integer.parseInt(InstrumentationRegistry.getArguments().getString("expectedPresentationRoads","3"));
         try(ActivityScenario<MapsActivity> scenario=ActivityScenario.launch(new Intent(context,MapsActivity.class))){
             scenario.onActivity(a->{try{
                 // Exact previously geocoded pins; real providers still supply all roads and ML scores.
@@ -244,13 +245,31 @@ public class CloudRehearsalInstrumentedTest {
             until(scenario,a->{try{
                 org.maplibre.android.maps.Style style=(org.maplibre.android.maps.Style)field(a,"mapStyle");
                 return field(a,"displayedRoute")!=null&&style!=null&&style.isFullyLoaded()
-                    &&((TextView)a.findViewById(R.id.routeRiskSummary)).getText().toString().startsWith("3 recommended roads.");
+                    &&((TextView)a.findViewById(R.id.routeRiskSummary)).getText().toString().startsWith(expectedRoads+" recommended roads.");
             }catch(Exception error){throw new AssertionError(error);}},150);
             scenario.onActivity(a->{try{
                 assertFalse("This must be the live cloud, not the offline graph",(Boolean)field(a,"displayedOffline"));
                 assertTrue(((TextView)a.findViewById(R.id.routeResultRisk)).getText().toString().contains("ML safe-route-linear"));
                 org.maplibre.android.maps.Style style=(org.maplibre.android.maps.Style)field(a,"mapStyle");
-                for(String suffix:new String[]{"fastest","balanced","safest"})assertNotNull(style.getLayer("safe-navi-route-options-"+suffix));
+                String[] suffixes={"fastest","balanced","safest"};
+                int[] colors={0xFF2563EB,0xFF7C3AED,0xFF00796B};
+                int[] buttons={R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation};
+                int drawn=0;
+                for(int i=0;i<suffixes.length;i++) {
+                    org.maplibre.android.style.layers.LineLayer line=style.getLayerAs("safe-navi-route-options-"+suffixes[i]);
+                    org.maplibre.android.style.layers.LineLayer casing=style.getLayerAs("safe-navi-route-options-"+suffixes[i]+"-casing");
+                    if(line!=null){drawn++;assertNotNull(casing);
+                        assertTrue(line.getLineColorAsInt()==colors[i]||line.getLineColorAsInt()==0xFF526C85);
+                        assertEquals(android.graphics.Color.WHITE,casing.getLineColorAsInt());
+                        assertEquals(line.getLineWidth().getValue()+4f,casing.getLineWidth().getValue(),.01f);}
+                    assertTrue(a.findViewById(buttons[i]).performClick());
+                    int selected=0;
+                    for(String name:suffixes){org.maplibre.android.style.layers.LineLayer highlighted=style.getLayerAs("safe-navi-route-options-"+name);
+                        if(highlighted!=null&&Math.abs(highlighted.getLineWidth().getValue()-8f)<.01f)selected++;}
+                    assertEquals("Exactly one physical road is highlighted",1,selected);
+                }
+                assertEquals(expectedRoads,drawn);
+                a.findViewById(R.id.balancedRecommendation).performClick();
                 assertTrue(a.findViewById(R.id.fastestRecommendation).isShown());
                 assertTrue(a.findViewById(R.id.balancedRecommendation).isShown());
                 assertTrue(a.findViewById(R.id.safestRecommendation).isShown());
@@ -259,6 +278,75 @@ public class CloudRehearsalInstrumentedTest {
             scenario.onActivity(a->a.findViewById(R.id.findRouteButton).performClick());
             android.os.SystemClock.sleep(500);shot("cloud-presentation-route-choices.png");
         }
+    }
+    @Test public void g_officialCanInspectExplicitFloodPassabilityControls()throws Exception {
+        Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("floodPassability")));
+        JSONObject official=access.getJSONArray("accounts").getJSONObject(1);
+        api("/api/v1/auth/logout",new JSONObject());
+        JSONObject signed=api("/api/v1/auth/login",new JSONObject().put("email",official.getString("email")).put("password",official.getString("password")));
+        JSONObject user=signed.getJSONObject("user");assertEquals("government",user.getString("role"));
+        ProductSession.save(context,signed.getString("access_token"),user.getString("id"),user.getString("name"),user.getString("email"),user.getString("role"));
+        String hazardId=access.getString("presentation_flood_hazard");
+        try(ActivityScenario<MapsActivity> scenario=ActivityScenario.launch(new Intent(context,MapsActivity.class))){
+            until(scenario,a->{try{return ((Map<?,?>)field(a,"liveHazardRecords")).containsKey(hazardId);}catch(Exception error){throw new AssertionError(error);}},90);
+            scenario.onActivity(a->{try{
+                JSONObject record=(JSONObject)((Map<?,?>)field(a,"liveHazardRecords")).get(hazardId);
+                assertTrue(record.getBoolean("routing_blocked"));assertEquals("IMPASSABLE",record.getString("passability"));
+                Method show=MapsActivity.class.getDeclaredMethod("showHazard",String.class);show.setAccessible(true);show.invoke(a,hazardId);
+            }catch(Exception error){throw new AssertionError(error);}});
+            RouteActionsInstrumentedTest.tap("Update official hazard lifecycle");
+            RouteActionsInstrumentedTest.tap("Keep active");
+            RouteActionsInstrumentedTest.visible("Impassable (exclude road)");
+            shot("cloud-flood-official-controls.png");
+            RouteActionsInstrumentedTest.tap("Impassable (exclude road)");
+            RouteActionsInstrumentedTest.visible("Not confirmed (exclude road)");
+            RouteActionsInstrumentedTest.visible("Inspected: passable with caution");
+            RouteActionsInstrumentedTest.tap("Impassable (exclude road)");
+            RouteActionsInstrumentedTest.tap("Cancel"); // Read-only UI check: never submit a false inspection.
+        }
+    }
+    @Test public void h_officialPublishedReportsOpenMapAndPendingReportsOpenPublishForm()throws Exception {
+        JSONObject official=access.getJSONArray("accounts").getJSONObject(1);
+        api("/api/v1/auth/logout",new JSONObject());
+        JSONObject signed=api("/api/v1/auth/login",new JSONObject().put("email",official.getString("email")).put("password",official.getString("password")));
+        JSONObject user=signed.getJSONObject("user");assertEquals("government",user.getString("role"));
+        ProductSession.save(context,signed.getString("access_token"),user.getString("id"),user.getString("name"),user.getString("email"),user.getString("role"));
+        JSONArray reports=api("/api/v1/reports",null).getJSONArray("items");
+        int hazardCount=api("/api/v1/hazards/map",null).getJSONArray("hazards").length();
+        JSONObject published=null,pending=null;
+        for(Object item:iter(reports)) {
+            JSONObject report=(JSONObject)item;
+            if("VERIFIED".equals(report.optString("status"))&&published==null)published=report;
+            if("REPORTED".equals(report.optString("status"))&&pending==null)pending=report;
+        }
+        assertNotNull(published);assertNotNull(pending);
+        final JSONObject selected=published,awaiting=pending;
+        AtomicReference<Intent> opened=new AtomicReference<>();
+        android.app.Instrumentation.ActivityMonitor monitor=new android.app.Instrumentation.ActivityMonitor(){
+            @Override public android.app.Instrumentation.ActivityResult onStartActivity(Intent intent){
+                if(intent.getComponent()!=null&&MapsActivity.class.getName().equals(intent.getComponent().getClassName())) {
+                    opened.set(new Intent(intent));return new android.app.Instrumentation.ActivityResult(0,null);
+                } return null;
+            }
+        };
+        InstrumentationRegistry.getInstrumentation().addMonitor(monitor);
+        try(ActivityScenario<GovernmentSafetyDashboardActivity> scenario=ActivityScenario.launch(new Intent(context,GovernmentSafetyDashboardActivity.class))){
+            until(scenario,a->{try{return field(a,"currentReport")!=null;}catch(Exception error){throw new AssertionError(error);}},40);
+            scenario.onActivity(a->{try{
+                Field f=a.getClass().getDeclaredField("currentReport");f.setAccessible(true);f.set(a,selected);invoke(a,"renderCurrentReport");
+                Button action=a.findViewById(R.id.verifyReportButton);
+                assertTrue(action.isEnabled());assertEquals("View published hazard on map",action.getText().toString());action.performClick();
+                assertNotNull(opened.get());assertEquals(selected.optString("linked_hazard_id"),opened.get().getStringExtra("focus_hazard_id"));
+                f.set(a,awaiting);invoke(a,"renderCurrentReport");
+                assertTrue(action.isEnabled());assertEquals("Verify and publish hazard",action.getText().toString());action.performClick();
+            }catch(Exception error){throw new AssertionError(error);}});
+            RouteActionsInstrumentedTest.visible("Publish verified hazard");
+            RouteActionsInstrumentedTest.tap("Cancel");
+            scenario.onActivity(a->a.findViewById(R.id.browseGovernmentHazardsButton).performClick());
+            RouteActionsInstrumentedTest.visible("Published hazards · "+hazardCount);
+            shot("official-hazard-browser-1.8.4.png");
+            RouteActionsInstrumentedTest.tap("Close");
+        } finally { InstrumentationRegistry.getInstrumentation().removeMonitor(monitor); }
     }
     private static List<Object> iter(JSONArray values)throws JSONException{
         List<Object> result=new ArrayList<>();for(int i=0;i<values.length();i++)result.add(values.get(i));return result;

@@ -28,6 +28,7 @@
         </LinearLayout>
         <Spinner android:id="@+id/governmentQueueSpinner" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="56dp" android:layout_marginTop="10dp" android:background="@color/surface" android:popupBackground="@color/surface" />
         <com.google.android.material.button.MaterialButton android:id="@+id/filterGovernmentQueueButton" style="@style/Widget.SafeNavi.DashboardAction" android:layout_marginTop="8dp" android:text="Filter reports" />
+        <com.google.android.material.button.MaterialButton android:id="@+id/browseGovernmentHazardsButton" style="@style/Widget.SafeNavi.DashboardAction" android:layout_marginTop="8dp" android:text="Browse published hazards" />
         <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" app:cardBackgroundColor="@color/surface" app:cardCornerRadius="22dp" app:cardElevation="2dp" app:strokeColor="@color/divider" app:strokeWidth="1dp">
             <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
                 <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">

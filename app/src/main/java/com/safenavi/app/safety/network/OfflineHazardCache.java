@@ -36,11 +36,12 @@ public final class OfflineHazardCache {
             JSONObject h=hazards.optJSONObject(i); if (h == null) continue;
             if(expired(h,System.currentTimeMillis()))continue;
             String status=h.optString("status", "ACTIVE");
-            if (!"ACTIVE".equals(status) && !"MONITORING".equals(status)) continue;
+            if (!"ACTIVE".equals(status) && !"MONITORING".equals(status) && !"VERIFIED".equals(status)) continue;
             boolean closed="CLOSED".equals(h.optString("road_status"));
-            if (!closed && !("CRITICAL".equals(h.optString("severity")) && "UNSAFE".equals(h.optString("road_status")))) continue;
-            double radius=h.optDouble("no_go_radius_m", closed ? 60 : 40);
-            if (!Double.isFinite(radius) || radius <= 0) radius=closed ? 60 : 40;
+            if (!com.safenavi.app.safety.service.HazardPassability.restricted(h)) continue;
+            double defaultRadius=closed||com.safenavi.app.safety.service.HazardPassability.isFlood(h)?60:40;
+            double radius=h.optDouble("no_go_radius_m", defaultRadius);
+            if (!Double.isFinite(radius) || radius <= 0) radius=defaultRadius;
             JSONArray geometry=h.optJSONArray("geometry_coordinates"); List<double[]> points=new ArrayList<>();
             boolean polygon="POLYGON".equals(h.optString("geometry_type"));
             if (!"POINT".equals(h.optString("geometry_type", "POINT")) && geometry != null) for (int j=0; j<geometry.length(); j++) {

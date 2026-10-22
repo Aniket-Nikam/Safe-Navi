@@ -77,6 +77,11 @@ public class NavigationInstrumentedTest {
                 assertEquals(selected.getRoute().getGeometry().size(),engine.get().route.getGeometry().size());
                 assertEquals(selected.getRoute().getNavigationSteps().size(),engine.get().route.getNavigationSteps().size());
                 assertNotNull(((Style)get(active,"style")).getLayer("navigation-position"));
+                org.maplibre.android.style.layers.LineLayer line=((Style)get(active,"style")).getLayerAs("navigation-route-line");
+                org.maplibre.android.style.layers.LineLayer casing=((Style)get(active,"style")).getLayerAs("navigation-route-outline");
+                assertEquals("Navigation must retain the selected preference palette",com.safenavi.app.safety.presentation.RouteColors.forProfileName(((org.json.JSONObject)get(active,"snapshot")).optString("profile")),line.getLineColorAsInt());
+                assertEquals(android.graphics.Color.WHITE,casing.getLineColorAsInt());
+                assertEquals(8f,line.getLineWidth().getValue(),.01f);
             }catch(Exception error){throw new AssertionError(error);}});
             SystemClock.sleep(2200);assertTrue(engine.get().progress()>0);
             RouteActionsInstrumentedTest.tap("Pause");double paused=engine.get().progress();SystemClock.sleep(1400);assertEquals(paused,engine.get().progress(),.01);

@@ -42,7 +42,7 @@ public final class RouteUserSummary {
     public static String alerts(RouteSafetyResult result) {
         long count = result.getRiskPoints().stream().filter(point -> point.isVerified()).count();
         return count == 0 ? "No official alerts found along this route. Stay aware of your surroundings."
-                : count + (count == 1 ? " official alert" : " official alerts") + " along this route. Tap a red pin for details.";
+                : count + (count == 1 ? " official alert" : " official alerts") + " along this route. Tap an alert pin for details.";
     }
 
     /** Universal directions link: preserves the selected A, B and mode, not Safe-Navi's road geometry. */

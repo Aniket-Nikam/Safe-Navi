@@ -87,7 +87,12 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         });
         findViewById(R.id.filterGovernmentQueueButton).setOnClickListener(v -> showQueueFilters());
         triageButton.setOnClickListener(v -> triage());
-        verifyButton.setOnClickListener(v -> showVerificationDialog());
+        verifyButton.setOnClickListener(v -> {
+            if (currentReport != null && "VERIFIED".equals(currentReport.optString("status")))
+                openPublishedHazard(currentReport.optString("linked_hazard_id"));
+            else showVerificationDialog();
+        });
+        findViewById(R.id.browseGovernmentHazardsButton).setOnClickListener(v -> browsePublishedHazards());
         rejectButton.setOnClickListener(v -> reject());
         assignButton.setOnClickListener(v -> showAssignmentDialog());
         requestInfoButton.setOnClickListener(v -> showInformationDialog());
@@ -206,13 +211,49 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         reportMeta.setText(currentReport.optString("category_key").replace('_', ' ') + " · "
                 + currentReport.optString("address") + "\n" + currentReport.optString("description"));
         setActions(true);
+        verifyButton.setText("Verify and publish hazard");
         triageButton.setEnabled(status.equals("REPORTED"));
         triageButton.setText(status.equals("REPORTED") ? "Start review" : "Review already started");
         boolean finalState = status.equals("VERIFIED") || status.equals("REJECTED") || status.equals("DUPLICATE");
         if (finalState) { setActions(false); auditButton.setEnabled(true);
             findViewById(R.id.viewReportEvidenceButton).setEnabled(true);
             findViewById(R.id.reportConversationButton).setEnabled(true);
+            if ("VERIFIED".equals(status)) {
+                verifyButton.setText("View published hazard on map");
+                verifyButton.setEnabled(true);
+            } else verifyButton.setText("Report already " + status.toLowerCase(Locale.US));
         }
+    }
+
+    private void openPublishedHazard(String hazardId) {
+        Intent intent = new Intent(this, MapsActivity.class);
+        if (hazardId != null && !hazardId.isEmpty() && !"null".equals(hazardId))
+            intent.putExtra("focus_hazard_id", hazardId);
+        startActivity(intent);
+    }
+
+    private void browsePublishedHazards() {
+        api.mapHazards(new ProductApiClient.ObjectCallback() {
+            @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> {
+                JSONArray hazards = value.optJSONArray("hazards");
+                if (hazards == null || hazards.length() == 0) {
+                    new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this)
+                            .setTitle("Published hazards").setMessage("No active published hazards. Choose a report awaiting review to publish a new hazard.")
+                            .setPositiveButton("Close", null).show(); return;
+                }
+                String[] labels = new String[hazards.length()];
+                for (int i=0; i<hazards.length(); i++) {
+                    JSONObject hazard=hazards.optJSONObject(i);
+                    labels[i]=hazard.optString("title")+"\n"+hazard.optString("address");
+                }
+                new MaterialAlertDialogBuilder(GovernmentSafetyDashboardActivity.this)
+                        .setTitle("Published hazards · "+hazards.length())
+                        .setItems(labels,(dialog,which)->openPublishedHazard(hazards.optJSONObject(which).optString("id")))
+                        .setNegativeButton("Close",null).show();
+            }); }
+            @Override public void onError(String message) { runOnUiThread(() ->
+                    Toast.makeText(GovernmentSafetyDashboardActivity.this,message,Toast.LENGTH_LONG).show()); }
+        });
     }
 
     private boolean hasQueueFilters() {
@@ -521,6 +562,9 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         noGoRadius.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         form.addView(label("Severity")); form.addView(severity); form.addView(label("Road status")); form.addView(road);
         form.addView(label("Routing exclusion buffer")); form.addView(noGoRadius); form.addView(reason);
+        boolean flood="FLOODING".equals(currentReport.optString("category_key"));
+        Spinner passability=flood?com.safenavi.app.product.FloodPassabilityControls.add(this,form,"UNKNOWN"):null;
+        if(flood)road.setSelection(1);
         new MaterialAlertDialogBuilder(this).setTitle("Publish verified hazard").setView(scrollable(form))
                 .setNegativeButton("Cancel", null).setPositiveButton("Publish", (dialog, which) -> {
                     String note = reason.getText() == null ? "" : reason.getText().toString().trim();
@@ -530,6 +574,7 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
                                 .put("severity", severity.getSelectedItem().toString())
                                 .put("road_status", road.getSelectedItem().toString())
                                 .put("hazard_status", "ACTIVE").put("reason", note);
+                        if(passability!=null)payload.put("passability",com.safenavi.app.product.FloodPassabilityControls.value(passability));
                         String radiusText = noGoRadius.getText() == null ? "" : noGoRadius.getText().toString().trim();
                         if (!radiusText.isEmpty()) {
                             double radius = Double.parseDouble(radiusText);
@@ -584,5 +629,9 @@ public class GovernmentSafetyDashboardActivity extends AppCompatActivity {
         findViewById(R.id.viewReportEvidenceButton).setEnabled(enabled);
         findViewById(R.id.reportConversationButton).setEnabled(enabled);
     }
-    private void showError(String message) { reportTitle.setText("Operations unavailable"); reportMeta.setText(message); setActions(false); }
+    private void showError(String message) {
+        // A failed secondary request must not disable an otherwise usable report queue.
+        if (currentReport == null) { reportTitle.setText("Could not load reports"); reportMeta.setText(message); setActions(false); }
+        else Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+    }
 }

@@ -20,6 +20,7 @@ import com.safenavi.app.navigation.*;
 import com.safenavi.app.safety.model.*;
 import com.safenavi.app.safety.model.HazardLocation.GeoPoint;
 import com.safenavi.app.safety.service.RouteUserSummary;
+import com.safenavi.app.safety.presentation.RouteColors;
 import java.util.*;
 import org.json.*;
 import org.maplibre.android.MapLibre;
@@ -153,9 +154,9 @@ public class NavigationActivity extends AppCompatActivity {
     private void renderRoute() {
         List<Point> shape=new ArrayList<>(); for(GeoPoint point:progress.route.getGeometry()) shape.add(Point.fromLngLat(point.getLongitude(),point.getLatitude()));
         style.addSource(new GeoJsonSource("navigation-route",Feature.fromGeometry(LineString.fromLngLats(shape))));
-        String color="SAFEST".equals(snapshot.optString("profile"))?"#168A4A":"FASTEST".equals(snapshot.optString("profile"))?"#E53935":"#F4C430";
-        style.addLayer(new LineLayer("navigation-route-outline","navigation-route").withProperties(lineColor("#FFFFFF"),lineWidth(11f)));
-        style.addLayer(new LineLayer("navigation-route-line","navigation-route").withProperties(lineColor(color),lineWidth(7f),lineJoin(Property.LINE_JOIN_ROUND)));
+        int color=RouteColors.forProfileName(snapshot.optString("profile"));
+        style.addLayer(new LineLayer("navigation-route-outline","navigation-route").withProperties(lineColor(RouteColors.CASING),lineWidth(RouteColors.SELECTED_WIDTH+RouteColors.CASING_EXTRA_WIDTH)));
+        style.addLayer(new LineLayer("navigation-route-line","navigation-route").withProperties(lineColor(color),lineWidth(RouteColors.SELECTED_WIDTH),lineJoin(Property.LINE_JOIN_ROUND)));
         List<Feature> endpoints=new ArrayList<>();
         for(int i=0;i<2;i++) {
             GeoPoint p=progress.route.getGeometry().get(i==0?0:progress.route.getGeometry().size()-1);

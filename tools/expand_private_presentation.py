@@ -138,6 +138,9 @@ def prepare(state, accounts, official_token):
 def verify(state, official_token):
     current = api("/api/v1/hazards/map")
     ids = {h["id"] for h in current["hazards"]}
+    flood_id=next(r["hazard_id"] for r in state["reports"] if r["key"]=="sanpada-drainage")
+    flood_record=next(h for h in current["hazards"] if h["id"]==flood_id)
+    expected_vashi_roads=2 if flood_record.get("routing_blocked") else 3
     all_published = state["reports"] + state["news"] + state["extra_reports"]
     assert len(state["extra_reports"]) == 10 and len(state["pending_reports"]) == 2
     assert all(r["hazard_id"] in ids for r in all_published)
@@ -161,7 +164,7 @@ def verify(state, official_token):
             result = evaluate(case["candidates"], period)
             assert result["http_status"] == 200 and result["risk_provider"] == "trained_ml"
             if index == 0:
-                assert result["distinct_recommended_routes"] == 3, "Three-road example regressed"
+                assert result["distinct_recommended_routes"] == expected_vashi_roads, "Route count must respect the active flood restriction"
             if index == 2:
                 assert any(any(h["id"] == closure_id for h in r["blocked_by"]) for r in result["excluded_routes"])
             state["expansion_checks"].append(dict(source=case["source"], destination=case["destination"], period=period, evaluation=result))
@@ -170,7 +173,7 @@ def verify(state, official_token):
     # Also ask the road provider again; preserved candidates alone cannot prove fresh upstream availability.
     fresh = roads(state["places"]["Vashi Railway Station"], state["places"]["SIES GST, Nerul"])
     state["expansion_fresh_route"] = evaluate(fresh)
-    assert state["expansion_fresh_route"]["http_status"] == 200 and state["expansion_fresh_route"]["distinct_recommended_routes"] == 3
+    assert state["expansion_fresh_route"]["http_status"] == 200 and state["expansion_fresh_route"]["distinct_recommended_routes"] == expected_vashi_roads
     state["expansion_local_route_checks"] = []
     for first, second in (("Mumbai Central Railway Station", "Worli Sea Face"),
                           ("Airoli Railway Station", "Ghansoli Railway Station")):

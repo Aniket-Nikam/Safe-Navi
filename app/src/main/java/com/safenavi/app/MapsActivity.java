@@ -61,6 +61,9 @@ import com.safenavi.app.safety.network.OfflineRouter;
 import com.safenavi.app.safety.network.OfflineHazardCache;
 import com.safenavi.app.safety.service.RouteRecommendations;
 import com.safenavi.app.safety.service.RouteUserSummary;
+import com.safenavi.app.safety.presentation.RouteColors;
+import com.safenavi.app.safety.service.HazardPassability;
+import com.safenavi.app.product.FloodPassabilityControls;
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationServices;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
@@ -361,7 +364,7 @@ public class MapsActivity extends AppCompatActivity {
             option.setOnClickListener(v -> { routeProfile = preference; invalidateRouteForEndpoints(); });
         }
         if (mapStyle != null) {
-            for(String suffix:new String[]{"-fastest","-balanced","-safest"})removeLayerAndSource(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix);
+            clearRouteOptions();
             findViewById(R.id.routeChoices).setVisibility(View.GONE);
             removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE); removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
             removeLayerAndSource(RISK_POINTS_LAYER, RISK_POINTS_SOURCE);
@@ -370,7 +373,7 @@ public class MapsActivity extends AppCompatActivity {
     }
 
     private int routeColor(RouteProfile profile) {
-        return Color.parseColor(profile == RouteProfile.FASTEST ? "#E53935" : profile == RouteProfile.SAFEST ? "#168A4A" : "#F4C430");
+        return RouteColors.forProfile(profile);
     }
 
     private void styleRouteOption(TextView option, RouteProfile profile, boolean selected) {
@@ -827,6 +830,9 @@ public class MapsActivity extends AppCompatActivity {
                 Feature feature = Feature.fromGeometry(Point.fromLngLat(
                         hazard.getLocation().getLongitude(), hazard.getLocation().getLatitude()));
                 feature.addStringProperty("hazardId", hazard.getId());
+                JSONObject record=liveHazardRecords.get(hazard.getId());
+                int markerColor=HazardPassability.restricted(record)?Color.parseColor("#B93D36"):severityColor(severity);
+                feature.addStringProperty("markerColor",String.format(Locale.ROOT,"#%06X",markerColor&0xFFFFFF));
                 features.add(feature);
             }
             String key = severity.name().toLowerCase(Locale.US);
@@ -839,15 +845,16 @@ public class MapsActivity extends AppCompatActivity {
             mapStyle.addSource(new GeoJsonSource(sourceId, FeatureCollection.fromFeatures(features)));
             int color = severityColor(severity);
             mapStyle.addLayer(new CircleLayer(heatId, sourceId).withProperties(
-                    circleRadius(40f), circleColor(color), circleOpacity(0.16f), circleBlur(0.65f)));
+                    circleRadius(40f), circleColor(org.maplibre.android.style.expressions.Expression.get("markerColor")), circleOpacity(0.16f), circleBlur(0.65f)));
             mapStyle.addLayer(new CircleLayer(pointId, sourceId).withProperties(
-                    circleRadius(8f), circleColor(color), circleOpacity(0.95f)));
+                    circleRadius(8f), circleColor(org.maplibre.android.style.expressions.Expression.get("markerColor")), circleOpacity(0.95f)));
         }
         renderHazardGeometries();
         renderAlertLabels();
     }
 
     private String alertLabel(JSONObject record) {
+        if(HazardPassability.isFlood(record))return ("NEWS_VERIFIED".equals(record.optString("source"))?"News · ":"")+HazardPassability.floodLabel(record);
         JSONArray types=record.optJSONArray("crime_types");
         if(types!=null&&types.length()>0)return types.optString(0);
         String category=record.optString("category_key","Alert").replace('_',' ').toLowerCase(Locale.ROOT);
@@ -973,6 +980,9 @@ public class MapsActivity extends AppCompatActivity {
         detailTitle.setText(hazard.getTitle());
         detailMeta.setText(hazard.getSeverity().name() + " · " + hazard.getStatus().name()
                 + " · Government verified");
+        JSONObject record=liveHazardRecords.get(hazardId);
+        if(HazardPassability.isFlood(record))detailMeta.append("\n"+HazardPassability.floodLabel(record)+
+                (HazardPassability.restricted(record)?"\nAffected road excluded from all route preferences.":"\nOfficially marked passable; caution still applies."));
         detailReason.setText(hazard.getReason() + "\n" + hazard.getLocation().getDisplayName());
         openHazardDetailSheet();
         renderScore(hazard.getLocation().getLatitude(), hazard.getLocation().getLongitude());
@@ -990,12 +1000,22 @@ public class MapsActivity extends AppCompatActivity {
         String[] statuses = {"ACTIVE", "MONITORING", "RESOLVED", "CLOSED"};
         new MaterialAlertDialogBuilder(this).setTitle("Update verified hazard").setItems(labels, (dialog, which) -> {
             TextInputEditText reason = new TextInputEditText(this); reason.setHint("Field observation or resolution evidence"); reason.setMinLines(3); reason.setPadding(48, 12, 48, 12);
-            new MaterialAlertDialogBuilder(this).setTitle(labels[which]).setView(reason).setNegativeButton("Cancel", null)
+            android.widget.LinearLayout form=sheetContent();form.addView(reason);
+            JSONObject current=liveHazardRecords.get(currentHazardId);
+            android.widget.Spinner passability=HazardPassability.isFlood(current)?FloodPassabilityControls.add(this,form,current.optString("passability","UNKNOWN")):null;
+            android.widget.Spinner road=new android.widget.Spinner(this);
+            String[] roadChoices={"CAUTION","CLOSED","UNSAFE","SAFE","WORK_REQUIRED"};
+            if(passability!=null){road.setAdapter(new android.widget.ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,roadChoices));
+                for(int i=0;i<roadChoices.length;i++)if(roadChoices[i].equals(current.optString("road_status")))road.setSelection(i);
+                form.addView(sheetText("Road status (a closure always overrides passability)",13));form.addView(road);}
+            android.widget.ScrollView scroll=new android.widget.ScrollView(this);scroll.addView(form);
+            new MaterialAlertDialogBuilder(this).setTitle(labels[which]).setView(scroll).setNegativeButton("Cancel", null)
                     .setPositiveButton("Save audited update", (d,w) -> {
                         String note = reason.getText() == null ? "" : reason.getText().toString().trim();
                         if (note.length() < 3) { Toast.makeText(this, "Add an audit reason.", Toast.LENGTH_LONG).show(); return; }
                         try {
                             JSONObject payload = new JSONObject().put("status", statuses[which]).put("reason", note);
+                            if(passability!=null)payload.put("passability",FloodPassabilityControls.value(passability)).put("road_status",roadChoices[road.getSelectedItemPosition()]);
                             if ("RESOLVED".equals(statuses[which])) payload.put("road_status", "SAFE");
                             new ProductApiClient(this).updateHazard(currentHazardId, payload, new ProductApiClient.ObjectCallback() {
                                 @Override public void onSuccess(JSONObject value) { runOnUiThread(() -> { Toast.makeText(MapsActivity.this, "Hazard lifecycle updated", Toast.LENGTH_SHORT).show(); detailCard.setVisibility(View.GONE); loadHazards(); }); }
@@ -1161,7 +1181,7 @@ public class MapsActivity extends AppCompatActivity {
                     result.getRoute().getTravelMinutes(), result.getRiskExposure()));
         }
         comparison.append(objectives).append("Scores express different preferences, not different safety predictions. Same road = same time and exposure.\n")
-                .append("Distinct roads: red Fastest, yellow Balanced, green Safest. A road shared by preferences is drawn once in slate blue, not as artificial parallel routes. A = start, B = destination. Safest means lowest assessed exposure among available evaluated roads, not guaranteed safety.");
+                .append("Distinct roads: blue Fastest, violet Balanced, teal Safest. White outlines separate routes from map streets. A road shared by preferences is drawn once: the selected preference supplies its colour; unselected shared roads use slate blue. A = start, B = destination. Safest means lowest assessed exposure among available evaluated roads, not guaranteed safety.");
         routeResultRisk.setText(comparison.toString());
         renderSelectedRiskPoints(best);
         renderRiskSections(best);
@@ -1533,7 +1553,7 @@ public class MapsActivity extends AppCompatActivity {
     private void renderRoutes(List<RouteCandidate> candidates, RouteCandidate selected, List<RouteSafetyResult> evaluated,
                               PlaceSearchResult source, PlaceSearchResult destination) {
         if (!hasUsableMapStyle()) return;
-        for(String suffix:new String[]{"-fastest","-balanced","-safest"})removeLayerAndSource(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix);
+        clearRouteOptions();
         removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE);
         removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
         RouteProfile[] preferences={RouteProfile.FASTEST,RouteProfile.BALANCED,RouteProfile.SAFEST};
@@ -1543,6 +1563,8 @@ public class MapsActivity extends AppCompatActivity {
             winnerCounts.put(id,winnerCounts.getOrDefault(id,0)+1);
         }
         java.util.Set<String> drawn=new java.util.HashSet<>();
+        List<LineLayer> coloredLines=new ArrayList<>();
+        LineLayer selectedLine=null;
         for(int i=0;i<preferences.length;i++){
             RouteProfile preference=preferences[i];
             RouteCandidate recommended=RouteRecommendations.rank(evaluated,preference).get(0).getRoute();
@@ -1553,12 +1575,23 @@ public class MapsActivity extends AppCompatActivity {
             Feature feature=Feature.fromGeometry(lineString(recommended));
             feature.addStringProperty("preference",profileName(preference));
             mapStyle.addSource(new GeoJsonSource(ROUTES_SOURCE+suffix,feature));
-            mapStyle.addLayer(new LineLayer(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix).withProperties(
-                lineColor(shared?Color.parseColor("#526C85"):routeColor(preference)),lineWidth(recommended.getProviderRouteId().equals(selected.getProviderRouteId())?7f:5f),
-                lineOpacity(1f),
+            boolean isSelected=id.equals(selected.getProviderRouteId());
+            float width=isSelected?RouteColors.SELECTED_WIDTH:RouteColors.ALTERNATIVE_WIDTH;
+            // Add every casing below every colored line, so an outline cannot erase
+            // another preference at a crossing. Geometry stays on the provider road.
+            mapStyle.addLayer(new LineLayer(ROUTES_LAYER+suffix+"-casing",ROUTES_SOURCE+suffix).withProperties(
+                lineColor(RouteColors.CASING),lineWidth(width+RouteColors.CASING_EXTRA_WIDTH),lineOpacity(1f),
                 org.maplibre.android.style.layers.PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
                 org.maplibre.android.style.layers.PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND)));
+            LineLayer colored=new LineLayer(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix).withProperties(
+                lineColor(isSelected?routeColor(routeProfile):shared?RouteColors.SHARED:routeColor(preference)),lineWidth(width),
+                lineOpacity(1f),
+                org.maplibre.android.style.layers.PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                org.maplibre.android.style.layers.PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND));
+            if(isSelected)selectedLine=colored;else coloredLines.add(colored);
         }
+        for(LineLayer line:coloredLines)mapStyle.addLayer(line);
+        if(selectedLine!=null)mapStyle.addLayer(selectedLine);
 
         renderHazards();
         renderEndpoint("start", "A", source, "#08735C");
@@ -1673,6 +1706,15 @@ public class MapsActivity extends AppCompatActivity {
             points.add(Point.fromLngLat(point.getLongitude(), point.getLatitude()));
         }
         return LineString.fromLngLats(points);
+    }
+
+    private void clearRouteOptions() {
+        if (!hasUsableMapStyle()) return;
+        for(String suffix:new String[]{"-fastest","-balanced","-safest"}) {
+            String casing=ROUTES_LAYER+suffix+"-casing";
+            if(mapStyle.getLayer(casing)!=null)mapStyle.removeLayer(casing);
+            removeLayerAndSource(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix);
+        }
     }
 
     private void removeLayerAndSource(String layerId, String sourceId) {
@@ -1872,7 +1914,7 @@ public class MapsActivity extends AppCompatActivity {
                 removeLayerAndSource(RISK_SECTIONS_LAYER, RISK_SECTIONS_SOURCE);
                 removeLayerAndSource(SELECTED_ROUTE_LAYER, SELECTED_ROUTE_SOURCE);
                 removeLayerAndSource(ROUTES_LAYER, ROUTES_SOURCE);
-                for(String suffix:new String[]{"-fastest","-balanced","-safest"})removeLayerAndSource(ROUTES_LAYER+suffix,ROUTES_SOURCE+suffix);
+                clearRouteOptions();
             }
             for (int id : new int[]{R.id.fastestRecommendation,R.id.balancedRecommendation,R.id.safestRecommendation}) {
                 TextView option = findViewById(id);

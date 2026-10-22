@@ -240,7 +240,8 @@ def main():
     accounts = json.loads(ACCESS.read_text(encoding="utf-8"))["accounts"]
     if args.ui_handoff:
         state = json.loads(STATE.read_text(encoding="utf-8"))
-        data = {"accounts": [next(a for a in accounts if a["expected_role"] == "citizen")],
+        data = {"accounts": [next(a for a in accounts if a["expected_role"] == role) for role in ("citizen", "government")],
+                "presentation_flood_hazard": next(r["hazard_id"] for r in state["reports"] if r["key"] == "sanpada-drainage"),
                 "presentation_hazards": [r["hazard_id"] for r in state["reports"]+state["news"]+state.get("extra_reports", [])]}
         target = ROOT / "tmp/presentation-ui-handoff.private.json"
         target.parent.mkdir(exist_ok=True)

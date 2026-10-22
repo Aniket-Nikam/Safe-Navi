@@ -55,6 +55,33 @@ public class MapPresentationInstrumentedTest {
                 catch (Exception error) { throw new AssertionError(error); }
             }));
             assertTrue("Local test map style did not load", ready.await(20, TimeUnit.SECONDS));
+            // Settle the initial cloud snapshot before injecting artificial paths.
+            // Otherwise a late real hazard response correctly re-ranks the fixture.
+            final String awaiting="render-fixture-awaiting-hazards";
+            scenario.onActivity(activity -> {
+                try {
+                    Field signature=MapsActivity.class.getDeclaredField("hazardSignature");signature.setAccessible(true);signature.set(activity,awaiting);
+                    Method load=MapsActivity.class.getDeclaredMethod("loadHazards");load.setAccessible(true);load.invoke(activity);
+                } catch(Exception error) {throw new AssertionError(error);}
+            });
+            AtomicReference<Boolean> snapshotReady=new AtomicReference<>(false);
+            for(int attempt=0;attempt<160&&!snapshotReady.get();attempt++) {
+                scenario.onActivity(activity -> {
+                    try {
+                        Field signature=MapsActivity.class.getDeclaredField("hazardSignature");signature.setAccessible(true);
+                        snapshotReady.set(!awaiting.equals(signature.get(activity)));
+                    } catch(Exception error) {throw new AssertionError(error);}
+                });
+                if(!snapshotReady.get())android.os.SystemClock.sleep(250);
+            }
+            assertTrue("Initial hazard snapshot must settle before rendering a fixture",snapshotReady.get());
+            scenario.onActivity(activity -> {
+                try {
+                    Field handler=MapsActivity.class.getDeclaredField("refreshHandler");handler.setAccessible(true);
+                    Field refresh=MapsActivity.class.getDeclaredField("hazardRefresh");refresh.setAccessible(true);
+                    ((android.os.Handler)handler.get(activity)).removeCallbacks((Runnable)refresh.get(activity));
+                } catch(Exception error) {throw new AssertionError(error);}
+            });
             scenario.onActivity(activity -> {
                 try {
                     List<RouteCandidate> roads = new ArrayList<>(); List<RouteSafetyResult> evaluated = new ArrayList<>();
@@ -80,18 +107,27 @@ public class MapPresentationInstrumentedTest {
                     assertTrue(balanced.getText().toString().contains("20 min"));
                     assertTrue(safest.getText().toString().contains("22 min"));
                     String[] names={"fastest","balanced","safest"};
-                    int[] colors={android.graphics.Color.parseColor("#E53935"),android.graphics.Color.parseColor("#F4C430"),android.graphics.Color.parseColor("#168A4A")};
+                    int[] colors={android.graphics.Color.parseColor("#2563EB"),android.graphics.Color.parseColor("#7C3AED"),android.graphics.Color.parseColor("#00796B")};
                     Field layerField=MapsActivity.class.getDeclaredField("ROUTES_LAYER");layerField.setAccessible(true);
                     String layerPrefix=(String)layerField.get(null);
                     for(int i=0;i<3;i++){
                         org.maplibre.android.style.layers.LineLayer layer=mapRef.get().getStyle().getLayerAs(layerPrefix+"-"+names[i]);
                         assertNotNull(layer);assertEquals(colors[i],layer.getLineColorAsInt());
+                        org.maplibre.android.style.layers.LineLayer casing=mapRef.get().getStyle().getLayerAs(layerPrefix+"-"+names[i]+"-casing");
+                        assertNotNull("Every preference needs an outline",casing);
+                        assertEquals(android.graphics.Color.WHITE,casing.getLineColorAsInt());
+                        assertEquals(layer.getLineWidth().getValue()+4f,casing.getLineWidth().getValue(),.01f);
                         Float offset=layer.getLineOffset().getValue();
                         // Unset is MapLibre's zero-offset default; explicit zero is also valid.
                         if(offset!=null) assertEquals("Real roads must not be shifted into artificial parallel paths",0f,offset,.01f);
                     }
                     assertTrue(safest.performClick());
                     assertTrue(((TextView) activity.findViewById(R.id.routeResultTitle)).getText().toString().contains("Safest"));
+                    org.maplibre.android.style.layers.LineLayer selected=mapRef.get().getStyle().getLayerAs(layerPrefix+"-safest");
+                    assertEquals(8f,selected.getLineWidth().getValue(),.01f);
+                    List<String> order=new ArrayList<>();
+                    for(org.maplibre.android.style.layers.Layer layer:mapRef.get().getStyle().getLayers())order.add(layer.getId());
+                    assertTrue(order.indexOf(layerPrefix+"-safest")>order.indexOf(layerPrefix+"-balanced"));
                     assertNotNull(mapRef.get().getStyle().getLayer("endpoint-start-marker"));
                     assertNotNull(mapRef.get().getStyle().getLayer("endpoint-finish-marker"));
                     assertNotNull(mapRef.get().getStyle().getLayer("selected-route-risk-markers"));
@@ -134,9 +170,10 @@ public class MapPresentationInstrumentedTest {
                         new PlaceSearchResult("A · TEST",19.0657,72.9986),new PlaceSearchResult("B · TEST",19.042644,73.023428),"Test geometry","Test only");
                     org.maplibre.android.style.layers.LineLayer shared=mapRef.get().getStyle().getLayerAs("safe-navi-route-options-fastest");
                     assertNotNull("The shared road must be rendered once",shared);
-                    assertEquals(android.graphics.Color.parseColor("#526C85"),shared.getLineColorAsInt());
+                    assertEquals("A shared selected road matches the active Balanced card",android.graphics.Color.parseColor("#7C3AED"),shared.getLineColorAsInt());
                     for(String name:new String[]{"balanced","safest"}){
                         assertNull("Do not duplicate identical geometry",mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name));
+                        assertNull("Do not leave stale outlines",mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name+"-casing"));
                         assertNull(mapRef.get().getStyle().getSource("safe-navi-routes-"+name));
                     }
                     assertEquals("All three recommend the same road",((TextView)activity.findViewById(R.id.routeStatusText)).getText().toString());
@@ -154,6 +191,16 @@ public class MapPresentationInstrumentedTest {
             });
             android.os.SystemClock.sleep(2500);
             screenshot("map-shared-road-1.5.png");
+            scenario.onActivity(activity -> {
+                try {
+                    Method invalidate=MapsActivity.class.getDeclaredMethod("invalidateRouteForEndpoints");invalidate.setAccessible(true);invalidate.invoke(activity);
+                    for(String name:new String[]{"fastest","balanced","safest"}) {
+                        assertNull(mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name));
+                        assertNull(mapRef.get().getStyle().getLayer("safe-navi-route-options-"+name+"-casing"));
+                        assertNull(mapRef.get().getStyle().getSource("safe-navi-routes-"+name));
+                    }
+                } catch(Exception error) {throw new AssertionError(error);}
+            });
         }
     }
 

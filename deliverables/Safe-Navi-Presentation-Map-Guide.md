@@ -2,6 +2,12 @@
 
 Prepared 22 October 2026 for the owner's explicitly non-production academic presentation project.
 
+**Update for 1.8.3:** the flood-passability policy overrides the earlier route-count
+snapshot below. Unconfirmed or impassable Sanpada waterlogging now excludes the
+affected candidate for every preference. Do not present the old 20/25/28-minute
+three-road snapshot as current while that flood is restricted. See
+`Safe-Navi-1.8.3-Colour-and-Passability.md` for current rules and the official workflow.
+
 ## Ready on the existing cloud
 
 Twenty sample citizen reports were submitted through the two existing citizen accounts,
@@ -48,7 +54,7 @@ and the [coastal-road construction article](https://indianexpress.com/article/ci
 Their source links and original publication timestamps remain intact. Source-locality
 pins and simulated severity do not establish a current threat or real road closure.
 
-## Best example: Vashi Railway Station → SIES GST, Nerul
+## Earlier measured snapshot: Vashi Railway Station → SIES GST, Nerul
 
 Choose **Drive** and use these exact endpoints:
 
