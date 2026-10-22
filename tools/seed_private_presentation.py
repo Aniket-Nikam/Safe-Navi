@@ -241,7 +241,7 @@ def main():
     if args.ui_handoff:
         state = json.loads(STATE.read_text(encoding="utf-8"))
         data = {"accounts": [next(a for a in accounts if a["expected_role"] == "citizen")],
-                "presentation_hazards": [r["hazard_id"] for r in state["reports"]+state["news"]]}
+                "presentation_hazards": [r["hazard_id"] for r in state["reports"]+state["news"]+state.get("extra_reports", [])]}
         target = ROOT / "tmp/presentation-ui-handoff.private.json"
         target.parent.mkdir(exist_ok=True)
         target.write_text(json.dumps(data), encoding="utf-8")

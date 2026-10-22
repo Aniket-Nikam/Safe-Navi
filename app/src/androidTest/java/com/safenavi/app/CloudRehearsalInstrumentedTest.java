@@ -23,6 +23,7 @@ import java.util.function.Predicate;
 @RunWith(AndroidJUnit4.class)
 public class CloudRehearsalInstrumentedTest {
     private Context context; private JSONObject access; private String oldServer; private Map<String,?> oldSession;
+    private boolean testSessionCreated;
     @Before public void setup() throws Exception {
         Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("cloudRehearsal")));
         context=InstrumentationRegistry.getInstrumentation().getTargetContext();
@@ -37,10 +38,11 @@ public class CloudRehearsalInstrumentedTest {
         JSONObject value=api("/api/v1/auth/login",new JSONObject().put("email",account.getString("email")).put("password",account.getString("password")));
         JSONObject user=value.getJSONObject("user");
         ProductSession.save(context,value.getString("access_token"),user.getString("id"),user.getString("name"),user.getString("email"),user.getString("role"));
+        testSessionCreated=true;
     }
     @After public void restore(){
         if(context==null)return;
-        try { if(ProductSession.isSignedIn(context))api("/api/v1/auth/logout",new JSONObject()); }
+        try { if(testSessionCreated&&ProductSession.isSignedIn(context))api("/api/v1/auth/logout",new JSONObject()); }
         catch(Exception ignored) { /* Best effort: never revoke another device's sessions. */ }
         SharedPreferences.Editor editor=context.getSharedPreferences("safe_navi_session",0).edit().clear();
         for(Map.Entry<String,?> entry:oldSession.entrySet()){
@@ -78,6 +80,9 @@ public class CloudRehearsalInstrumentedTest {
     }
     private void shot(String name)throws Exception{
         InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+        android.view.accessibility.AccessibilityNodeInfo window=InstrumentationRegistry.getInstrumentation().getUiAutomation().getRootInActiveWindow();
+        assertNotNull("Screenshot requires an active app window",window);
+        assertEquals("An Android/system dialog must not cover presentation evidence",context.getPackageName(),String.valueOf(window.getPackageName()));
         android.graphics.Bitmap bitmap=InstrumentationRegistry.getInstrumentation().getUiAutomation().takeScreenshot();
         try(FileOutputStream stream=new FileOutputStream(new File(context.getExternalFilesDir(null),name))){
             bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,stream);
@@ -198,7 +203,10 @@ public class CloudRehearsalInstrumentedTest {
     @Test public void e_privatePresentationAlertsRenderFromTheCloud()throws Exception {
         Assume.assumeTrue("true".equals(InstrumentationRegistry.getArguments().getString("presentationSeeded")));
         JSONArray expected=access.getJSONArray("presentation_hazards");
-        assertEquals(12,expected.length());
+        assertTrue("Original markers and any expansion must be included",expected.length()>=12);
+        Set<String> expectedIds=new HashSet<>();
+        for(int i=0;i<expected.length();i++)expectedIds.add(expected.getString(i));
+        assertEquals("Handoff must not duplicate markers",expected.length(),expectedIds.size());
         JSONObject mapResponse=api("/api/v1/hazards/map",null);
         Set<String> ids=new HashSet<>();int news=0;
         for(Object row:iter(mapResponse.getJSONArray("hazards"))){JSONObject h=(JSONObject)row;ids.add(h.getString("id"));if("NEWS_VERIFIED".equals(h.optString("source")))news++;}
