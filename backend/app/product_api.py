@@ -148,6 +148,7 @@ class ReportMessageCreate(BaseModel):
 
 
 class NewsPublishRequest(BaseModel):
+    passability: Literal["UNKNOWN", "PASSABLE", "IMPASSABLE"] = "UNKNOWN"
     latitude: float = Field(ge=-90,le=90)
     longitude: float = Field(ge=-180,le=180)
     address: str = Field(min_length=5,max_length=500)
@@ -207,6 +208,7 @@ class HazardGeometryPoint(BaseModel):
 
 
 class ReviewDecision(BaseModel):
+    passability: Literal["UNKNOWN", "PASSABLE", "IMPASSABLE"] = "UNKNOWN"
     decision: Literal["verify", "reject", "duplicate"]
     severity: Literal["LOW", "MODERATE", "HIGH", "CRITICAL"] | None = None
     road_status: Literal["SAFE", "CAUTION", "UNSAFE", "WORK_REQUIRED", "CLOSED"] | None = None
@@ -220,6 +222,7 @@ class ReviewDecision(BaseModel):
 
 
 class HazardUpdate(BaseModel):
+    passability: Literal["UNKNOWN", "PASSABLE", "IMPASSABLE"] | None = None
     severity: Literal["LOW", "MODERATE", "HIGH", "CRITICAL"] | None = None
     road_status: Literal["SAFE", "CAUTION", "UNSAFE", "WORK_REQUIRED", "CLOSED"] | None = None
     status: Literal["ACTIVE", "MONITORING", "RESOLVED", "CLOSED"] | None = None
@@ -595,8 +598,12 @@ def map_hazards(
         raise HTTPException(422, "Invalid map bounds")
     hazards = active_hazards(bounds)  # type: ignore[arg-type]
     from .crime_labels import crime_labels
+    from .hazard_policy import restriction_reason, flood_label
     for hazard in hazards:
         hazard["crime_types"] = crime_labels(hazard)
+        hazard["routing_restriction"] = restriction_reason(hazard)
+        hazard["routing_blocked"] = hazard["routing_restriction"] is not None
+        hazard["passability_label"] = flood_label(hazard)
     return {"hazards": hazards, "count": len(hazards)}
 
 

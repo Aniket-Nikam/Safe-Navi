@@ -24,10 +24,10 @@ def publish_news(signal_id, actor, payload):
         note=payload["verification_note"].strip()
         reason=note+"\nVerified news source: "+signal["publisher"]+"\n"+signal["source_url"]
         created=db.execute("""INSERT OR IGNORE INTO hazards(id,report_id,title,category_key,description,latitude,longitude,address,
-            severity,status,road_status,reason,verified_by,source,created_at,updated_at,valid_until,geometry_type,no_go_radius_m)
-            VALUES (?,NULL,?,?,?,?,?,?,?,'ACTIVE',?,?,?,'NEWS_VERIFIED',?,?,?,'POINT',?)""",
+            severity,status,road_status,reason,verified_by,source,created_at,updated_at,valid_until,geometry_type,no_go_radius_m,passability)
+            VALUES (?,NULL,?,?,?,?,?,?,?,'ACTIVE',?,?,?,'NEWS_VERIFIED',?,?,?,'POINT',?,?)""",
             (hazard_id,signal["headline"],category,signal["summary"],payload["latitude"],payload["longitude"],payload["address"],
-             payload["severity"],payload["road_status"],reason,actor["id"],now,now,expiry,payload.get("no_go_radius_m")))
+             payload["severity"],payload["road_status"],reason,actor["id"],now,now,expiry,payload.get("no_go_radius_m"),payload.get("passability") or "UNKNOWN"))
         db.execute("INSERT OR IGNORE INTO news_hazard_links VALUES (?,?,?,?,?)",(signal_id,hazard_id,actor["id"],now,note))
         db.execute("UPDATE news_signals SET review_status='PUBLISHED',latitude=?,longitude=?,linked_hazard_id=? WHERE id=?",(payload["latitude"],payload["longitude"],hazard_id,signal_id))
         if created.rowcount:

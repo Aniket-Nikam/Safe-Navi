@@ -12,6 +12,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
+from .hazard_policy import restriction_reason
 
 
 DEFAULT_PRODUCT_DB = Path(__file__).resolve().parents[1] / "data" / "safe_navi_product.sqlite"
@@ -298,6 +299,7 @@ def _initialize_product_schema(connection) -> None:
     _ensure_column(connection, "hazards", "geometry_type TEXT NOT NULL DEFAULT 'POINT'")
     _ensure_column(connection, "hazards", "geometry_json TEXT")
     _ensure_column(connection, "hazards", "no_go_radius_m REAL")
+    _ensure_column(connection, "hazards", "passability TEXT NOT NULL DEFAULT 'UNKNOWN'")
     _ensure_column(connection, "community_comments", "parent_id TEXT REFERENCES community_comments(id)")
     _ensure_column(connection, "journeys", "checkin_interval_minutes INTEGER")
     _ensure_column(connection, "journeys", "last_checkin_at TEXT")
@@ -614,15 +616,15 @@ def decide_report(report_id: str, actor_id: str, payload: dict[str, Any]) -> dic
                 """
                 INSERT INTO hazards(id,report_id,title,category_key,description,latitude,longitude,address,
                                     severity,status,road_status,reason,verified_by,source,created_at,updated_at,valid_until,
-                                    geometry_type,geometry_json,no_go_radius_m)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'CITIZEN_REPORT',?,?,?,?,?,?)
+                                    geometry_type,geometry_json,no_go_radius_m,passability)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'CITIZEN_REPORT',?,?,?,?,?,?,?)
                 """,
                 (hazard_id, report_id, report["title"], report["category_key"], report["description"],
                  report["latitude"], report["longitude"], report["address"], payload["severity"],
                  hazard_status, payload["road_status"], payload["reason"], actor_id, now, now,
                  payload.get("valid_until"), payload.get("geometry_type") or "POINT",
                  write_json(payload.get("geometry_coordinates")) if payload.get("geometry_coordinates") else None,
-                 payload.get("no_go_radius_m")),
+                 payload.get("no_go_radius_m"), payload.get("passability") or "UNKNOWN"),
             )
             connection.execute(
                 "UPDATE reports SET status=?,linked_hazard_id=?,updated_at=? WHERE id=?",
@@ -632,7 +634,8 @@ def decide_report(report_id: str, actor_id: str, payload: dict[str, Any]) -> dic
         connection.execute(
             "INSERT INTO hazard_history VALUES (?,?,?,?,?,?,?,?,?)",
             (f"hst_{uuid.uuid4().hex}", hazard["id"] if hazard else None, report_id, actor_id,
-             f"REPORT_{new_status}", report["status"], new_status, payload["reason"], now),
+             f"REPORT_{new_status}", report["status"], new_status,
+             payload["reason"] + (" [Flood passability: " + (payload.get("passability") or "UNKNOWN") + "]" if report["category_key"] == "FLOODING" and decision == "verify" else ""), now),
         )
         decision_message = (f"{report['title']} was verified and can now affect public safety layers."
                             if new_status == "VERIFIED" else f"{report['title']} was marked {new_status.lower()}.")
@@ -652,22 +655,23 @@ def update_hazard(hazard_id: str, actor_id: str, payload: dict[str, Any]) -> dic
         new_severity = payload.get("severity") or hazard["severity"]
         new_road_status = payload.get("road_status") or hazard["road_status"]
         new_no_go_radius = payload.get("no_go_radius_m", hazard["no_go_radius_m"])
+        new_passability = payload.get("passability") or hazard["passability"] or "UNKNOWN"
         resolved_at = now if new_status in {"RESOLVED", "CLOSED"} else None
         connection.execute(
             """
             UPDATE hazards SET status=?,severity=?,road_status=?,reason=?,updated_at=?,resolved_at=?,valid_until=?,
-                               geometry_type=?,geometry_json=?,no_go_radius_m=?
+                               geometry_type=?,geometry_json=?,no_go_radius_m=?,passability=?
             WHERE id=?
             """,
             (new_status, new_severity, new_road_status, payload["reason"], now, resolved_at,
              payload.get("valid_until", hazard["valid_until"]), payload.get("geometry_type", hazard["geometry_type"]),
              write_json(payload["geometry_coordinates"]) if payload.get("geometry_coordinates") else hazard["geometry_json"],
-             new_no_go_radius, hazard_id),
+             new_no_go_radius, new_passability, hazard_id),
         )
         connection.execute(
             "INSERT INTO hazard_history VALUES (?,?,?,?,?,?,?,?,?)",
             (f"hst_{uuid.uuid4().hex}", hazard_id, hazard["report_id"], actor_id, "HAZARD_UPDATED",
-             hazard["status"], new_status, payload["reason"], now),
+             hazard["status"], new_status, payload["reason"] + (f" [Flood passability: {hazard['passability']} -> {new_passability}]" if hazard["category_key"] == "FLOODING" else ""), now),
         )
         if hazard["report_id"]:
             owner = connection.execute("SELECT citizen_id,title FROM reports WHERE id=?", (hazard["report_id"],)).fetchone()
@@ -1170,7 +1174,8 @@ def store_news_signals(values: list[dict[str, Any]]) -> int:
 
 def list_news_signals(review_status: str | None = None) -> list[dict[str, Any]]:
     query = """SELECT n.*,l.hazard_id AS published_hazard_id,h.status AS hazard_status,
-        h.severity AS hazard_severity,h.road_status AS hazard_road_status,h.valid_until AS hazard_valid_until
+        h.severity AS hazard_severity,h.road_status AS hazard_road_status,h.valid_until AS hazard_valid_until,
+        h.category_key AS hazard_category_key,h.passability AS hazard_passability
         FROM news_signals n LEFT JOIN news_hazard_links l ON l.signal_id=n.id
         LEFT JOIN hazards h ON h.id=COALESCE(l.hazard_id,n.linked_hazard_id)"""; params: list[Any] = []
     if review_status:
@@ -1187,8 +1192,9 @@ def list_news_signals(review_status: str | None = None) -> list[dict[str, Any]]:
         elif value.get("hazard_status") not in {"ACTIVE", "MONITORING", "VERIFIED"} or (
                 value.get("hazard_valid_until") and value["hazard_valid_until"] <= utc_now()):
             value["routing_effect"] = "INACTIVE"
-        elif value.get("hazard_road_status") == "CLOSED" or (
-                value.get("hazard_severity") == "CRITICAL" and value.get("hazard_road_status") == "UNSAFE"):
+        elif restriction_reason({
+                "category_key": value.get("hazard_category_key"), "severity": value.get("hazard_severity"),
+                "road_status": value.get("hazard_road_status"), "passability": value.get("hazard_passability")}):
             value["routing_effect"] = "EXCLUDES_INTERSECTING_ROUTES"
         else:
             value["routing_effect"] = "INCREASES_NEARBY_ROUTE_RISK"

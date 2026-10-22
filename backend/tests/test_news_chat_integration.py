@@ -24,8 +24,8 @@ def report(headers):
     return response.json()["id"]
 
 
-def signal():
-    assert store_news_signal(dict(headline="Flooding affects Vashi road",publisher="example.test",source_url="https://example.test/vashi-flood",summary="Current road disruption requires official checking",published_at="2026-10-18T01:00:00+00:00",location_text="Vashi",category="FLOODING",confidence=.69))
+def signal(category="FLOODING"):
+    assert store_news_signal(dict(headline="Flooding affects Vashi road",publisher="example.test",source_url="https://example.test/vashi-flood",summary="Current road disruption requires official checking",published_at="2026-10-18T01:00:00+00:00",location_text="Vashi",category=category,confidence=.69))
     return list_news_signals()[0]["id"]
 
 
@@ -71,7 +71,7 @@ def test_news_only_enters_map_and_excludes_route_after_official_publication(peop
 
 
 def test_news_severity_changes_exposure_without_an_automatic_closure(people):
-    news=signal();payload=publication();payload["road_status"]="UNSAFE"
+    news=signal("TRAFFIC");payload=publication();payload["road_status"]="UNSAFE"
     before=client.post("/api/v1/risk/route",json=routes()).json()
     assert client.post(f"/api/v1/government/news-signals/{news}/publish",headers=people["government"],json=payload).status_code==200
     after=client.post("/api/v1/risk/route",json=routes()).json()
@@ -79,6 +79,18 @@ def test_news_severity_changes_exposure_without_an_automatic_closure(people):
     assert b["crossing"]["risk_exposure"]>a["crossing"]["risk_exposure"]
     assert after["excluded_routes"]==[]
     assert client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]["routing_effect"]=="INCREASES_NEARBY_ROUTE_RISK"
+
+
+@pytest.mark.parametrize("passability", ["UNKNOWN", "IMPASSABLE", "PASSABLE"])
+def test_published_flood_news_uses_explicit_passability(people, passability):
+    news=signal();payload=publication();payload.update(road_status="CAUTION",passability=passability)
+    hazard=client.post(f"/api/v1/government/news-signals/{news}/publish",headers=people["government"],json=payload)
+    assert hazard.status_code==200 and hazard.json()["passability"]==passability
+    result=client.post("/api/v1/risk/route",json=routes()).json()
+    blocked=passability!="PASSABLE"
+    assert bool(result["excluded_routes"])==blocked
+    record=client.get("/api/v1/government/news-signals",headers=people["government"]).json()[0]
+    assert record["routing_effect"]==("EXCLUDES_INTERSECTING_ROUTES" if blocked else "INCREASES_NEARBY_ROUTE_RISK")
 
 
 def test_chat_retries_are_idempotent_and_pagination_is_case_scoped(people):

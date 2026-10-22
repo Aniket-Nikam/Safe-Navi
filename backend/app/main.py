@@ -121,7 +121,7 @@ class RouteRiskRequest(BaseModel):
 def health() -> dict:
     provider = provider_metadata()
     news = news_configuration()
-    return {"status": "ok", "database": db_path().name, "risk_provider": provider["active_provider"],
+    return {"status": "ok", "flood_passability_policy": "explicit_passable_or_excluded_v1", "database": db_path().name, "risk_provider": provider["active_provider"],
             "news_scheduler": ("external" if scheduler_mode() == "external" else "active") if configured_feeds() else "not_configured",
             "product_store": "postgresql" if database_url() else "sqlite",
             "evidence_store": backend_name(),
@@ -372,18 +372,19 @@ def route_hazard_risk(points: list[Coordinate]) -> tuple[float, list[dict]]:
 def route_no_go_conflicts(points: list[Coordinate]) -> list[dict]:
     """Find verified restrictions that must never be treated as a soft preference."""
     conflicts = []
+    from .hazard_policy import restriction_reason
     for hazard in active_hazards():
-        authoritative_closed = hazard["road_status"] == "CLOSED"
-        critical_unsafe = hazard["severity"] == "CRITICAL" and hazard["road_status"] == "UNSAFE"
-        if not authoritative_closed and not critical_unsafe:
+        restriction = restriction_reason(hazard)
+        if restriction is None:
             continue
-        default_radius = 60.0 if authoritative_closed else 40.0
+        default_radius = 40.0 if restriction == "CRITICAL_UNSAFE" else 60.0
         radius = float(hazard.get("no_go_radius_m") or default_radius)
         distance = route_geometry_distance(points, hazard)
         if distance <= radius:
             conflicts.append({
                 "id": hazard["id"], "title": hazard["title"], "severity": hazard["severity"],
                 "road_status": hazard["road_status"], "distance_meters": round(distance),
+                "passability": hazard.get("passability") or "UNKNOWN", "restriction_reason": restriction,
                 "no_go_radius_m": radius,
             })
     return conflicts
@@ -452,7 +453,7 @@ def route_risk(request: RouteRiskRequest) -> dict:
     if not results:
         raise HTTPException(status_code=409, detail={
             "code": "NO_SAFE_ALTERNATIVE",
-            "message": "Every available route intersects an authoritative closure or critical no-go area.",
+            "message": "No confirmed safe alternative: every available route intersects an authoritative closure, impassable flood or flood with unconfirmed passability.",
             "excluded_routes": excluded_routes,
         })
     model_payload = {"time_period": request.time_period, "profile": request.profile,
